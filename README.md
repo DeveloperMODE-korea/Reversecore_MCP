@@ -200,17 +200,17 @@ docker run -it \
 
 Reversecore_MCP supports integration with various MCP-compatible AI clients. Below are setup instructions for popular clients.
 
-### Example 1: Claude Desktop
+### Claude Desktop
 
-To set up Claude Desktop to use Reversecore_MCP, configure the MCP server in your Claude Desktop settings.
+Claude Desktop can connect to Reversecore_MCP using Docker. Follow these steps to configure the integration.
 
-#### Configuration Steps
+#### Quick Setup
 
-1. Open Claude Desktop
-2. Navigate to `Claude` → `Settings` → `Developer` → `Edit Config`
+1. **Open Claude Desktop**
+2. Go to **Settings** → **Developer** → **Edit Config**
 3. Add the following configuration to `claude_desktop_config.json`:
 
-**For Stdio Transport (Recommended for local use):**
+**For Stdio Transport (Recommended):**
 
 ```json
 {
@@ -234,92 +234,115 @@ To set up Claude Desktop to use Reversecore_MCP, configure the MCP server in you
 }
 ```
 
-**For HTTP Transport (Advanced - for remote/networked use):**
+**⚠️ Important:** Replace `/ABSOLUTE_PATH_TO_YOUR_SAMPLES` with your actual samples directory path.
 
-First, start the Reversecore_MCP server:
+**Example:**
+- macOS/Linux: `/Users/username/malware_samples` or `/home/username/samples`
+- Windows: `C:/Users/username/samples` (use forward slashes)
+
+#### Advanced: HTTP Transport
+
+For networked or remote usage, you can run Reversecore_MCP in HTTP mode:
+
+**Step 1:** Start the server
 
 ```bash
 docker run -d \
   -p 8000:8000 \
-  -v /path/to/your/samples:/app/workspace \
+  -v /path/to/samples:/app/workspace \
   -e REVERSECORE_WORKSPACE=/app/workspace \
   -e MCP_TRANSPORT=http \
   --name reversecore-mcp \
   reversecore-mcp
 ```
 
-Then configure Claude Desktop to connect via HTTP. Note that Claude Desktop may require additional configuration or a custom HTTP client script for HTTP transport mode. For most users, stdio mode (above) is recommended.
+**Step 2:** Configure Claude Desktop
+
+For HTTP mode, Claude Desktop requires a custom client. **For most users, stdio mode (above) is recommended.**
+
+> 📝 **Note:** HTTP mode setup is more complex and requires additional configuration. Stick with stdio mode unless you have specific networking requirements.
 
 #### Configuration File Location
 
-Alternatively, you can directly edit the configuration file at:
+You can directly edit the configuration file instead of using the UI:
 
-**macOS:**
+| Platform | Path |
+|----------|------|
+| **macOS** | `/Users/YOUR_USER/Library/Application Support/Claude/claude_desktop_config.json` |
+| **Windows** | `%APPDATA%\Claude\claude_desktop_config.json` |
+| **Linux** | `~/.config/Claude/claude_desktop_config.json` |
+
+> 💡 **Tip:** After editing, restart Claude Desktop completely for changes to take effect.
+
+#### ⚠️ Important Security Notes
+
+- **File Access Restriction:** All files must be in `/app/workspace` (the mounted directory). Files outside this directory **cannot** be accessed for security reasons.
+- **Docker Requirement:** Ensure Docker is installed and the image is built: `docker build -t reversecore-mcp .`
+- **Absolute Paths:** Use absolute paths in the configuration, not relative paths.
+- **YARA Rules:** For read-only YARA rules, mount to `/app/rules` and set `REVERSECORE_READ_DIRS` environment variable.
+
+#### ✅ Verification
+
+After restarting Claude Desktop:
+
+1. Look for the MCP connection indicator (🔌 icon or connection status)
+2. You should see **"reversecore"** listed as an available server
+3. Test with: *"What reverse engineering tools do you have?"*
+
+**Quick Test:**
+
 ```
-/Users/YOUR_USER/Library/Application Support/Claude/claude_desktop_config.json
+"Can you identify the file type of sample.exe in my workspace?"
 ```
 
-**Windows:**
-```
-%APPDATA%\Claude\claude_desktop_config.json
-```
+#### 🔧 Troubleshooting
 
-**Linux:**
-```
-~/.config/Claude/claude_desktop_config.json
-```
+<details>
+<summary><b>Connection Failed Error</b></summary>
 
-#### Important Notes
+**Symptoms:** Claude Desktop shows "Connection failed" or cannot connect
 
-- Replace `/ABSOLUTE_PATH_TO_YOUR_SAMPLES` with the actual absolute path to your binary samples directory
-- Ensure Docker is installed and the `reversecore-mcp` image is built (run `docker build -t reversecore-mcp .`)
-- For stdio mode, Claude Desktop will automatically start/stop the container for each session
-- For HTTP mode, the server must be running before starting Claude Desktop
-- **Security**: All files must be placed in the mounted workspace directory (`/app/workspace`) for security. Files outside this directory cannot be accessed.
-- The workspace directory restriction prevents unauthorized file access and path traversal attacks
-- For read-only YARA rules, you can mount an additional directory to `/app/rules` and set `REVERSECORE_READ_DIRS` environment variable
-
-#### Verification
-
-After configuration:
-
-1. Restart Claude Desktop completely
-2. Look for the MCP server connection indicator in Claude Desktop (typically shown in the settings or as a connection status icon)
-3. You should see "reversecore" listed as an available tool server
-4. Test with a simple query: "What tools do you have available for reverse engineering?"
-5. Try analyzing a file: "Can you identify the file type of sample.exe in my workspace?"
-
-#### Troubleshooting
-
-**Issue:** Claude Desktop shows "Connection failed" or cannot connect to the MCP server
-
+**Solutions:**
 - Verify Docker is running: `docker ps`
-- Check that the image exists: `docker images | grep reversecore-mcp`
-- If the image doesn't exist, build it: `docker build -t reversecore-mcp .`
-- Review Docker logs: `docker logs reversecore-mcp` (if using HTTP mode with named container)
-- Verify the absolute path in the configuration is correct and accessible
+- Check image exists: `docker images | grep reversecore-mcp`
+- Build if missing: `docker build -t reversecore-mcp .`
+- Review logs: `docker logs reversecore-mcp` (for HTTP mode)
 
-**Issue:** "File not found" errors when trying to analyze files
+</details>
 
-- Ensure files are in the mounted workspace directory on your host system
-- Check the path mapping in the Docker command: `/host/path:/app/workspace`
-- Verify the file path uses the container path (`/app/workspace/filename`) not the host path
-- Confirm the `REVERSECORE_WORKSPACE` environment variable matches the mounted directory
+<details>
+<summary><b>File Not Found Errors</b></summary>
 
-**Issue:** Permission denied errors
+**Symptoms:** Tools return "file not found" or "outside workspace" errors
 
-- Ensure Docker has permission to access the mounted directory
-- On Linux/macOS, check directory permissions: `ls -la /path/to/your/samples`
-- On Windows, ensure the path is accessible to Docker Desktop
+**Solutions:**
+- Ensure files are in the mounted workspace directory on your host
+- Verify path mapping: `/your/host/path:/app/workspace`
+- Use container paths in queries: `/app/workspace/filename` not host paths
+- Check `REVERSECORE_WORKSPACE` environment variable
 
-### Example 2: Other MCP Clients
+</details>
 
-Reversecore_MCP follows the standard MCP protocol and should work with any MCP-compatible client. Configure the client to connect to:
+<details>
+<summary><b>Permission Denied</b></summary>
 
-- **Stdio mode**: Use the Docker command as shown in Example 1 (Claude Desktop stdio configuration)
-- **HTTP mode**: Point to `http://localhost:8000` (or your configured host/port) after starting the server with HTTP transport
+**Symptoms:** Docker cannot access the mounted directory
 
-For clients that support MCP over HTTP, ensure the Reversecore_MCP server is running in HTTP mode and accessible at the configured endpoint.
+**Solutions:**
+- On Linux/macOS: Check permissions with `ls -la /path/to/samples`
+- On Windows: Ensure Docker Desktop has access to the drive
+- Try running Docker with elevated permissions (not recommended for security)
+
+</details>
+
+### Other MCP Clients
+
+Reversecore_MCP follows the standard MCP protocol and works with any MCP-compatible client:
+
+- **Stdio mode:** Use the Docker command from the Claude Desktop setup above
+- **HTTP mode:** Connect to `http://localhost:8000` after starting the server
+
+For client-specific setup instructions, refer to your MCP client's documentation.
 
 ## Usage
 
