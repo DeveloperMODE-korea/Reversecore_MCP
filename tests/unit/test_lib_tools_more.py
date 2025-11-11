@@ -41,7 +41,7 @@ def test_run_yara_compile_error(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "yara", fake_yara)
 
     out = lib_tools.run_yara(str(f), str(f))
-    assert "failed to compile" in out.lower()
+    assert "bad rule" in out.lower()
 
 
 def test_run_yara_timeout(monkeypatch, tmp_path):

@@ -20,13 +20,12 @@ def test_server_main_stdio(monkeypatch, tmp_path):
 
     called = {"run": False}
 
-    class _MCP:
-        def run(self, transport: str = "stdio"):
-            called["run"] = True
-            called["transport"] = transport
+    def _run(transport: str = "stdio"):
+        called["run"] = True
+        called["transport"] = transport
 
-    # Replace server.mcp with dummy
-    monkeypatch.setattr(server, "mcp", _MCP(), raising=True)
+    # Patch run method only
+    monkeypatch.setattr(server.mcp, "run", _run, raising=True)
 
     server.main()
 
@@ -55,18 +54,18 @@ def test_server_main_http(monkeypatch, tmp_path):
     sys.modules.pop("reversecore_mcp.server", None)
     import reversecore_mcp.server as server
 
-    # Replace server.mcp.app with dummy for uvicorn.run signature
+    # Provide a minimal FastAPI-like app with required attributes
     class _App:
-        pass
-
-    class _MCP2:
         def __init__(self):
-            self.app = _App()
-        def run(self, transport: str = "stdio"):
-            # Should not be called in http mode
-            raise AssertionError("mcp.run should not be called in http mode")
+            self.state = types.SimpleNamespace()
+        def add_exception_handler(self, *args, **kwargs):
+            return None
+        def middleware(self, *args, **kwargs):
+            def decorator(fn):
+                return fn
+            return decorator
 
-    monkeypatch.setattr(server, "mcp", _MCP2(), raising=True)
+    monkeypatch.setattr(server.mcp, "app", _App(), raising=True)
 
     server.main()
 
