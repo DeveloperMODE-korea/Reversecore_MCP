@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from reversecore_mcp.core.security import validate_file_path
+from reversecore_mcp.core.exceptions import ValidationError
 
 
 class TestValidateFilePath:
@@ -30,7 +31,7 @@ class TestValidateFilePath:
         outside_file = workspace_dir.parent / "outside_file.txt"
         outside_file.write_text("test")
         
-        with pytest.raises(ValueError, match="outside allowed"):
+        with pytest.raises(ValidationError, match="outside allowed"):
             validate_file_path(str(outside_file))
 
     def test_nonexistent_file(self, workspace_dir, monkeypatch):
@@ -38,14 +39,14 @@ class TestValidateFilePath:
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace_dir))
         
         nonexistent = workspace_dir / "nonexistent.txt"
-        with pytest.raises(ValueError, match="Invalid file path"):
+        with pytest.raises(ValidationError, match="Invalid file path"):
             validate_file_path(str(nonexistent))
 
     def test_directory_instead_of_file(self, workspace_dir, monkeypatch):
         """Test that a directory path is rejected."""
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace_dir))
         
-        with pytest.raises(ValueError, match="does not point to a file"):
+        with pytest.raises(ValidationError, match="does not point to a file"):
             validate_file_path(str(workspace_dir))
 
     def test_symlink_outside_workspace(self, workspace_dir, tmp_path, monkeypatch):
@@ -61,7 +62,7 @@ class TestValidateFilePath:
         symlink.symlink_to(outside_file)
         
         # Should be blocked because resolved path is outside workspace
-        with pytest.raises(ValueError, match="outside allowed"):
+        with pytest.raises(ValidationError, match="outside allowed"):
             validate_file_path(str(symlink))
 
     def test_path_traversal_attack(self, workspace_dir, monkeypatch):
@@ -71,7 +72,7 @@ class TestValidateFilePath:
         # Try to access parent directory
         traversal_path = workspace_dir / ".." / ".." / "etc" / "passwd"
         
-        with pytest.raises(ValueError):
+        with pytest.raises(ValidationError):
             validate_file_path(str(traversal_path))
 
     def test_read_only_directory_access(self, workspace_dir, tmp_path, monkeypatch):
@@ -90,7 +91,7 @@ class TestValidateFilePath:
         assert result == str(rule_file.resolve())
         
         # Should fail with read_only=False
-        with pytest.raises(ValueError, match="outside allowed"):
+        with pytest.raises(ValidationError, match="outside allowed"):
             validate_file_path(str(rule_file), read_only=False)
 
     def test_workspace_attack_edge_case(self, workspace_dir, monkeypatch):
@@ -104,6 +105,6 @@ class TestValidateFilePath:
         attack_file.write_text("attack")
         
         # Should be blocked even though path starts with workspace
-        with pytest.raises(ValueError, match="outside allowed"):
+        with pytest.raises(ValidationError, match="outside allowed"):
             validate_file_path(str(attack_file))
 

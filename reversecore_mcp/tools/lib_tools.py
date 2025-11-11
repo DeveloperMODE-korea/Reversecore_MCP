@@ -149,19 +149,47 @@ def run_yara(
 
         results = []
         for match in matches:
+            # Build strings list supporting yara-python API:
+            # match.strings is a list of StringMatch; each has .identifier and .instances
+            # Each instance has .offset and .matched_data
+            formatted_strings = []
+            try:
+                for sm in getattr(match, "strings", []) or []:
+                    identifier = getattr(sm, "identifier", None)
+                    instances = getattr(sm, "instances", []) or []
+                    for inst in instances:
+                        offset = getattr(inst, "offset", None)
+                        matched_data = getattr(inst, "matched_data", None)
+                        formatted_strings.append(
+                            {
+                                "identifier": identifier,
+                                "offset": int(offset) if offset is not None else None,
+                                "matched_data": matched_data.hex() if hasattr(matched_data, "hex") and matched_data is not None else (matched_data if isinstance(matched_data, str) else None),
+                            }
+                        )
+            except Exception:
+                # Fallback: older API may return tuples (offset, identifier, data)
+                try:
+                    for t in match.strings:
+                        if not isinstance(t, (list, tuple)) or len(t) < 3:
+                            continue
+                        off, ident, data = t[0], t[1], t[2]
+                        formatted_strings.append(
+                            {
+                                "identifier": ident,
+                                "offset": int(off) if off is not None else None,
+                                "matched_data": data.hex() if hasattr(data, "hex") else (data if isinstance(data, str) else None),
+                            }
+                        )
+                except Exception:
+                    pass
+
             result = {
                 "rule": match.rule,
                 "namespace": match.namespace,
                 "tags": match.tags,
                 "meta": match.meta,
-                "strings": [
-                    {
-                        "identifier": s.identifier,
-                        "offset": s.offset,
-                        "matched_data": s.matched_data.hex() if s.matched_data else None,
-                    }
-                    for s in match.strings
-                ],
+                "strings": formatted_strings,
             }
             results.append(result)
 
