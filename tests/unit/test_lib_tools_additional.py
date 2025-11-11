@@ -3,6 +3,8 @@ Additional unit tests for tools.lib_tools with mocks.
 """
 
 import json
+import types
+import sys
 import pytest
 
 from reversecore_mcp.tools import lib_tools
@@ -33,33 +35,35 @@ def test_run_yara_formatter(monkeypatch, tmp_path):
     test_file = tmp_path / "t.bin"
     test_file.write_bytes(b"abc")
 
-    # Bypass validation
+    # Bypass validation for both file and rule
     monkeypatch.setattr(lib_tools, "validate_file_path", lambda p, read_only=False: str(test_file))
 
-    # Mock yara module and behavior
+    # Fake yara module injected into sys.modules
+    fake_yara = types.ModuleType("yara")
+
     class _Rules:
         def match(self, f, timeout=300):
             inst1 = _Inst(10, b"abc")
             sm = _SM("$a", [inst1])
             return [_Match("r1", "default", ["tag"], {"k": "v"}, [sm])]
 
-    class _Yara:
-        class Error(Exception):
-            pass
-        class TimeoutError(Exception):
-            pass
-        def compile(self, filepath):
-            return _Rules()
+    class _Error(Exception):
+        pass
+
+    class _TimeoutError(Exception):
+        pass
 
     def _compile(filepath):
         return _Rules()
 
-    # Inject yara
-    monkeypatch.setitem(__import__("builtins").__dict__, "yara", _Yara())
-    monkeypatch.setattr(_Yara, "compile", staticmethod(_compile))
+    fake_yara.compile = _compile
+    fake_yara.Error = _Error
+    fake_yara.TimeoutError = _TimeoutError
+
+    monkeypatch.setitem(sys.modules, "yara", fake_yara)
 
     out = lib_tools.run_yara(str(test_file), str(test_file))
-    # Should be JSON
+    # Should be JSON string
     data = json.loads(out)
     assert isinstance(data, list)
     assert data[0]["rule"] == "r1"

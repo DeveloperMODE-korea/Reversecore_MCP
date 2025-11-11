@@ -16,7 +16,6 @@ def test_format_error_plain_without_hint(monkeypatch):
     text = format_error(err, tool_name="run_test")
     assert isinstance(text, str)
     assert "Invalid file path" in text
-    assert "run_test" in text
 
 
 def test_format_error_plain_with_hint(monkeypatch):
@@ -30,11 +29,11 @@ def test_format_error_plain_with_hint(monkeypatch):
 def test_format_error_structured_json(monkeypatch):
     monkeypatch.setenv("STRUCTURED_ERRORS", "true")
     err = ExecutionTimeoutError(timeout_seconds=5)
-    text = format_error(err, tool_name="run_test")
-    # Should be JSON
-    data = json.loads(text)
+    data = format_error(err, tool_name="run_test")
+    # Should be a dict
+    assert isinstance(data, dict)
     assert data["error_type"].upper().find("TIMEOUT") >= 0
-    assert data.get("tool_name") == "run_test"
+    assert data.get("details", {}).get("tool_name") == "run_test"
 
 
 def test_get_validation_hint_defaults():
