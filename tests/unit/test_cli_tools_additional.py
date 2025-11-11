@@ -48,3 +48,37 @@ def test_run_strings_called_process_error(monkeypatch, tmp_path):
     monkeypatch.setattr(cli_tools, "execute_subprocess_streaming", raise_cpe)
     out = cli_tools.run_strings(str(tmp_path / "x"))
     assert "exit code" in out.lower()
+
+
+def test_run_binwalk_success(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli_tools, "validate_file_path", lambda p, read_only=False: str(tmp_path / "fw.bin"))
+    monkeypatch.setattr(cli_tools, "execute_subprocess_streaming", lambda cmd, **kw: ("BINWALK OK", 50))
+    out = cli_tools.run_binwalk(str(tmp_path / "fw.bin"))
+    assert "BINWALK" in out
+
+
+def test_run_binwalk_called_process_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli_tools, "validate_file_path", lambda p, read_only=False: str(tmp_path / "fw.bin"))
+    def raise_cpe(cmd, **kw):
+        raise subprocess.CalledProcessError(2, cmd, output="", stderr="bad arg")
+    monkeypatch.setattr(cli_tools, "execute_subprocess_streaming", raise_cpe)
+    out = cli_tools.run_binwalk(str(tmp_path / "fw.bin"))
+    assert "exit code" in out.lower()
+
+
+def test_run_radare2_success(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli_tools, "validate_file_path", lambda p, read_only=False: str(tmp_path / "a.out"))
+    monkeypatch.setattr(cli_tools, "sanitize_command_string", lambda s, allowlist=None: s)
+    monkeypatch.setattr(cli_tools, "execute_subprocess_streaming", lambda cmd, **kw: ("r2 out", 10))
+    out = cli_tools.run_radare2(str(tmp_path / "a.out"), "i")
+    assert isinstance(out, str)
+
+
+def test_run_radare2_tool_not_found(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli_tools, "validate_file_path", lambda p, read_only=False: str(tmp_path / "a.out"))
+    monkeypatch.setattr(cli_tools, "sanitize_command_string", lambda s, allowlist=None: s)
+    def raise_not_found(cmd, **kw):
+        raise ToolNotFoundError("r2")
+    monkeypatch.setattr(cli_tools, "execute_subprocess_streaming", raise_not_found)
+    out = cli_tools.run_radare2(str(tmp_path / "a.out"), "i")
+    assert "not found" in out.lower()
