@@ -142,9 +142,9 @@ docker build -t reversecore-mcp .
 
 #### Run the Server
 
-The server supports two transport modes: **stdio** (for local AI clients) and **http** (for network-based AI agents).
+Reversecore_MCP supports two transport modes, but starting with v1.1 the documentation “standard” is HTTP mode. The standard HTTP endpoint is `http://127.0.0.1:8000/mcp`.
 
-**HTTP Mode (Default in Docker):**
+**HTTP Mode (Standard/Recommended):**
 
 ```bash
 # Run with HTTP transport on port 8000
@@ -189,28 +189,60 @@ docker run -it \
 
 3. Run the server:
    ```bash
-   # Stdio mode (default)
-   python -m reversecore_mcp.server
-   
-   # HTTP mode
+   # HTTP mode (Standard)
    MCP_TRANSPORT=http python -m reversecore_mcp.server
+
+   # (Optional) Stdio mode
+   MCP_TRANSPORT=stdio python -m reversecore_mcp.server
    ```
 
 ## MCP Client Integration
 
-Reversecore_MCP supports integration with various MCP-compatible AI clients. Below are setup instructions for popular clients.
+Reversecore_MCP works with MCP-compatible clients. This guide focuses on Cursor AI and Claude Desktop, which are the most commonly used.
 
-### Example 1: Claude Desktop
+### Cursor AI setup (HTTP standard connection)
 
-To set up Claude Desktop to use Reversecore_MCP, configure the MCP server in your Claude Desktop settings.
+#### 1) Run the server
 
-#### Configuration Steps
+First, run the Reversecore_MCP server in HTTP mode.
 
-1. Open Claude Desktop
-2. Navigate to `Claude` → `Settings` → `Developer` → `Edit Config`
-3. Add the following configuration to `claude_desktop_config.json`:
+```bash
+docker run -d \
+  -p 8000:8000 \
+  -v ./my_samples:/app/workspace \
+  -e REVERSECORE_WORKSPACE=/app/workspace \
+  -e MCP_TRANSPORT=http \
+  --name reversecore-mcp \
+  reversecore-mcp
+```
 
-**For Stdio Transport (Recommended for local use):**
+If the server is running correctly, you should be able to open `http://127.0.0.1:8000/docs` in your browser.
+
+#### 2) Add the MCP server in Cursor
+
+- Cursor → Settings → Cursor Settings → MCP → Add new global MCP server
+- Add the following to `~/.cursor/mcp.json` (Windows: `C:\Users\<USER>\.cursor\mcp.json`).
+
+```json
+{
+  "mcpServers": {
+    "reversecore": {
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+To add it per-project instead, create a `.cursor/mcp.json` file in your project root with the same contents.
+
+#### 3) Verify
+
+- From the Cursor command palette or MCP panel, run “List available tools for server reversecore”
+- If you see the tools listed (e.g., “Found N tools ...”), the connection is working
+
+#### (Optional) Let Cursor manage a container/remote without running the server yourself
+
+You can register the server using `command`/`args` so that Cursor starts it for you.
 
 ```json
 {
@@ -218,15 +250,11 @@ To set up Claude Desktop to use Reversecore_MCP, configure the MCP server in you
     "reversecore": {
       "command": "docker",
       "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-v",
-        "/ABSOLUTE_PATH_TO_YOUR_SAMPLES:/app/workspace",
-        "-e",
-        "REVERSECORE_WORKSPACE=/app/workspace",
-        "-e",
-        "MCP_TRANSPORT=stdio",
+        "run", "-i", "--rm",
+        "-p", "8000:8000",
+        "-v", "E:/Reversecore_Workspace:/app/workspace",
+        "-e", "REVERSECORE_WORKSPACE=/app/workspace",
+        "-e", "MCP_TRANSPORT=http",
         "reversecore-mcp"
       ]
     }
@@ -234,21 +262,31 @@ To set up Claude Desktop to use Reversecore_MCP, configure the MCP server in you
 }
 ```
 
-**For HTTP Transport (Advanced - for remote/networked use):**
+### Claude Desktop setup
 
-First, start the Reversecore_MCP server:
+To set up Claude Desktop to use Reversecore_MCP, configure the MCP server in your Claude Desktop settings.
 
-```bash
-docker run -d \
-  -p 8000:8000 \
-  -v /path/to/your/samples:/app/workspace \
-  -e REVERSECORE_WORKSPACE=/app/workspace \
-  -e MCP_TRANSPORT=http \
-  --name reversecore-mcp \
-  reversecore-mcp
+#### Setup steps
+
+1) Run the Reversecore_MCP server in HTTP mode (same as “Run the server” above for Cursor).
+
+2) In Claude Desktop → Settings → MCP Servers (or Developer), add a new server and set the URL to `http://127.0.0.1:8000/mcp`.
+
+If you prefer to edit the settings file manually, use a configuration like the following:
+
+**HTTP Transport (standard):**
+
+```json
+{
+  "mcpServers": {
+    "reversecore": {
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
 ```
 
-Then configure Claude Desktop to connect via HTTP. Note that Claude Desktop may require additional configuration or a custom HTTP client script for HTTP transport mode. For most users, stdio mode (above) is recommended.
+Menu names and paths may vary slightly by Claude Desktop version. If there’s no UI to add an MCP server, edit the settings file directly.
 
 #### Configuration File Location
 
@@ -271,13 +309,10 @@ Alternatively, you can directly edit the configuration file at:
 
 #### Important Notes
 
-- Replace `/ABSOLUTE_PATH_TO_YOUR_SAMPLES` with the actual absolute path to your binary samples directory
-- Ensure Docker is installed and the `reversecore-mcp` image is built (run `docker build -t reversecore-mcp .`)
-- For stdio mode, Claude Desktop will automatically start/stop the container for each session
-- For HTTP mode, the server must be running before starting Claude Desktop
-- **Security**: All files must be placed in the mounted workspace directory (`/app/workspace`) for security. Files outside this directory cannot be accessed.
-- The workspace directory restriction prevents unauthorized file access and path traversal attacks
-- For read-only YARA rules, you can mount an additional directory to `/app/rules` and set `REVERSECORE_READ_DIRS` environment variable
+- Ensure Docker is installed and the `reversecore-mcp` image is built (`docker build -t reversecore-mcp .`).
+- In HTTP mode, the server must be running before the client connects.
+- Security: Analysis files must be located inside the workspace (`/app/workspace`); files outside this directory are inaccessible.
+- Read-only YARA rules can be placed under `/app/rules`, or add extra read paths via the `REVERSECORE_READ_DIRS` environment variable.
 
 #### Verification
 
@@ -312,12 +347,12 @@ After configuration:
 - On Linux/macOS, check directory permissions: `ls -la /path/to/your/samples`
 - On Windows, ensure the path is accessible to Docker Desktop
 
-### Example 2: Other MCP Clients
+### Other MCP Clients
 
 Reversecore_MCP follows the standard MCP protocol and should work with any MCP-compatible client. Configure the client to connect to:
 
-- **Stdio mode**: Use the Docker command as shown in Example 1 (Claude Desktop stdio configuration)
-- **HTTP mode**: Point to `http://localhost:8000` (or your configured host/port) after starting the server with HTTP transport
+- HTTP mode (standard): start the server in HTTP mode and point the client to `http://127.0.0.1:8000/mcp` (or your configured host/port)
+- Stdio mode: provided for local development convenience. Start with `MCP_TRANSPORT=stdio` and use a client that supports stdio transport
 
 For clients that support MCP over HTTP, ensure the Reversecore_MCP server is running in HTTP mode and accessible at the configured endpoint.
 

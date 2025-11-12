@@ -30,34 +30,39 @@ def main():
     if transport == "http":
         # HTTP transport mode for network-based AI agents
         import uvicorn
-        
-        try:
-            from slowapi import Limiter, _rate_limit_exceeded_handler
-            from slowapi.util import get_remote_address
-            from slowapi.errors import RateLimitExceeded
+        from fastapi import FastAPI
 
-            # Setup rate limiting for HTTP mode
-            rate_limit = int(os.environ.get("RATE_LIMIT", "60"))  # Default: 60 requests per minute
+        # Build a host FastAPI app with docs enabled and mount FastMCP under /mcp
+        app = FastAPI(
+            title="Reversecore_MCP",
+            docs_url="/docs",
+            redoc_url="/redoc",
+            openapi_url="/openapi.json",
+        )
+        mcp_app = mcp.http_app()
+        app.mount("/mcp", mcp_app)
+
+        # Optional: apply rate limiting if slowapi is available
+        try:
+            from slowapi import Limiter, _rate_limit_exceeded_handler  # type: ignore
+            from slowapi.util import get_remote_address  # type: ignore
+            from slowapi.errors import RateLimitExceeded  # type: ignore
+
+            rate_limit = int(os.environ.get("RATE_LIMIT", "60"))  # Default: 60 requests/min
             limiter = Limiter(key_func=get_remote_address, default_limits=[f"{rate_limit}/minute"])
-            
-            # Apply rate limiting to the FastAPI app
-            mcp.app.state.limiter = limiter
-            mcp.app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-            
-            # Apply rate limit to all routes
-            @mcp.app.middleware("http")
-            async def rate_limit_middleware(request, call_next):
-                # Apply rate limiting
-                response = await limiter.middleware(request, call_next)
-                return response
-        except ImportError:
-            # slowapi not installed, skip rate limiting
+
+            # Attach middleware and exception handler
+            @app.middleware("http")
+            async def rate_limit_middleware(request, call_next):  # pragma: no cover - integration
+                return await limiter.middleware(request, call_next)
+
+            app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+        except Exception:
+            # slowapi unavailable or version mismatch: skip gracefully
             pass
 
-        # Swagger UI is automatically available at /docs when using FastAPI
-        # FastMCP is built on FastAPI, so /docs endpoint should work out of the box
-        
-        uvicorn.run(mcp.app, host="0.0.0.0", port=8000)
+        # Run uvicorn with the FastMCP HTTP app
+        uvicorn.run(app, host="0.0.0.0", port=8000)
     else:
         # Stdio transport mode for local AI clients (default)
         # Rate limiting not needed for stdio mode (single client)
