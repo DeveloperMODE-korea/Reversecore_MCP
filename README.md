@@ -435,12 +435,43 @@ For clients that support MCP over HTTP, ensure the Reversecore_MCP server is run
 
 Reversecore_MCP is designed to enable AI agents to perform reverse engineering tasks through natural language commands. The server wraps common reverse engineering CLI tools and Python libraries, making them accessible to AI assistants for automated triage and analysis workflows.
 
+### Real-World Use Cases
+
+#### 🔍 Malware Triage
+Quickly identify suspicious files and extract indicators of compromise (IOCs):
+```
+AI Agent: "Analyze sample.exe in my workspace. What type of file is it and does it contain any suspicious strings?"
+→ Uses run_file + run_strings to identify PE executable and extract URLs, IPs, suspicious API calls
+```
+
+#### 🛡️ Security Research
+Automate detection of known malware families using YARA rules:
+```
+AI Agent: "Scan all files in workspace with my malware detection rules"
+→ Uses run_yara to match against custom rulesets and identify threats
+```
+
+#### 🔬 Binary Analysis
+Deep dive into executable structure and behavior:
+```
+AI Agent: "Disassemble the main function and identify what APIs it calls"
+→ Uses run_radare2 to disassemble code and extract function calls
+```
+
+#### 📊 Firmware Analysis
+Analyze embedded systems and extract firmware components:
+```
+AI Agent: "What file systems are embedded in this firmware image?"
+→ Uses run_binwalk to identify embedded file systems, bootloaders, etc.
+```
+
 ### API Examples
 
 The server exposes tools that can be called by AI agents via the MCP protocol. Below are examples of how to use each tool:
 
 #### 1. Identify File Type (`run_file`)
 
+**Tool Call:**
 ```json
 {
   "tool": "run_file",
@@ -455,8 +486,11 @@ The server exposes tools that can be called by AI agents via the MCP protocol. B
 PE32 executable (GUI) Intel 80386, for MS Windows
 ```
 
+**Use Case**: Initial file identification during triage
+
 #### 2. Extract Strings (`run_strings`)
 
+**Tool Call:**
 ```json
 {
   "tool": "run_strings",
@@ -474,11 +508,17 @@ PE32 executable (GUI) Intel 80386, for MS Windows
 Hello World
 GetProcAddress
 LoadLibraryA
+kernel32.dll
+http://malicious-domain.com/payload
+C:\Windows\System32\cmd.exe
 ...
 ```
 
+**Use Case**: Extract URLs, file paths, API names, debug strings for IOC extraction
+
 #### 3. Disassemble with radare2 (`run_radare2`)
 
+**Tool Call:**
 ```json
 {
   "tool": "run_radare2",
@@ -498,11 +538,24 @@ LoadLibraryA
 |   sym.main ();
 |           0x00401000      55             push rbp
 |           0x00401001      4889e5         mov rbp, rsp
+|           0x00401004      4883ec20       sub rsp, 0x20
+|           0x00401008      488d0d...      lea rcx, str.Hello_World
+|           0x0040100f      e8...          call sym.imp.printf
 ...
 ```
 
+**Use Case**: Analyze function behavior, control flow, identify malicious code patterns
+
+**Common Commands**:
+- `pdf @ main` - Disassemble main function
+- `afl` - List all functions
+- `ii` - List imports
+- `iz` - List strings in data section
+- `afi @ main` - Show function info
+
 #### 4. Scan with YARA (`run_yara`)
 
+**Tool Call:**
 ```json
 {
   "tool": "run_yara",
@@ -520,21 +573,29 @@ LoadLibraryA
   {
     "rule": "SuspiciousPE",
     "namespace": "default",
-    "tags": ["malware"],
-    "meta": {"author": "analyst"},
+    "tags": ["malware", "trojan"],
+    "meta": {"author": "analyst", "description": "Detects suspicious PE behavior"},
     "strings": [
       {
         "identifier": "$s1",
         "offset": 1024,
-        "matched_data": "48656c6c6f"
+        "matched_data": "48656c6c6f20576f726c64"
+      },
+      {
+        "identifier": "$api1",
+        "offset": 2048,
+        "matched_data": "437265617465526d6f746554687265616445"
       }
     ]
   }
 ]
 ```
 
+**Use Case**: Automated malware family detection, compliance scanning, threat hunting
+
 #### 5. Disassemble with Capstone (`disassemble_with_capstone`)
 
+**Tool Call:**
 ```json
 {
   "tool": "disassemble_with_capstone",
@@ -553,8 +614,122 @@ LoadLibraryA
 0x0:	push	rbp
 0x1:	mov	rbp, rsp
 0x4:	sub	rsp, 0x20
+0x8:	lea	rcx, [rip + 0x100]
+0xf:	call	0x200
 ...
 ```
+
+**Use Case**: Quick disassembly of specific code sections, shellcode analysis
+
+**Supported Architectures**:
+- x86 (32-bit and 64-bit)
+- ARM, ARM64
+- MIPS, PowerPC, SPARC
+- And more...
+
+#### 6. Parse Binary with LIEF (`parse_binary_with_lief`)
+
+**Tool Call:**
+```json
+{
+  "tool": "parse_binary_with_lief",
+  "arguments": {
+    "file_path": "/app/workspace/sample.exe",
+    "timeout": 300
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "format": "PE",
+  "architecture": "x86-64",
+  "entrypoint": "0x1400",
+  "sections": [
+    {
+      "name": ".text",
+      "virtual_address": "0x1000",
+      "size": 16384,
+      "entropy": 6.42
+    },
+    {
+      "name": ".data",
+      "virtual_address": "0x5000",
+      "size": 4096,
+      "entropy": 3.21
+    }
+  ],
+  "imports": [
+    {
+      "library": "kernel32.dll",
+      "functions": ["CreateFileA", "ReadFile", "WriteFile"]
+    }
+  ],
+  "exports": [],
+  "security_features": {
+    "has_nx": true,
+    "has_aslr": true,
+    "has_pie": false,
+    "has_canary": true
+  }
+}
+```
+
+**Use Case**: Extract metadata, analyze binary structure, identify security features
+
+### Natural Language Interaction
+
+When using with AI assistants, you can use natural language instead of direct API calls:
+
+**Example Conversations**:
+
+```
+User: "I have a suspicious executable called malware.exe in my workspace. 
+       Can you analyze it and tell me what it does?"
+
+AI Agent: 
+1. Uses run_file to identify file type
+2. Uses run_strings to extract IOCs
+3. Uses run_yara to check against known malware signatures
+4. Uses run_radare2 to analyze main function
+5. Provides comprehensive report with findings
+```
+
+```
+User: "Scan all PE files in my workspace for ransomware indicators"
+
+AI Agent:
+1. Lists files in workspace
+2. For each PE file:
+   - Uses run_yara with ransomware rules
+   - Uses run_strings to look for ransom notes
+   - Checks for suspicious API calls
+3. Summarizes results with risk assessment
+```
+
+```
+User: "What security features are enabled in this binary?"
+
+AI Agent:
+1. Uses parse_binary_with_lief to extract security info
+2. Reports ASLR, DEP/NX, stack canaries, code signing status
+3. Provides recommendations based on findings
+```
+
+### Best Practices
+
+#### For AI Agents
+- **Start broad, then narrow**: Use `run_file` for identification, then targeted tools
+- **Set appropriate timeouts**: Large files may need 5-10 minutes
+- **Use output limits**: Prevent overwhelming responses with `max_output_size`
+- **Combine tools**: Multiple tools provide better context than any single tool
+
+#### For Users
+- **Organize workspace**: Keep samples in organized directories
+- **Use YARA rules**: Build a library of rules for common threats
+- **Review logs**: Check logs for errors and performance issues
+- **Isolate environment**: Always analyze malware in isolated systems
 
 ## Available Tools
 
