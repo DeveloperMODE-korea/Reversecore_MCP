@@ -44,6 +44,7 @@ An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents 
 - [Development](#development)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
+- [FastMCP Cloud Support](#fastmcp-cloud-support)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -1544,6 +1545,80 @@ Feel free to:
 
 Thank you for contributing! 🙏
 
+## FastMCP Cloud Support
+
+### Overview
+
+Reversecore_MCP is currently designed for **local file system access** and is not directly compatible with FastMCP Cloud. This document explains the architectural constraints and potential solutions.
+
+### Current Architecture
+
+Reversecore_MCP uses a **local file system-based architecture**:
+- Files are accessed directly from the local filesystem
+- Docker volume mounts are used to share files with the container
+- Path validation ensures files are within the allowed workspace directory
+
+### Compatibility Issue
+
+**FastMCP Cloud** runs on cloud servers that cannot access your local filesystem:
+- ❌ Local file paths (e.g., `E:\Reversecore_Workspace\file.exe`) are not accessible
+- ❌ Docker volume mounts are not available in cloud environments
+- ❌ File upload mechanism is required for cloud deployment
+
+### Current Recommendation
+
+**Use Local Server** (Current Approach):
+- ✅ Direct access to local files
+- ✅ No file upload required
+- ✅ Better security control
+- ✅ Works offline
+
+**Configuration**:
+```bash
+# HTTP mode (local server)
+MCP_TRANSPORT=http python server.py
+
+# Cursor/Claude Desktop configuration
+# Use: http://127.0.0.1:8000/mcp
+```
+
+### Future Support
+
+FastMCP Cloud support would require:
+1. **File Upload Functionality**: Upload files to cloud server
+2. **Temporary Storage**: Manage uploaded files with TTL
+3. **File ID System**: Use file IDs instead of paths
+4. **Path Validation Updates**: Support cloud storage paths
+
+**Estimated Development Time**: 8-10 days
+
+### Detailed Analysis
+
+For a comprehensive analysis of FastMCP Cloud support, including:
+- Detailed architecture analysis
+- Implementation plan
+- Technical considerations
+- Security considerations
+- Alternative approaches
+
+See: **[FastMCP Cloud Support Report](docs/FASTMCP_CLOUD_SUPPORT.md)**
+
+### FAQ
+
+**Q: Can I use FastMCP Cloud with Reversecore_MCP?**  
+A: Not currently. The server requires local file access, which is not available in cloud environments.
+
+**Q: Will FastMCP Cloud support be added?**  
+A: It's under consideration. We're gathering user feedback to prioritize this feature.
+
+**Q: What's the best way to share Reversecore_MCP with my team?**  
+A: Currently, each team member should run a local server. FastMCP Cloud support would enable team sharing in the future.
+
+**Q: Can I analyze files stored in cloud storage (S3, GCS)?**  
+A: Not directly. You would need to download files locally first, then analyze them with the local server.
+
+---
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
@@ -1566,6 +1641,7 @@ Please review and comply with each dependency's license terms.
 ## Additional Resources
 
 ### Documentation
+- [FastMCP Cloud Support](docs/FASTMCP_CLOUD_SUPPORT.md) - Comprehensive analysis of FastMCP Cloud compatibility and implementation plan
 - [Performance Optimizations](docs/PERFORMANCE_OPTIMIZATIONS.md) - Detailed performance benchmarks and optimization techniques
 - [Python Path Setup](docs/pythonpath_setup.md) - Configuration guide for local development
 - [Performance Summary](PERFORMANCE_SUMMARY.md) - Recent performance improvements and impact
