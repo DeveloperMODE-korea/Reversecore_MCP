@@ -48,7 +48,7 @@ def setup_logging() -> None:
     Logging configuration:
     - Log level from settings (default: INFO)
     - Log format from settings (default: human-readable)
-    - Log file from settings (default: /var/log/reversecore/app.log)
+    - Log file from settings (default: /tmp/reversecore/app.log)
     - Log rotation: 100MB max size, daily rotation, keep 10 backup files
     """
     # Get configuration from settings
@@ -83,26 +83,34 @@ def setup_logging() -> None:
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 
-    # File handler with rotation
-    file_handler = RotatingFileHandler(
-        str(log_file),
-        maxBytes=100 * 1024 * 1024,  # 100MB
-        backupCount=10,
-        encoding="utf-8",
-    )
-    file_handler.setLevel(logging.DEBUG)
-
-    # Choose formatter based on LOG_FORMAT
-    if log_format == "json":
-        file_formatter = JSONFormatter()
-    else:
-        file_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+    # File handler with rotation (only if we can write to the log file)
+    try:
+        file_handler = RotatingFileHandler(
+            str(log_file),
+            maxBytes=100 * 1024 * 1024,  # 100MB
+            backupCount=10,
+            encoding="utf-8",
         )
+        file_handler.setLevel(logging.DEBUG)
 
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
+        # Choose formatter based on LOG_FORMAT
+        if log_format == "json":
+            file_formatter = JSONFormatter()
+        else:
+            file_formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+
+        file_handler.setFormatter(file_formatter)
+        logger.addHandler(file_handler)
+    except (PermissionError, OSError, IOError) as e:
+        # If we can't create or write to the log file, log to console only
+        # This is acceptable in restricted environments (e.g., AWS Lambda, read-only filesystems)
+        logger.warning(
+            f"Could not create log file handler for {log_file}: {e}. "
+            "Logging to console only."
+        )
 
     # Prevent propagation to root logger
     logger.propagate = False

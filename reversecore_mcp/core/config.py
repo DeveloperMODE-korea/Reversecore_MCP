@@ -55,7 +55,7 @@ if BaseSettings:
                 alias="LOG_LEVEL",
             )
             log_file: Path = Field(
-                default=Path("/var/log/reversecore/app.log"),
+                default=Path("/tmp/reversecore/app.log"),
                 description="Path to log file",
                 alias="LOG_FILE",
             )
@@ -139,7 +139,7 @@ if BaseSettings:
                 description="Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
             )
             log_file: Path = Field(
-                default=Path("/var/log/reversecore/app.log"),
+                default=Path("/tmp/reversecore/app.log"),
                 description="Path to log file",
             )
             log_format: str = Field(
@@ -224,7 +224,7 @@ else:
             )
             self.log_level = os.environ.get("LOG_LEVEL", "INFO")
             self.log_file = Path(
-                os.environ.get("LOG_FILE", "/var/log/reversecore/app.log")
+                os.environ.get("LOG_FILE", "/tmp/reversecore/app.log")
             )
             self.log_format = os.environ.get("LOG_FORMAT", "human")
             self.structured_errors = (
