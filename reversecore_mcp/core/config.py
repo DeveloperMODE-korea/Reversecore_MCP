@@ -117,7 +117,7 @@ if BaseSettings:
             def validate_paths(self) -> None:
                 """
                 Validate that workspace and read directories exist and are accessible.
-                
+
                 Raises:
                     ValueError: If required directories are missing or inaccessible
                 """
@@ -126,7 +126,7 @@ if BaseSettings:
                     raise ValueError(f"Workspace directory does not exist: {workspace}")
                 if not workspace.is_dir():
                     raise ValueError(f"Workspace path is not a directory: {workspace}")
-                
+
                 for read_dir in self.allowed_read_dirs:
                     if not read_dir.exists():
                         raise ValueError(f"Read directory does not exist: {read_dir}")
@@ -228,7 +228,7 @@ if BaseSettings:
             def validate_paths(self) -> None:
                 """
                 Validate that workspace and read directories exist and are accessible.
-                
+
                 Raises:
                     ValueError: If required directories are missing or inaccessible
                 """
@@ -237,7 +237,7 @@ if BaseSettings:
                     raise ValueError(f"Workspace directory does not exist: {workspace}")
                 if not workspace.is_dir():
                     raise ValueError(f"Workspace path is not a directory: {workspace}")
-                
+
                 for read_dir in self.allowed_read_dirs:
                     if not read_dir.exists():
                         raise ValueError(f"Read directory does not exist: {read_dir}")
@@ -291,7 +291,7 @@ else:
         def validate_paths(self) -> None:
             """
             Validate that workspace and read directories exist and are accessible.
-            
+
             Raises:
                 ValueError: If required directories are missing or inaccessible
             """
@@ -300,7 +300,7 @@ else:
                 raise ValueError(f"Workspace directory does not exist: {workspace}")
             if not workspace.is_dir():
                 raise ValueError(f"Workspace path is not a directory: {workspace}")
-            
+
             for read_dir in self.allowed_read_dirs:
                 if not read_dir.exists():
                     raise ValueError(f"Read directory does not exist: {read_dir}")
