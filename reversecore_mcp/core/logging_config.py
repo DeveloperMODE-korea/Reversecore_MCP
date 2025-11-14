@@ -9,7 +9,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from typing import Any, Dict
 
-from reversecore_mcp.core.config import get_settings
+from reversecore_mcp.core.settings_manager import SettingsManager
 
 
 class JSONFormatter(logging.Formatter):
@@ -52,7 +52,7 @@ def setup_logging() -> None:
     - Log rotation: 100MB max size, daily rotation, keep 10 backup files
     """
     # Get configuration from settings
-    settings = get_settings()
+    settings = SettingsManager.get()
     log_level = settings.log_level.upper()
     log_format = settings.log_format.lower()
     log_file = settings.log_file

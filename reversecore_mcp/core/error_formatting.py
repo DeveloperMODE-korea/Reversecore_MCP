@@ -4,7 +4,7 @@ Error formatting utilities for structured error responses.
 
 from typing import Any, Dict, Optional, Union
 
-from reversecore_mcp.core.config import get_settings
+from reversecore_mcp.core.settings_manager import SettingsManager
 from reversecore_mcp.core.exceptions import ReversecoreError
 
 
@@ -23,7 +23,7 @@ def format_error(
         Error message as string (default) or structured dict (if structured_errors enabled)
     """
     # Check if structured errors are enabled
-    structured = get_settings().structured_errors
+    structured = SettingsManager.get().structured_errors
 
     if isinstance(error, ReversecoreError):
         error_code = error.error_code
