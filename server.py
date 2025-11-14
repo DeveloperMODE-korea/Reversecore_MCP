@@ -2,6 +2,7 @@
 Reversecore_MCP Server
 
 This module initializes the FastMCP server and registers all available tools.
+It includes health and metrics endpoints for monitoring in HTTP mode.
 """
 
 from fastmcp import FastMCP
