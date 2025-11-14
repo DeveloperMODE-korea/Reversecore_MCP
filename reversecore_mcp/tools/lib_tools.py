@@ -12,7 +12,7 @@ from typing import Any, Dict, List
 
 from fastmcp import FastMCP
 
-from reversecore_mcp.core.config import get_settings
+from reversecore_mcp.core.settings_manager import SettingsManager
 from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_formatting import format_error, get_validation_hint
 from reversecore_mcp.core.exceptions import ValidationError
@@ -466,7 +466,7 @@ def _parse_binary_with_lief_impl(file_path: str, format: str = "json") -> Result
         validated_path = validate_file_path(file_path)
 
         # 2. Check file size (1GB limit for safety)
-        max_file_size = get_settings().lief_max_file_size
+        max_file_size = SettingsManager.get().lief_max_file_size
         file_size = Path(validated_path).stat().st_size
         if file_size > max_file_size:
             return failure(

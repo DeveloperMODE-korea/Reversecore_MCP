@@ -6,6 +6,7 @@ in a single location with type validation and default values.
 """
 
 import os
+import warnings
 from pathlib import Path
 from typing import List, Optional
 
@@ -315,24 +316,57 @@ _settings: Optional[Settings] = None
 def get_settings() -> Settings:
     """
     Get the global settings instance (singleton pattern).
+    
+    .. deprecated::
+        Use :func:`reversecore_mcp.core.settings_manager.SettingsManager.get` instead.
+        This function uses a global singleton which can cause issues with test isolation
+        and multi-tenant scenarios. The SettingsManager provides context-based settings
+        that are better suited for modern applications.
 
     Returns:
         Settings instance
     """
+    warnings.warn(
+        "get_settings() from core.config is deprecated. "
+        "Use SettingsManager.get() from core.settings_manager instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     global _settings
     if _settings is None:
         _settings = Settings()
+        # Sync with SettingsManager for consistency
+        from reversecore_mcp.core.settings_manager import SettingsManager
+        SettingsManager.set(_settings)
     return _settings
 
 
 def reload_settings() -> Settings:
     """
     Reload settings from environment (useful for testing).
+    
+    .. deprecated::
+        Use :func:`reversecore_mcp.core.settings_manager.SettingsManager.clear` followed by
+        :func:`reversecore_mcp.core.settings_manager.SettingsManager.get` instead.
+        This function manipulates global state which can cause issues with test isolation.
+        The SettingsManager provides better test isolation through context variables.
 
     Returns:
         New Settings instance
     """
+    warnings.warn(
+        "reload_settings() from core.config is deprecated. "
+        "Use SettingsManager.clear() then SettingsManager.get() from core.settings_manager instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     global _settings
     _settings = Settings()
+    
+    # Also update SettingsManager for backward compatibility
+    # This ensures code using SettingsManager.get() also picks up the new settings
+    from reversecore_mcp.core.settings_manager import SettingsManager
+    SettingsManager.set(_settings)
+    
     return _settings
 

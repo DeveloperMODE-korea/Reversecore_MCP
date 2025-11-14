@@ -14,18 +14,18 @@ import warnings
 from pathlib import Path
 from typing import List, Optional
 
-from reversecore_mcp.core.config import get_settings
+from reversecore_mcp.core.settings_manager import SettingsManager
 from reversecore_mcp.core.exceptions import ValidationError
 
 
 def _get_allowed_workspace() -> Path:
     """Get the allowed workspace directory from settings."""
-    return get_settings().allowed_workspace
+    return SettingsManager.get().allowed_workspace
 
 
 def _get_allowed_read_dirs() -> List[Path]:
     """Get the allowed read-only directories from settings."""
-    return get_settings().allowed_read_dirs
+    return SettingsManager.get().allowed_read_dirs
 
 
 # For backward compatibility, provide module-level constants

@@ -27,10 +27,18 @@ def reset_workspace_env(monkeypatch, tmp_path):
     monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
     monkeypatch.setenv("REVERSECORE_READ_DIRS", str(tmp_path / "rules"))
     
-    # Reload settings to pick up new environment variables
-    # This is critical because get_settings() uses a singleton pattern
-    from reversecore_mcp.core.config import reload_settings
-    reload_settings()
+    # Clear and reload settings to pick up new environment variables
+    # Use the new SettingsManager for better test isolation
+    from reversecore_mcp.core.settings_manager import SettingsManager
+    from reversecore_mcp.core.config import Settings
+    
+    # Clear any existing settings
+    SettingsManager.clear()
+    
+    # Create new settings with the test environment variables
+    # This ensures settings are created with the current environment
+    test_settings = Settings()
+    SettingsManager.set(test_settings)
 
     return workspace
 
