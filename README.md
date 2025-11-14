@@ -1469,7 +1469,8 @@ We welcome contributions to Reversecore_MCP! Here's how you can help:
 
 1. **Fork and Clone**:
 ```bash
-git clone https://github.com/YOUR_USERNAME/Reversecore_MCP.git
+# Fork the repository under your GitHub account first, then clone your fork
+git clone https://github.com/sjkim1127/Reversecore_MCP.git
 cd Reversecore_MCP
 ```
 
