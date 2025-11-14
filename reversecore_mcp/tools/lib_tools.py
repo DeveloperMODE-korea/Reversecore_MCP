@@ -149,19 +149,22 @@ def _run_yara_impl(
             hint="Install with: pip install yara-python"
         )
     except Exception as e:
-        # Handle yara-specific errors
-        error_type = type(e).__name__
-        if "yara" in error_type.lower():
-            if "timeout" in str(e).lower():
+        # Import yara to check exception types
+        try:
+            import yara
+            # Check if this is a YARA-specific exception
+            if hasattr(yara, 'TimeoutError') and isinstance(e, yara.TimeoutError):
                 return failure(
                     "TIMEOUT",
                     f"YARA scan timed out after {timeout} seconds"
                 )
-            elif "error" in error_type.lower():
+            elif hasattr(yara, 'Error') and isinstance(e, yara.Error):
                 return failure(
                     "YARA_ERROR",
                     f"YARA error: {str(e)}"
                 )
+        except ImportError:
+            pass
         
         # Handle validation errors
         if isinstance(e, ValidationError):
