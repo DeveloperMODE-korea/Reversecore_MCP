@@ -208,6 +208,126 @@ def run_yara(
     return result_to_string(result)
 
 
+def _disassemble_with_capstone_impl(
+    file_path: str,
+    offset: int = 0,
+    size: int = 1024,
+    arch: str = "x86",
+    mode: str = "64",
+) -> Result:
+    """
+    Internal implementation of disassemble_with_capstone that returns Result type.
+    
+    Args:
+        file_path: Path to the binary file to disassemble
+        offset: Byte offset in the file to start disassembly (default: 0)
+        size: Number of bytes to disassemble (default: 1024)
+        arch: Architecture (x86, arm, arm64) (default: x86)
+        mode: Mode (16, 32, 64, arm, thumb) (default: 64)
+    
+    Returns:
+        Result: Success with disassembly output or Failure with error details
+    """
+    try:
+        # 1. Validate parameters and file path
+        validate_tool_parameters("disassemble_with_capstone", {
+            "offset": offset,
+            "size": size
+        })
+        validated_path = validate_file_path(file_path)
+
+        # 2. Import capstone library
+        from capstone import (
+            CS_ARCH_ARM,
+            CS_ARCH_ARM64,
+            CS_ARCH_X86,
+            CS_MODE_32,
+            CS_MODE_64,
+            CS_MODE_ARM,
+            CS_MODE_THUMB,
+            Cs,
+        )
+
+        # 3. Validate architecture and mode
+        arch_map = {
+            "x86": CS_ARCH_X86,
+            "arm": CS_ARCH_ARM,
+            "arm64": CS_ARCH_ARM64,
+        }
+        
+        mode_map = {
+            "x86": {"16": CS_MODE_32, "32": CS_MODE_32, "64": CS_MODE_64},
+            "arm": {"arm": CS_MODE_ARM, "thumb": CS_MODE_THUMB},
+            "arm64": {"64": CS_MODE_64},
+        }
+
+        if arch not in arch_map:
+            supported = ", ".join(sorted(arch_map.keys()))
+            return failure(
+                "INVALID_PARAMETER",
+                f"Unsupported architecture: {arch}",
+                hint=f"Supported architectures: {supported}"
+            )
+
+        if arch not in mode_map or mode not in mode_map[arch]:
+            supported = ", ".join(sorted(mode_map.get(arch, {}).keys()))
+            return failure(
+                "INVALID_PARAMETER",
+                f"Unsupported mode '{mode}' for architecture '{arch}'",
+                hint=f"Supported modes: {supported}"
+            )
+
+        # 4. Read binary data
+        with open(validated_path, "rb") as f:
+            f.seek(offset)
+            code = f.read(size)
+
+        if not code:
+            return failure(
+                "NO_DATA",
+                f"No data read from file at offset {offset}",
+                hint="Check the offset and file size"
+            )
+
+        # 5. Disassemble
+        md = Cs(arch_map[arch], mode_map[arch][mode])
+        results = []
+        for instruction in md.disasm(code, offset):
+            results.append(
+                f"0x{instruction.address:x}:\t{instruction.mnemonic}\t{instruction.op_str}"
+            )
+
+        if not results:
+            return success("No instructions disassembled.", instruction_count=0)
+
+        return success("\n".join(results), instruction_count=len(results))
+        
+    except ImportError:
+        return failure(
+            "DEPENDENCY_MISSING",
+            "capstone library is not installed",
+            hint="Install with: pip install capstone"
+        )
+    except ValidationError as e:
+        return failure(
+            "VALIDATION_ERROR",
+            str(e),
+            hint="Ensure the file is in the workspace directory"
+        )
+    except FileNotFoundError as e:
+        return failure(
+            "FILE_NOT_FOUND",
+            f"File not found: {file_path}"
+        )
+    except Exception as e:
+        logger.exception("Unexpected error in disassemble_with_capstone")
+        return failure(
+            "INTERNAL_ERROR",
+            f"An unexpected error occurred: {str(e)}"
+        )
+
+
+@log_execution(tool_name="disassemble_with_capstone")
 @track_metrics("disassemble_with_capstone")
 def disassemble_with_capstone(
     file_path: str,
@@ -235,224 +355,8 @@ def disassemble_with_capstone(
     Raises:
         Returns error message string if execution fails (never raises exceptions)
     """
-    start_time = time.time()
-    file_name = Path(file_path).name
-
-    logger.info(
-        "Starting disassemble_with_capstone",
-        extra={"tool_name": "disassemble_with_capstone", "file_name": file_name, "arch": arch, "mode": mode},
-    )
-
-    try:
-        # Validate parameters (offset and size only, arch is validated later)
-        validate_tool_parameters("disassemble_with_capstone", {
-            "offset": offset,
-            "size": size
-        })
-        
-        # Validate file path
-        validated_path = validate_file_path(file_path)
-
-        # Import capstone (will raise ImportError if not installed)
-        try:
-            from capstone import (
-                CS_ARCH_ARM,
-                CS_ARCH_ARM64,
-                CS_ARCH_X86,
-                CS_MODE_32,
-                CS_MODE_64,
-                CS_MODE_ARM,
-                CS_MODE_THUMB,
-                Cs,
-            )
-        except ImportError:
-            execution_time = int((time.time() - start_time) * 1000)
-            logger.error(
-                "disassemble_with_capstone failed - capstone not installed",
-                extra={
-                    "tool_name": "disassemble_with_capstone",
-                    "file_name": file_name,
-                    "execution_time_ms": execution_time,
-                },
-            )
-            return format_error(
-                Exception("capstone library is not installed"),
-                tool_name="disassemble_with_capstone",
-                hint="Please install it with: pip install capstone",
-            )
-
-        # Map architecture string to capstone constant
-        arch_map = {
-            "x86": CS_ARCH_X86,
-            "arm": CS_ARCH_ARM,
-            "arm64": CS_ARCH_ARM64,
-        }
-
-        if arch not in arch_map:
-            supported_archs = ", ".join(sorted(arch_map.keys()))
-            execution_time = int((time.time() - start_time) * 1000)
-            logger.warning(
-                "disassemble_with_capstone - unsupported architecture",
-                extra={
-                    "tool_name": "disassemble_with_capstone",
-                    "file_name": file_name,
-                    "execution_time_ms": execution_time,
-                    "arch": arch,
-                },
-            )
-            return format_error(
-                ValueError(f"Unsupported architecture: {arch}. Supported: {supported_archs}"),
-                tool_name="disassemble_with_capstone",
-            )
-
-        # Map mode string to capstone constant
-        # Mode mapping depends on architecture
-        mode_map = {
-            "x86": {
-                "16": CS_MODE_32,  # x86-16 uses 32-bit mode constant
-                "32": CS_MODE_32,
-                "64": CS_MODE_64,
-            },
-            "arm": {
-                "arm": CS_MODE_ARM,
-                "thumb": CS_MODE_THUMB,
-            },
-            "arm64": {
-                "64": CS_MODE_64,  # ARM64 is always 64-bit
-            },
-        }
-
-        # Get mode constant based on architecture
-        if arch not in mode_map:
-            execution_time = int((time.time() - start_time) * 1000)
-            logger.warning(
-                "disassemble_with_capstone - invalid architecture for mode mapping",
-                extra={
-                    "tool_name": "disassemble_with_capstone",
-                    "file_name": file_name,
-                    "execution_time_ms": execution_time,
-                    "arch": arch,
-                },
-            )
-            return format_error(
-                ValueError(f"Invalid architecture for mode mapping: {arch}"),
-                tool_name="disassemble_with_capstone",
-            )
-
-        arch_mode_map = mode_map[arch]
-        if mode not in arch_mode_map:
-            supported_modes = ", ".join(sorted(arch_mode_map.keys()))
-            execution_time = int((time.time() - start_time) * 1000)
-            logger.warning(
-                "disassemble_with_capstone - unsupported mode",
-                extra={
-                    "tool_name": "disassemble_with_capstone",
-                    "file_name": file_name,
-                    "execution_time_ms": execution_time,
-                    "arch": arch,
-                    "mode": mode,
-                },
-            )
-            return format_error(
-                ValueError(f"Unsupported mode '{mode}' for architecture '{arch}'. Supported: {supported_modes}"),
-                tool_name="disassemble_with_capstone",
-            )
-
-        mode_constant = arch_mode_map[mode]
-
-        # Read binary data from file
-        with open(validated_path, "rb") as f:
-            f.seek(offset)
-            code = f.read(size)
-
-        if not code:
-            execution_time = int((time.time() - start_time) * 1000)
-            logger.warning(
-                "disassemble_with_capstone - no data read",
-                extra={
-                    "tool_name": "disassemble_with_capstone",
-                    "file_name": file_name,
-                    "execution_time_ms": execution_time,
-                    "offset": offset,
-                },
-            )
-            return format_error(
-                ValueError(f"No data read from file at offset {offset}"),
-                tool_name="disassemble_with_capstone",
-            )
-
-        # Create disassembler with selected architecture and mode
-        md = Cs(arch_map[arch], mode_constant)
-
-        # Disassemble
-        results = []
-        for instruction in md.disasm(code, offset):
-            results.append(
-                f"0x{instruction.address:x}:\t{instruction.mnemonic}\t{instruction.op_str}"
-            )
-
-        if not results:
-            execution_time = int((time.time() - start_time) * 1000)
-            logger.info(
-                "disassemble_with_capstone completed - no instructions",
-                extra={
-                    "tool_name": "disassemble_with_capstone",
-                    "file_name": file_name,
-                    "execution_time_ms": execution_time,
-                },
-            )
-            return "No instructions disassembled."
-
-        execution_time = int((time.time() - start_time) * 1000)
-        logger.info(
-            "disassemble_with_capstone completed successfully",
-            extra={
-                "tool_name": "disassemble_with_capstone",
-                "file_name": file_name,
-                "execution_time_ms": execution_time,
-                "instruction_count": len(results),
-            },
-        )
-
-        return "\n".join(results)
-
-    except (ValidationError, ValueError) as e:
-        execution_time = int((time.time() - start_time) * 1000)
-        hint = get_validation_hint(e) if isinstance(e, ValidationError) else get_validation_hint(ValueError(str(e)))
-        logger.warning(
-            "disassemble_with_capstone validation failed",
-            extra={
-                "tool_name": "disassemble_with_capstone",
-                "file_name": file_name,
-                "execution_time_ms": execution_time,
-            },
-            exc_info=True,
-        )
-        return format_error(e, tool_name="disassemble_with_capstone", hint=hint)
-    except FileNotFoundError as e:
-        execution_time = int((time.time() - start_time) * 1000)
-        logger.error(
-            "disassemble_with_capstone - file not found",
-            extra={
-                "tool_name": "disassemble_with_capstone",
-                "file_name": file_name,
-                "execution_time_ms": execution_time,
-            },
-            exc_info=True,
-        )
-        return format_error(e, tool_name="disassemble_with_capstone")
-    except Exception as e:
-        execution_time = int((time.time() - start_time) * 1000)
-        logger.error(
-            "disassemble_with_capstone unexpected error",
-            extra={
-                "tool_name": "disassemble_with_capstone",
-                "file_name": file_name,
-                "execution_time_ms": execution_time,
-            },
-            exc_info=True,
-        )
-        return format_error(e, tool_name="disassemble_with_capstone")
+    result = _disassemble_with_capstone_impl(file_path, offset, size, arch, mode)
+    return result_to_string(result)
 
 
 def _extract_sections(binary: Any) -> List[Dict[str, Any]]:
@@ -543,6 +447,85 @@ def _format_lief_output(result: Dict[str, Any], format: str) -> str:
     return "\n".join(lines)
 
 
+def _parse_binary_with_lief_impl(file_path: str, format: str = "json") -> Result:
+    """
+    Internal implementation of parse_binary_with_lief that returns Result type.
+    
+    Args:
+        file_path: Path to the binary file to parse
+        format: Output format - "json" (default) or "text"
+    
+    Returns:
+        Result: Success with binary structure info or Failure with error details
+    """
+    try:
+        # 1. Validate file path
+        validated_path = validate_file_path(file_path)
+
+        # 2. Check file size (1GB limit for safety)
+        max_file_size = get_settings().lief_max_file_size
+        file_size = Path(validated_path).stat().st_size
+        if file_size > max_file_size:
+            return failure(
+                "FILE_TOO_LARGE",
+                f"File size ({file_size} bytes) exceeds maximum allowed size ({max_file_size} bytes)",
+                hint=f"Set LIEF_MAX_FILE_SIZE environment variable to increase limit"
+            )
+
+        # 3. Import LIEF library
+        import lief
+
+        # 4. Parse binary file
+        binary = lief.parse(validated_path)
+        if binary is None:
+            return failure(
+                "UNSUPPORTED_FORMAT",
+                "Unsupported binary format",
+                hint="LIEF supports ELF, PE, and Mach-O formats"
+            )
+
+        # 5. Extract information
+        result_data: Dict[str, Any] = {
+            "format": str(binary.format).split(".")[-1].lower(),
+            "entry_point": hex(binary.entrypoint) if hasattr(binary, "entrypoint") else None,
+        }
+
+        # Add sections and symbols
+        sections = _extract_sections(binary)
+        if sections:
+            result_data["sections"] = sections
+
+        symbols = _extract_symbols(binary)
+        result_data.update(symbols)
+
+        # 6. Format output
+        if format.lower() == "json":
+            return success(result_data)
+        else:
+            # Text format
+            formatted_text = _format_lief_output(result_data, format)
+            return success(formatted_text)
+        
+    except ImportError:
+        return failure(
+            "DEPENDENCY_MISSING",
+            "lief library is not installed",
+            hint="Install with: pip install lief"
+        )
+    except ValidationError as e:
+        return failure(
+            "VALIDATION_ERROR",
+            str(e),
+            hint="Ensure the file is in the workspace directory"
+        )
+    except Exception as e:
+        logger.exception("Unexpected error in parse_binary_with_lief")
+        return failure(
+            "INTERNAL_ERROR",
+            f"An unexpected error occurred: {str(e)}"
+        )
+
+
 @log_execution(tool_name="parse_binary_with_lief")
 @track_metrics("parse_binary_with_lief")
 def parse_binary_with_lief(file_path: str, format: str = "json") -> str:
@@ -568,46 +551,5 @@ def parse_binary_with_lief(file_path: str, format: str = "json") -> str:
     Raises:
         Returns error message string if execution fails (never raises exceptions)
     """
-    # Validate file path
-    validated_path = validate_file_path(file_path)
-
-    # Check file size (1GB limit for safety)
-    max_file_size = get_settings().lief_max_file_size
-    file_size = Path(validated_path).stat().st_size
-    if file_size > max_file_size:
-        raise ValueError(
-            f"File size ({file_size} bytes) exceeds maximum allowed size ({max_file_size} bytes). "
-            f"Set LIEF_MAX_FILE_SIZE environment variable to increase limit (current: {max_file_size} bytes)"
-        )
-
-    # Import lief (will raise ImportError if not installed)
-    try:
-        import lief
-    except ImportError:
-        raise ImportError("lief library is not installed. Please install it with: pip install lief")
-
-    # Parse binary file
-    try:
-        binary = lief.parse(validated_path)
-    except Exception as e:
-        raise Exception(f"Failed to parse binary file: {e}")
-
-    if binary is None:
-        raise ValueError("Unsupported binary format. LIEF supports ELF, PE, and Mach-O formats.")
-
-    # Extract information using helper functions
-    result: Dict[str, Any] = {
-        "format": str(binary.format).split(".")[-1].lower(),  # ELF, PE, MACHO
-        "entry_point": hex(binary.entrypoint) if hasattr(binary, "entrypoint") else None,
-    }
-
-    # Add sections and symbols
-    sections = _extract_sections(binary)
-    if sections:
-        result["sections"] = sections
-
-    symbols = _extract_symbols(binary)
-    result.update(symbols)
-
-    # Format and return
-    return _format_lief_output(result, format)
+    result = _parse_binary_with_lief_impl(file_path, format)
+    return result_to_string(result)
