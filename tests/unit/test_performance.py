@@ -7,20 +7,20 @@ and provide baseline measurements for key operations.
 
 import sys
 import time
-from pathlib import Path
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 
 import pytest
 
 
-def test_yara_result_processing_with_many_matches():
+def test_yara_result_processing_with_many_matches(
+    workspace_dir,
+    read_only_dir,
+    patched_workspace_config,
+):
     """Test that YARA result processing handles many matches efficiently."""
     # This test validates that the optimized YARA processing doesn't regress
     # We're testing the code path, not actual YARA functionality
     # The optimization reduces getattr calls and improves type checking
-
-    # Mock the necessary components
-    from unittest.mock import patch, MagicMock
 
     # Create a mock match with many string instances
     mock_instance = MagicMock()
@@ -41,33 +41,31 @@ def test_yara_result_processing_with_many_matches():
     # This creates 500 total string matches to process
     mock_matches = [mock_match] * 5  # 5 matches = 2500 total instances
 
-    with patch("reversecore_mcp.tools.lib_tools.validate_file_path") as mock_validate:
-        mock_validate.side_effect = (
-            lambda path, read_only=False, config=None: Path(path)
-        )
+    binary = workspace_dir / "perf.bin"
+    binary.write_bytes(b"data")
+    rule_file = read_only_dir / "perf.yar"
+    rule_file.write_text("rule perf { condition: true }")
 
-        # Import and mock yara within the function scope
-        import sys
-        mock_yara_module = MagicMock()
-        sys.modules['yara'] = mock_yara_module
-        mock_yara_module.compile.return_value.match.return_value = mock_matches
+    import sys
+    mock_yara_module = MagicMock()
+    sys.modules['yara'] = mock_yara_module
+    mock_yara_module.compile.return_value.match.return_value = mock_matches
 
-        try:
-            from reversecore_mcp.tools.lib_tools import run_yara
+    try:
+        from reversecore_mcp.tools.lib_tools import run_yara
 
-            start_time = time.time()
-            result = run_yara("/tmp/test.bin", "/tmp/test.yar")
-            elapsed = time.time() - start_time
+        start_time = time.time()
+        result = run_yara(str(binary), str(rule_file))
+        elapsed = time.time() - start_time
 
-            # Should complete in under 1 second even with 2500 instances
-            assert elapsed < 1.0, f"YARA processing took too long: {elapsed}s"
-            assert result.status == "success"
-            assert result.data["match_count"] == len(mock_matches)
-            assert result.data["matches"][0]["rule"] == "TestRule"
-        finally:
-            # Clean up mock
-            if 'yara' in sys.modules:
-                del sys.modules['yara']
+        # Should complete in under 1 second even with 2500 instances
+        assert elapsed < 1.0, f"YARA processing took too long: {elapsed}s"
+        assert result.status == "success"
+        assert result.data["match_count"] == len(mock_matches)
+        assert result.data["matches"][0]["rule"] == "TestRule"
+    finally:
+        if 'yara' in sys.modules:
+            del sys.modules['yara']
 
 
 def test_file_path_validation_string_conversion_optimization(workspace_config):

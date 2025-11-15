@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.exceptions import ValidationError, ToolNotFoundError
-from reversecore_mcp.core.result import ToolError
+from reversecore_mcp.core.result import ToolError, ToolResult, success
 
 
 class TestLogExecutionDecorator:
@@ -17,12 +17,13 @@ class TestLogExecutionDecorator:
     def test_successful_execution_logging(self, mock_logger):
         """Test that successful execution is logged correctly."""
         @log_execution(tool_name="test_tool")
-        def dummy_function(file_path: str) -> str:
-            return "success"
+        def dummy_function(file_path: str) -> ToolResult:
+            return success("success")
         
         result = dummy_function("/tmp/test.bin")
         
-        assert result == "success"
+        assert result.status == "success"
+        assert result.data == "success"
         assert mock_logger.info.call_count == 2  # Start and completion
         
         # Check that file_name was extracted
@@ -85,12 +86,12 @@ class TestLogExecutionDecorator:
     def test_file_name_extraction_from_kwargs(self, mock_logger):
         """Test file name extraction from keyword arguments."""
         @log_execution(tool_name="test_tool")
-        def dummy_function(path: str) -> str:
-            return "success"
+        def dummy_function(path: str):
+            return success("success")
         
         result = dummy_function(path="/tmp/test_file.bin")
         
-        assert result == "success"
+        assert result.status == "success"
         first_call = mock_logger.info.call_args_list[0]
         assert first_call[1]['extra']['file_name'] == 'test_file.bin'
 
@@ -98,12 +99,12 @@ class TestLogExecutionDecorator:
     def test_execution_time_logging(self, mock_logger):
         """Test that execution time is logged."""
         @log_execution(tool_name="test_tool")
-        def dummy_function() -> str:
-            return "success"
+        def dummy_function():
+            return success("success")
         
         result = dummy_function()
         
-        assert result == "success"
+        assert result.status == "success"
         # Check completion log has execution_time_ms
         completion_call = mock_logger.info.call_args_list[1]
         assert 'execution_time_ms' in completion_call[1]['extra']
@@ -113,12 +114,12 @@ class TestLogExecutionDecorator:
     def test_default_tool_name_uses_function_name(self, mock_logger):
         """Test that default tool name is function name."""
         @log_execution()
-        def my_custom_function() -> str:
-            return "success"
+        def my_custom_function():
+            return success("success")
         
         result = my_custom_function()
         
-        assert result == "success"
+        assert result.status == "success"
         # Check that function name was used as tool name
         first_call = mock_logger.info.call_args_list[0]
         assert "my_custom_function" in first_call[0][0]

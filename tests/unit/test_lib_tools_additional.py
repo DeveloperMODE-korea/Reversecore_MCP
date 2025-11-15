@@ -29,16 +29,21 @@ class _Match:
         self.strings = strings
 
 
-def test_run_yara_formatter(monkeypatch, tmp_path):
-    test_file = tmp_path / "t.bin"
-    test_file.write_bytes(b"abc")
+def _create_workspace_binary(workspace_dir, name: str, data: bytes = b"abc"):
+    path = workspace_dir / name
+    path.write_bytes(data)
+    return path
 
-    # Bypass validation for both file and rule
-    monkeypatch.setattr(
-        lib_tools,
-        "validate_file_path",
-        lambda p, read_only=False, config=None: test_file,
-    )
+
+def test_run_yara_formatter(
+    monkeypatch,
+    workspace_dir,
+    read_only_dir,
+    patched_workspace_config,
+):
+    test_file = _create_workspace_binary(workspace_dir, "t.bin")
+    rule_file = read_only_dir / "rules.yar"
+    rule_file.write_text("rule t { condition: true }")
 
     # Fake yara module injected into sys.modules
     fake_yara = types.ModuleType("yara")
@@ -55,7 +60,7 @@ def test_run_yara_formatter(monkeypatch, tmp_path):
     class _TimeoutError(Exception):
         pass
 
-    def _compile(filepath):
+    def _compile(filepath=None, **_kwargs):
         return _Rules()
 
     fake_yara.compile = _compile
@@ -64,7 +69,7 @@ def test_run_yara_formatter(monkeypatch, tmp_path):
 
     monkeypatch.setitem(sys.modules, "yara", fake_yara)
 
-    out = lib_tools.run_yara(str(test_file), str(test_file))
+    out = lib_tools.run_yara(str(test_file), str(rule_file))
     assert out.status == "success"
     data = out.data
     assert isinstance(data, dict)
@@ -76,14 +81,11 @@ def test_run_yara_formatter(monkeypatch, tmp_path):
     assert data["match_count"] == 1
 
 
-def test_disassemble_invalid_arch_mode(monkeypatch, tmp_path):
-    test_file = tmp_path / "t.bin"
-    test_file.write_bytes(b"\x90\x90\x90\x90")
-    monkeypatch.setattr(
-        lib_tools,
-        "validate_file_path",
-        lambda p, read_only=False, config=None: test_file,
-    )
+def test_disassemble_invalid_arch_mode(
+    workspace_dir,
+    patched_workspace_config,
+):
+    test_file = _create_workspace_binary(workspace_dir, "t.bin", b"\x90\x90\x90\x90")
 
     # Invalid arch
     out1 = lib_tools.disassemble_with_capstone(str(test_file), arch="badarch", mode="64")
@@ -98,20 +100,13 @@ def test_disassemble_invalid_arch_mode(monkeypatch, tmp_path):
     assert "unsupported mode" in out2.message.lower()
 
 
-def test_parse_binary_with_lief_error(monkeypatch, tmp_path):
-    test_file = tmp_path / "t.bin"
-    test_file.write_bytes(b"\x00\x01")
-
-    monkeypatch.setattr(
-        lib_tools,
-        "validate_file_path",
-        lambda p, read_only=False, config=None: test_file,
-    )
-    monkeypatch.setattr(
-        lib_tools,
-        "get_config",
-        lambda: types.SimpleNamespace(lief_max_file_size=10_000),
-    )
+def test_parse_binary_with_lief_error(
+    monkeypatch,
+    workspace_dir,
+    patched_workspace_config,
+    patched_config,
+):
+    test_file = _create_workspace_binary(workspace_dir, "t.bin", b"\x00\x01")
 
     fake_lief = types.ModuleType("lief")
 

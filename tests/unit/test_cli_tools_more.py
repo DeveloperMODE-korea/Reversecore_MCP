@@ -2,18 +2,17 @@
 More unit tests for tools.cli_tools covering additional branches.
 """
 
-import pytest
-
 from reversecore_mcp.core.exceptions import ValidationError
 from reversecore_mcp.tools import cli_tools
 
 
-def test_run_radare2_invalid_command_sanitization(monkeypatch, tmp_path):
-    path = tmp_path / "a.out"
+def test_run_radare2_invalid_command_sanitization(
+    monkeypatch,
+    workspace_dir,
+    patched_workspace_config,
+):
+    path = workspace_dir / "a.out"
     path.write_text("bin")
-    monkeypatch.setattr(
-        cli_tools, "validate_file_path", lambda p, read_only=False: path
-    )
 
     def _validate(cmd):
         raise ValidationError("invalid command")
@@ -23,10 +22,13 @@ def test_run_radare2_invalid_command_sanitization(monkeypatch, tmp_path):
     assert out.status == "error" and out.error_code == "VALIDATION_ERROR"
 
 
-def test_run_strings_validation_error(monkeypatch, tmp_path):
-    def _raise(_p, read_only=False):
-        raise ValidationError("Outside workspace")
+def test_run_strings_validation_error(
+    tmp_path,
+    workspace_dir,
+    patched_workspace_config,
+):
+    outside_file = tmp_path / "outside.bin"
+    outside_file.write_text("nope")
 
-    monkeypatch.setattr(cli_tools, "validate_file_path", _raise)
-    out = cli_tools.run_strings(str(tmp_path / "x"))
+    out = cli_tools.run_strings(str(outside_file))
     assert out.status == "error" and out.error_code == "VALIDATION_ERROR"

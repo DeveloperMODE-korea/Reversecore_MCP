@@ -493,6 +493,20 @@ The server exposes tools that can be called by AI agents via the MCP protocol. B
 }
 ```
 
+**Error Response:**
+```json
+{
+  "status": "error",
+  "error_code": "VALIDATION_ERROR",
+  "message": "File path is outside allowed directories: /tmp/payload.exe",
+  "hint": "Copy the sample under REVERSECORE_WORKSPACE before calling run_file",
+  "details": {
+    "allowed_directories": ["/app/workspace"],
+    "path": "/tmp/payload.exe"
+  }
+}
+```
+
 **Use Case**: Initial file identification during triage
 
 #### 2. Extract Strings (`run_strings`)
@@ -939,6 +953,8 @@ Every MCP tool now returns a Pydantic `ToolResult` union consisting of:
 - **`ToolError`**: `{ "status": "error", "error_code": "...", "message": "...", "hint": "...", "details": { ... } }`
 
 The contract is intentionally small so AI agents can branch on `status` and inspect structured metadata without parsing natural-language strings.
+
+`metadata` typically includes diagnostic context such as `bytes_read`, `instruction_count`, or tool-specific timings, while `details` carries structured fields for error surfaces (e.g., `allowed_directories`, `timeout_seconds`).
 
 **Success Example:**
 ```json

@@ -71,3 +71,17 @@ def patched_workspace_config(workspace_config, monkeypatch):
     monkeypatch.setattr(security, "WORKSPACE_CONFIG", workspace_config)
     return workspace_config
 
+
+@pytest.fixture
+def patched_config(config, monkeypatch):
+    """Ensure get_config() calls inside modules return the test Config."""
+    monkeypatch.setattr("reversecore_mcp.core.config._CONFIG", config)
+    monkeypatch.setattr("reversecore_mcp.core.config.get_config", lambda: config)
+
+    # Modules like reversecore_mcp.tools.lib_tools import get_config at module load
+    # time, so patch their reference as well for consistency.
+    from reversecore_mcp.tools import lib_tools
+
+    monkeypatch.setattr(lib_tools, "get_config", lambda: config)
+    return config
+
