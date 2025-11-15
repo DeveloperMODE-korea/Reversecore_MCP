@@ -21,8 +21,8 @@ lief>=0.13.0
 # Rate limiting for HTTP mode
 slowapi>=0.1.9
 
-# Additional dependencies (if needed by fastmcp)
-# These are typically included by fastmcp but listed here for clarity
-# fastapi>=0.100.0
-# uvicorn>=0.23.0
+# Additional dependencies for HTTP transport mode
+# fastmcp may include these, but we need them explicitly for server.py
+fastapi>=0.100.0
+uvicorn>=0.23.0
 
