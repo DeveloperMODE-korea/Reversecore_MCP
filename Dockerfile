@@ -10,7 +10,7 @@
 # Build Stage: Install dependencies that require compilation
 # ============================================================================
 FROM python:3.11-slim-bookworm AS builder
-ARG YARA_VERSION=4.3.2
+ARG YARA_VERSION=4.3.1
 
 # Set working directory
 WORKDIR /app
@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Build and install native YARA matching the pinned Python binding (4.3.2)
+# Build and install native YARA matching the pinned Python binding (4.3.1)
 RUN curl -sSL "https://github.com/VirusTotal/yara/archive/refs/tags/v${YARA_VERSION}.tar.gz" -o /tmp/yara.tar.gz \
     && tar -xzf /tmp/yara.tar.gz -C /tmp \
     && cd /tmp/yara-${YARA_VERSION} \
@@ -80,7 +80,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Cleanup
     && rm -rf /var/lib/apt/lists/*
 
-# Copy YARA 4.3.2 toolchain built in the builder stage so native libs match python bindings
+# Copy YARA 4.3.1 toolchain built in the builder stage so native libs match python bindings
 RUN mkdir -p /usr/local/include /usr/local/lib/pkgconfig
 COPY --from=builder /usr/local/bin/yara /usr/local/bin/yara
 COPY --from=builder /usr/local/bin/yarac /usr/local/bin/yarac
