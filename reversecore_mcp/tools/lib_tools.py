@@ -139,9 +139,14 @@ def run_yara(
             hint="Install with: pip install yara-python",
         )
 
-    rules = yara.compile(filepath=str(validated_rule))
     timeout_error = getattr(yara, "TimeoutError", None)
     generic_error = getattr(yara, "Error", None)
+    try:
+        rules = yara.compile(filepath=str(validated_rule))
+    except Exception as exc:  # noqa: BLE001 - need yara-specific surface area
+        if generic_error and isinstance(exc, generic_error):
+            return failure("YARA_ERROR", f"YARA error: {exc}")
+        raise
 
     try:
         matches = rules.match(str(validated_file), timeout=timeout)
@@ -192,6 +197,7 @@ def disassemble_with_capstone(
             CS_MODE_ARM,
             CS_MODE_THUMB,
             Cs,
+            CsError,
         )
     except ImportError:
         return failure(
@@ -239,11 +245,14 @@ def disassemble_with_capstone(
             hint="Check the offset and file size",
         )
 
-    disassembler = Cs(arch_map[arch], mode_map[arch][mode])
-    instructions = [
-        f"0x{instruction.address:x}:\t{instruction.mnemonic}\t{instruction.op_str}"
-        for instruction in disassembler.disasm(code, offset)
-    ]
+    try:
+        disassembler = Cs(arch_map[arch], mode_map[arch][mode])
+        instructions = [
+            f"0x{instruction.address:x}:\t{instruction.mnemonic}\t{instruction.op_str}"
+            for instruction in disassembler.disasm(code, offset)
+        ]
+    except CsError as exc:
+        return failure("CAPSTONE_ERROR", f"Capstone failed: {exc}")
 
     if not instructions:
         return success("No instructions disassembled.", instruction_count=0)
@@ -365,7 +374,16 @@ def parse_binary_with_lief(file_path: str, format: str = "json") -> ToolResult:
             hint="Install with: pip install lief",
         )
 
-    binary = lief.parse(str(validated_path))
+    try:
+        binary = lief.parse(str(validated_path))
+    except Exception as exc:  # noqa: BLE001 - lief exposes custom exception types
+        lief_error = getattr(lief, "exception", None)
+        lief_bad_file = getattr(lief, "bad_file", None)
+        if (lief_bad_file and isinstance(exc, lief_bad_file)) or (
+            lief_error and isinstance(exc, lief_error)
+        ):
+            return failure("LIEF_ERROR", f"LIEF failed to parse binary: {exc}")
+        raise
     if binary is None:
         return failure(
             "UNSUPPORTED_FORMAT",

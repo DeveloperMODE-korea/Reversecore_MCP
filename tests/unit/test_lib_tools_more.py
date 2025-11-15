@@ -53,7 +53,7 @@ def test_run_yara_compile_error(monkeypatch, tmp_path):
 
     out = lib_tools.run_yara(str(f), str(f))
     assert out.status == "error"
-    assert out.error_code == "INTERNAL_ERROR"
+    assert out.error_code == "YARA_ERROR"
     assert "bad rule" in out.message.lower()
 
 
@@ -105,3 +105,38 @@ def test_disassemble_capstone_import_error(monkeypatch, tmp_path):
     assert out.status == "error"
     assert out.error_code == "DEPENDENCY_MISSING"
     assert "capstone" in out.message.lower()
+
+
+def test_disassemble_capstone_runtime_error(monkeypatch, tmp_path):
+    f = tmp_path / "x.bin"
+    f.write_bytes(b"\x90\x90")
+    monkeypatch.setattr(
+        lib_tools,
+        "validate_file_path",
+        lambda p, read_only=False, config=None: f,
+    )
+
+    fake_capstone = types.ModuleType("capstone")
+    fake_capstone.CS_ARCH_ARM = 1
+    fake_capstone.CS_ARCH_ARM64 = 2
+    fake_capstone.CS_ARCH_X86 = 3
+    fake_capstone.CS_MODE_32 = 4
+    fake_capstone.CS_MODE_64 = 5
+    fake_capstone.CS_MODE_ARM = 6
+    fake_capstone.CS_MODE_THUMB = 7
+
+    class _CsError(Exception):
+        pass
+
+    class _Cs:
+        def __init__(self, *args, **kwargs):
+            raise _CsError("capstone boom")
+
+    fake_capstone.CsError = _CsError
+    fake_capstone.Cs = _Cs
+    monkeypatch.setitem(sys.modules, "capstone", fake_capstone)
+
+    out = lib_tools.disassemble_with_capstone(str(f))
+    assert out.status == "error"
+    assert out.error_code == "CAPSTONE_ERROR"
+    assert "capstone boom" in out.message.lower()

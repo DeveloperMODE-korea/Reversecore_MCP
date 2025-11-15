@@ -96,3 +96,38 @@ def test_disassemble_invalid_arch_mode(monkeypatch, tmp_path):
     assert out2.status == "error"
     assert out2.error_code == "INVALID_PARAMETER"
     assert "unsupported mode" in out2.message.lower()
+
+
+def test_parse_binary_with_lief_error(monkeypatch, tmp_path):
+    test_file = tmp_path / "t.bin"
+    test_file.write_bytes(b"\x00\x01")
+
+    monkeypatch.setattr(
+        lib_tools,
+        "validate_file_path",
+        lambda p, read_only=False, config=None: test_file,
+    )
+    monkeypatch.setattr(
+        lib_tools,
+        "get_config",
+        lambda: types.SimpleNamespace(lief_max_file_size=10_000),
+    )
+
+    fake_lief = types.ModuleType("lief")
+
+    class _BadFile(Exception):
+        pass
+
+    fake_lief.bad_file = _BadFile
+    fake_lief.exception = _BadFile
+
+    def _parse(path):
+        raise _BadFile("corrupt binary")
+
+    fake_lief.parse = _parse
+    monkeypatch.setitem(sys.modules, "lief", fake_lief)
+
+    out = lib_tools.parse_binary_with_lief(str(test_file))
+    assert out.status == "error"
+    assert out.error_code == "LIEF_ERROR"
+    assert "corrupt" in out.message.lower()
