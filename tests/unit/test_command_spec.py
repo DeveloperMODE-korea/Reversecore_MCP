@@ -6,7 +6,6 @@ import pytest
 import re
 from reversecore_mcp.core.command_spec import (
     CommandSpec,
-    CommandType,
     R2_COMMAND_SPECS,
     DANGEROUS_PATTERNS,
     validate_r2_command,
@@ -228,8 +227,8 @@ class TestValidateR2Command:
     def test_whitespace_handling(self):
         """Test that whitespace is properly handled."""
         # Should work with leading/trailing whitespace
-        spec = validate_r2_command("  pdf @ main  ")
-        assert spec.name == "pdf"
+        validated = validate_r2_command("  pdf @ main  ")
+        assert validated == "pdf @ main"
     
     def test_case_sensitivity(self):
         """Test case sensitivity of validation."""
@@ -240,15 +239,13 @@ class TestValidateR2Command:
         with pytest.raises(ValidationError):
             validate_r2_command("PDF")
     
-    def test_returns_correct_command_spec(self):
-        """Test that validation returns the correct CommandSpec."""
-        spec = validate_r2_command("pdf @ main")
-        assert spec.name == "pdf"
-        assert spec.type == "read"
-        
-        spec = validate_r2_command("aaa")
-        assert spec.name == "aaa"
-        assert spec.type == "analyze"
+    def test_returns_validated_command_string(self):
+        """Test that validation returns the sanitized command string."""
+        validated_pdf = validate_r2_command("pdf @ main")
+        assert validated_pdf == "pdf @ main"
+
+        validated_analyze = validate_r2_command("aaa")
+        assert validated_analyze == "aaa"
 
 
 class TestIsSafeR2Command:

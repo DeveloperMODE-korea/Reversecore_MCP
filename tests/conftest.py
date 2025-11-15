@@ -3,10 +3,12 @@ Pytest configuration and shared fixtures.
 """
 
 import os
-import tempfile
 from pathlib import Path
 
 import pytest
+
+from reversecore_mcp.core.config import reset_config
+
 
 # Set test environment variables (will be overridden by individual tests)
 os.environ["LOG_LEVEL"] = "INFO"
@@ -14,32 +16,15 @@ os.environ["LOG_LEVEL"] = "INFO"
 
 @pytest.fixture(autouse=True)
 def reset_workspace_env(monkeypatch, tmp_path):
-    """Automatically set workspace environment for each test using tmp_path.
-
-    Note: Do not create the directory here to avoid double-creation with
-    other fixtures. Just set the environment variables. The `workspace_dir`
-    fixture is responsible for creating the directory.
-    """
+    """Automatically set workspace environment for each test using tmp_path."""
     workspace = tmp_path / "workspace"
+    rules_dir = tmp_path / "rules"
+    rules_dir.mkdir(exist_ok=True)
 
-    # Set environment variables for this test
-    # security.py uses _get_allowed_workspace() which reads env vars dynamically
     monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
-    monkeypatch.setenv("REVERSECORE_READ_DIRS", str(tmp_path / "rules"))
-    
-    # Clear and reload settings to pick up new environment variables
-    # Use the new SettingsManager for better test isolation
-    from reversecore_mcp.core.settings_manager import SettingsManager
-    from reversecore_mcp.core.config import Settings
-    
-    # Clear any existing settings
-    SettingsManager.clear()
-    
-    # Create new settings with the test environment variables
-    # This ensures settings are created with the current environment
-    test_settings = Settings()
-    SettingsManager.set(test_settings)
+    monkeypatch.setenv("REVERSECORE_READ_DIRS", str(rules_dir))
 
+    reset_config()
     return workspace
 
 

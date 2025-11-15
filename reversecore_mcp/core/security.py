@@ -9,33 +9,47 @@ Note: For radare2 command validation, use the improved regex-based validation
 in command_spec.py which provides stronger security guarantees.
 """
 
-import os
-import warnings
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional, Tuple
 
-from reversecore_mcp.core.settings_manager import SettingsManager
+from reversecore_mcp.core.config import get_config
 from reversecore_mcp.core.exceptions import ValidationError
 
 
-def _get_allowed_workspace() -> Path:
-    """Get the allowed workspace directory from settings."""
-    return SettingsManager.get().allowed_workspace
+@dataclass(frozen=True)
+class WorkspaceConfig:
+    """Immutable configuration for workspace-aware file validation."""
+
+    workspace: Path
+    read_only_dirs: Tuple[Path, ...]
+
+    @classmethod
+    def from_env(cls) -> "WorkspaceConfig":
+        """Create a workspace configuration from the cached Config instance."""
+        config = get_config()
+        return cls(workspace=config.workspace, read_only_dirs=config.read_only_dirs)
 
 
-def _get_allowed_read_dirs() -> List[Path]:
-    """Get the allowed read-only directories from settings."""
-    return SettingsManager.get().allowed_read_dirs
+def _build_workspace_config() -> WorkspaceConfig:
+    return WorkspaceConfig.from_env()
 
 
-# For backward compatibility, provide module-level constants
-# These are computed at access time to allow test overrides
-# Note: Direct access to these should use the functions above
-ALLOWED_WORKSPACE = _get_allowed_workspace()  # Initial value, but functions are used internally
-ALLOWED_READ_DIRS = _get_allowed_read_dirs()  # Initial value, but functions are used internally
+WORKSPACE_CONFIG = _build_workspace_config()
 
 
-def validate_file_path(path: str, read_only: bool = False) -> str:
+def refresh_workspace_config() -> WorkspaceConfig:
+    """Recompute the default workspace configuration (mainly for tests)."""
+    global WORKSPACE_CONFIG
+    WORKSPACE_CONFIG = _build_workspace_config()
+    return WORKSPACE_CONFIG
+
+
+def validate_file_path(
+    path: str,
+    read_only: bool = False,
+    config: Optional[WorkspaceConfig] = None,
+) -> Path:
     """
     Validate and normalize a file path.
 
@@ -45,22 +59,24 @@ def validate_file_path(path: str, read_only: bool = False) -> str:
        or within allowed read-only directories (if read_only=True)
     3. The path is resolved to an absolute path
 
-    The workspace directory is determined by the REVERSECORE_WORKSPACE environment
-    variable, defaulting to /app/workspace if not set.
-    Read-only directories are determined by the REVERSECORE_READ_DIRS environment
-    variable (comma-separated), defaulting to /app/rules if not set.
+    The workspace directory is determined by an immutable WorkspaceConfig that
+    is loaded once from environment variables (REVERSECORE_WORKSPACE and
+    REVERSECORE_READ_DIRS).
 
     Args:
         path: The file path to validate
-        read_only: If True, also allow files from ALLOWED_READ_DIRS (e.g., for YARA rules)
+        read_only: If True, also allow files from configured read-only directories
+        config: Optional WorkspaceConfig override (useful for tests)
 
     Returns:
-        The normalized absolute file path
+        The normalized absolute file path as a Path instance
 
     Raises:
         ValueError: If the path is invalid, doesn't exist, or is outside
                    the allowed directories
     """
+    active_config = config or WORKSPACE_CONFIG
+
     # Convert to Path object for easier manipulation
     file_path = Path(path)
 
@@ -80,163 +96,35 @@ def validate_file_path(path: str, read_only: bool = False) -> str:
             details={"path": str(abs_path)},
         )
 
-    # Check if path is within allowed directories using os.path.commonpath()
-    # This is more robust than startswith() and handles edge cases correctly
-    # Read workspace path dynamically to allow test overrides
-    workspace_path = _get_allowed_workspace()
-
-    # Convert to string once for reuse
-    abs_path_str = str(abs_path)
-    workspace_path_str = str(workspace_path)
-
-    def is_path_in_directory(file_path_str: str, dir_path_str: str) -> bool:
-        """Check if file_path is within dir_path using commonpath."""
+    def _is_relative_to(base: Path) -> bool:
         try:
-            common = os.path.commonpath([file_path_str, dir_path_str])
-            return common == dir_path_str
+            abs_path.relative_to(base)
+            return True
         except ValueError:
-            # Different drives on Windows or no common path
             return False
 
-    is_in_workspace = is_path_in_directory(abs_path_str, workspace_path_str)
-
-    # Early return if in workspace and no read_only check needed
+    is_in_workspace = _is_relative_to(active_config.workspace)
     if is_in_workspace and not read_only:
-        return abs_path_str
+        return abs_path
 
-    # If read_only is True, also check read-only directories
-    # Read read-only dirs dynamically to allow test overrides
-    is_in_read_dirs = False
+    is_in_read_dir = False
     if read_only and not is_in_workspace:
-        read_dirs = _get_allowed_read_dirs()
-        for read_dir in read_dirs:
-            if is_path_in_directory(abs_path_str, str(read_dir)):
-                is_in_read_dirs = True
+        for read_dir in active_config.read_only_dirs:
+            if _is_relative_to(read_dir):
+                is_in_read_dir = True
                 break
 
-    if not (is_in_workspace or is_in_read_dirs):
-        allowed_dirs = [workspace_path_str]
+    if not (is_in_workspace or is_in_read_dir):
+        allowed_dirs = [str(active_config.workspace)]
         if read_only:
-            read_dirs = _get_allowed_read_dirs()
-            allowed_dirs.extend([str(d) for d in read_dirs])
+            allowed_dirs.extend(str(d) for d in active_config.read_only_dirs)
         raise ValidationError(
-            f"File path is outside allowed directories: {abs_path_str}. "
+            f"File path is outside allowed directories: {abs_path}. "
             f"Allowed directories: {allowed_dirs}. "
             f"Set REVERSECORE_WORKSPACE or REVERSECORE_READ_DIRS environment variables to change allowed paths.",
-            details={"path": abs_path_str, "allowed_directories": allowed_dirs},
+            details={"path": str(abs_path), "allowed_directories": allowed_dirs},
         )
 
-    return abs_path_str
+    return abs_path
 
-
-# Radare2 command allowlist
-# Read-only commands that are safe to execute
-R2_READONLY_COMMANDS = [
-    "pdf",  # Print disassembly function
-    "afl",  # Analyze functions list
-    "iS",   # Sections info
-    "iz",   # Strings in data sections
-    "px",   # Print hexdump
-    "pd",   # Print disassembly
-    "V",    # Visual mode (read-only)
-    "s",    # Seek (read-only navigation)
-    "?",    # Help
-    "i",    # Info commands (read-only)
-    "fs",   # Flag spaces (read-only)
-    "f",    # Flags (read-only)
-    "a",    # Analysis commands (read-only)
-    "aa",   # Analyze all
-    "af",   # Analyze function
-    "pdj",  # Print disassembly JSON
-    "pdfj", # Print disassembly function JSON
-    "aflj", # Analyze functions list JSON
-]
-
-# Dangerous radare2 commands that should be blocked
-R2_DANGEROUS_PATTERNS = [
-    "w",    # Write
-    "wo",   # Write opcode
-    "wx",   # Write hex
-    "o+",   # Open file for writing
-    "o-",   # Close file
-    "!",    # System command execution
-    "#!",   # Script execution
-    "waf",  # Write assembly function
-    "wa",   # Write assembly
-]
-
-
-def sanitize_command_string(cmd: str, allowlist: Optional[List[str]] = None) -> str:
-    """
-    Validate a command string against an allowlist.
-    
-    .. deprecated:: 1.1.0
-        Use :func:`validate_r2_command` from command_spec.py instead for radare2 commands.
-        This function provides only basic validation and is kept for backward compatibility.
-
-    This function is used to validate command strings that will be passed
-    as arguments to subprocess calls. It does NOT quote or escape the string
-    (since we use list-based subprocess calls), but validates that the
-    command matches expected patterns.
-
-    For radare2 commands, this function checks:
-    1. Command is not empty
-    2. Command does not contain dangerous patterns (write, system execution, etc.)
-    3. If allowlist is provided, command matches allowed patterns
-
-    Args:
-        cmd: The command string to validate
-        allowlist: Optional list of allowed command patterns.
-                  If None, only basic validation and dangerous pattern checking
-                  is performed. For radare2, use R2_READONLY_COMMANDS.
-
-    Returns:
-        The validated command string
-
-    Raises:
-        ValueError: If the command string is invalid, contains dangerous patterns,
-                   or does not match allowlist
-    """
-    warnings.warn(
-        "sanitize_command_string() is deprecated and will be removed in a future version. "
-        "Use validate_r2_command() from reversecore_mcp.core.command_spec for radare2 commands, "
-        "which provides stronger security guarantees through regex-based validation.",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    
-    if not cmd or not cmd.strip():
-        raise ValueError("Command string cannot be empty")
-
-    cmd_stripped = cmd.strip()
-    cmd_lower = cmd_stripped.lower()
-
-    # Check for dangerous patterns first
-    for dangerous in R2_DANGEROUS_PATTERNS:
-        # Check if dangerous pattern appears as a standalone command or with whitespace
-        # This prevents "w", "w ", " w", "wx", "wo", etc.
-        dangerous_lower = dangerous.lower()
-        if cmd_lower == dangerous_lower or cmd_lower.startswith(dangerous_lower + " "):
-            raise ValueError(
-                f"Dangerous command pattern detected: {dangerous}. "
-                f"Write and system execution commands are not allowed."
-            )
-
-    # If allowlist is provided, check if command matches any pattern
-    if allowlist:
-        # Check if command starts with any allowed pattern
-        # This allows commands like "pdf @ main", "afl", "iS", etc.
-        matches = any(
-            cmd_lower == pattern.lower()
-            or cmd_lower.startswith(pattern.lower() + " ")
-            or cmd_lower.startswith(pattern.lower() + "@")
-            for pattern in allowlist
-        )
-        if not matches:
-            raise ValueError(
-                f"Command string does not match allowed patterns: {cmd}. "
-                f"Allowed patterns: {allowlist}"
-            )
-
-    return cmd_stripped
 

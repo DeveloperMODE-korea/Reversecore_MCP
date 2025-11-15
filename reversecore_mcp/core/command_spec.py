@@ -8,11 +8,12 @@ commands like "pdf @ main; w hello" could bypass simple prefix matching.
 
 import re
 from dataclasses import dataclass
-from typing import Literal, List, Optional
+from typing import Literal, List, Optional, NewType
 from reversecore_mcp.core.exceptions import ValidationError
 
 
 CommandType = Literal["read", "write", "analyze", "system"]
+ValidatedR2Command = NewType("ValidatedR2Command", str)
 
 
 @dataclass
@@ -231,7 +232,7 @@ DANGEROUS_PATTERNS = [
 ]
 
 
-def validate_r2_command(cmd: str, allow_write: bool = False) -> CommandSpec:
+def validate_r2_command(cmd: str, allow_write: bool = False) -> ValidatedR2Command:
     """
     Validate a radare2 command using strict regex patterns.
     
@@ -245,14 +246,14 @@ def validate_r2_command(cmd: str, allow_write: bool = False) -> CommandSpec:
         allow_write: If True, allow write commands (default: False)
         
     Returns:
-        Matching CommandSpec if valid
+        ValidatedR2Command: Command string marked as validated
         
     Raises:
         ValidationError: If command is invalid, dangerous, or not in allowlist
         
     Example:
         >>> validate_r2_command("pdf @ main")
-        CommandSpec(name='pdf', type='read', ...)
+        ValidatedR2Command('pdf @ main')
         
         >>> validate_r2_command("pdf @ main; w hello")
         ValidationError: Dangerous command pattern detected
@@ -283,7 +284,7 @@ def validate_r2_command(cmd: str, allow_write: bool = False) -> CommandSpec:
                     f"Write commands are not allowed: {spec.name}",
                     details={"command": cmd_stripped, "command_type": spec.type}
                 )
-            return spec
+            return ValidatedR2Command(cmd_stripped)
     
     # No match found
     raise ValidationError(

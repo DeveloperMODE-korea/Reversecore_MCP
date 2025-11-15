@@ -3,6 +3,9 @@
 # Core MCP framework
 fastmcp>=0.1.0
 
+# Data validation for tool responses
+pydantic>=2.6.0
+
 # Radare2 Python bindings (preferred over subprocess for stability)
 r2pipe>=1.7.0
 

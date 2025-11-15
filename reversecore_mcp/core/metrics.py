@@ -57,8 +57,14 @@ def track_metrics(tool_name: str):
             
             try:
                 result = func(*args, **kwargs)
-                if "Error" in str(result):
-                    success = False
+
+                if hasattr(result, "status"):
+                    success = getattr(result, "status") == "success"
+                elif isinstance(result, dict) and "status" in result:
+                    success = result["status"] == "success"
+                else:
+                    success = "Error" not in str(result)
+
                 return result
             except Exception as e:
                 success = False

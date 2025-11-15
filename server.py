@@ -7,8 +7,8 @@ It includes health and metrics endpoints for monitoring in HTTP mode.
 
 from fastmcp import FastMCP
 
-from reversecore_mcp.core.settings_manager import SettingsManager
 from reversecore_mcp.core.logging_config import setup_logging, get_logger
+from reversecore_mcp.core.config import get_config
 from reversecore_mcp.tools import cli_tools, lib_tools
 
 # Setup logging
@@ -26,7 +26,7 @@ lib_tools.register_lib_tools(mcp)
 def main():
     """Run the MCP server."""
     # Get transport mode from settings (default: stdio)
-    settings = SettingsManager.get()
+    settings = get_config()
     
     # Validate paths at startup
     try:

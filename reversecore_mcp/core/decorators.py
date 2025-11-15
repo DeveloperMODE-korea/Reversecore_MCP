@@ -6,17 +6,9 @@ by centralizing logging, error handling, and execution time measurement.
 """
 
 import functools
-import subprocess
 import time
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar
-
-from reversecore_mcp.core.error_formatting import format_error, get_validation_hint
-from reversecore_mcp.core.exceptions import (
-    ExecutionTimeoutError,
-    ToolNotFoundError,
-    ValidationError,
-)
 from reversecore_mcp.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -69,72 +61,22 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
             logger.info(f"Starting {actual_tool_name}", extra=log_extra)
 
             try:
-                # Execute the function
                 result = func(*args, **kwargs)
-
-                # Log success
                 execution_time = int((time.time() - start_time) * 1000)
                 log_extra["execution_time_ms"] = execution_time
                 logger.info(
                     f"{actual_tool_name} completed successfully", extra=log_extra
                 )
-
                 return result
-
-            except (ToolNotFoundError, ExecutionTimeoutError, ValidationError) as e:
-                # Known exceptions - format with hints
-                execution_time = int((time.time() - start_time) * 1000)
-                hint = (
-                    get_validation_hint(e)
-                    if isinstance(e, ValidationError)
-                    else None
-                )
-                log_extra["execution_time_ms"] = execution_time
-                log_extra["error_code"] = (
-                    e.error_code if hasattr(e, "error_code") else None
-                )
-                logger.warning(f"{actual_tool_name} failed", extra=log_extra, exc_info=True)
-
-                # Return formatted error (tool functions should return strings, not raise)
-                return format_error(e, tool_name=actual_tool_name, hint=hint)
-
-            except ValueError as e:
-                # Validation errors
-                execution_time = int((time.time() - start_time) * 1000)
-                log_extra["execution_time_ms"] = execution_time
-                logger.warning(
-                    f"{actual_tool_name} validation failed",
-                    extra=log_extra,
-                    exc_info=True,
-                )
-                return format_error(
-                    e, tool_name=actual_tool_name, hint=get_validation_hint(e)
-                )
-
-            except subprocess.CalledProcessError as e:
-                # Command execution errors
-                execution_time = int((time.time() - start_time) * 1000)
-                stderr = e.stderr if e.stderr else "Unknown error"
-                log_extra["execution_time_ms"] = execution_time
-                log_extra["exit_code"] = e.returncode
-                logger.error(
-                    f"{actual_tool_name} command failed",
-                    extra=log_extra,
-                    exc_info=True,
-                )
-                error_msg = f"Command failed with exit code {e.returncode}. stderr: {stderr}"
-                return format_error(Exception(error_msg), tool_name=actual_tool_name)
-
-            except Exception as e:
-                # Unexpected errors
+            except Exception:
                 execution_time = int((time.time() - start_time) * 1000)
                 log_extra["execution_time_ms"] = execution_time
                 logger.error(
-                    f"{actual_tool_name} unexpected error",
+                    f"{actual_tool_name} failed",
                     extra=log_extra,
                     exc_info=True,
                 )
-                return format_error(e, tool_name=actual_tool_name)
+                raise
 
         return wrapper  # type: ignore
 
