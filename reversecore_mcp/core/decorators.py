@@ -9,7 +9,9 @@ import functools
 import time
 from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar
+
 from reversecore_mcp.core.logging_config import get_logger
+from reversecore_mcp.core.result import ToolResult, failure
 
 logger = get_logger(__name__)
 
@@ -38,7 +40,7 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
         actual_tool_name = tool_name or func.__name__
 
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: Any, **kwargs: Any) -> ToolResult:
             start_time = time.time()
             file_name = None
 
@@ -68,7 +70,7 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
                     f"{actual_tool_name} completed successfully", extra=log_extra
                 )
                 return result
-            except Exception:
+            except Exception as exc:
                 execution_time = int((time.time() - start_time) * 1000)
                 log_extra["execution_time_ms"] = execution_time
                 logger.error(
@@ -76,7 +78,11 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
                     extra=log_extra,
                     exc_info=True,
                 )
-                raise
+                return failure(
+                    "INTERNAL_ERROR",
+                    f"{actual_tool_name} failed: {exc}",
+                    exception_type=type(exc).__name__,
+                )
 
         return wrapper  # type: ignore
 

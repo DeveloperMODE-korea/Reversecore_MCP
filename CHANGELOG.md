@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved YARA timeout error detection to properly handle TimeoutError exceptions
 - Better error messages for CalledProcessError exceptions
 
-## [1.0.0] - 2024-XX-XX
+## [1.0.0] - 2025-11-15
 
 ### Added
 - Initial release of Reversecore_MCP

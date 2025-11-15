@@ -4,8 +4,10 @@ Performance metrics collection for monitoring.
 
 import time
 from collections import defaultdict
-from typing import Dict, Any
 from functools import wraps
+from typing import Any, Dict
+
+from reversecore_mcp.core.result import ToolError
 
 
 class MetricsCollector:
@@ -58,15 +60,17 @@ def track_metrics(tool_name: str):
             try:
                 result = func(*args, **kwargs)
 
-                if hasattr(result, "status"):
+                if isinstance(result, ToolError):
+                    success = False
+                elif hasattr(result, "status"):
                     success = getattr(result, "status") == "success"
                 elif isinstance(result, dict) and "status" in result:
                     success = result["status"] == "success"
                 else:
-                    success = "Error" not in str(result)
+                    success = True
 
                 return result
-            except Exception as e:
+            except Exception:
                 success = False
                 raise
             finally:

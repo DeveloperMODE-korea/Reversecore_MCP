@@ -1,168 +1,171 @@
-"""
-Unit tests for core.config module.
-"""
+"""Unit tests for the lightweight Config loader."""
+
+from pathlib import Path
 
 import pytest
-from pathlib import Path
-from reversecore_mcp.core.config import Settings, get_settings, reload_settings
+
+from reversecore_mcp.core.config import Config, get_config, reset_config
 
 
-class TestSettings:
-    """Test cases for Settings configuration."""
+class TestConfigDefaults:
+    """Verify default values and parsing behavior."""
 
-    def test_default_settings(self, monkeypatch):
-        """Test default settings values."""
-        # Clear any existing environment variables
-        monkeypatch.delenv("REVERSECORE_WORKSPACE", raising=False)
-        monkeypatch.delenv("LOG_LEVEL", raising=False)
-        monkeypatch.delenv("RATE_LIMIT", raising=False)
-        monkeypatch.delenv("STRUCTURED_ERRORS", raising=False)
-        
-        settings = reload_settings()
-        assert settings.reversecore_workspace == Path("/app/workspace")
-        assert settings.log_level == "INFO"
-        assert settings.rate_limit == 60
-        assert settings.structured_errors is False
+    def test_default_values(self, monkeypatch):
+        """Config.from_env should honor module defaults when env vars are unset."""
+        for key in (
+            "REVERSECORE_WORKSPACE",
+            "REVERSECORE_READ_DIRS",
+            "LOG_LEVEL",
+            "LOG_FILE",
+            "LOG_FORMAT",
+            "STRUCTURED_ERRORS",
+            "RATE_LIMIT",
+            "LIEF_MAX_FILE_SIZE",
+            "MCP_TRANSPORT",
+        ):
+            monkeypatch.delenv(key, raising=False)
 
-    def test_environment_override(self, monkeypatch, tmp_path):
-        """Test that environment variables override defaults."""
-        workspace = tmp_path / "custom_workspace"
+        config = reset_config()
+
+        assert config.workspace == Path("/app/workspace").resolve()
+        assert config.read_only_dirs == (Path("/app/rules").resolve(),)
+        assert config.log_level == "INFO"
+        assert config.log_file == Path("/tmp/reversecore/app.log")
+        assert config.log_format == "human"
+        assert config.structured_errors is False
+        assert config.rate_limit == 60
+        assert config.lief_max_file_size == 1_000_000_000
+        assert config.mcp_transport == "stdio"
+
+    def test_environment_overrides(self, monkeypatch, tmp_path):
+        """Environment variables should override defaults when present."""
+        workspace = tmp_path / "custom-workspace"
         workspace.mkdir()
-        
+        read_dir_one = tmp_path / "rules1"
+        read_dir_two = tmp_path / "rules2"
+        read_dir_one.mkdir()
+        read_dir_two.mkdir()
+
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
-        monkeypatch.setenv("LOG_LEVEL", "DEBUG")
-        monkeypatch.setenv("RATE_LIMIT", "120")
+        monkeypatch.setenv(
+            "REVERSECORE_READ_DIRS",
+            f" {read_dir_one} , {read_dir_two} ",
+        )
+        monkeypatch.setenv("LOG_LEVEL", "debug")
+        monkeypatch.setenv("LOG_FILE", str(tmp_path / "app.log"))
+        monkeypatch.setenv("LOG_FORMAT", "json")
         monkeypatch.setenv("STRUCTURED_ERRORS", "true")
-        
-        settings = reload_settings()
-        assert settings.reversecore_workspace == workspace
-        assert settings.log_level == "DEBUG"
-        assert settings.rate_limit == 120
-        assert settings.structured_errors is True
+        monkeypatch.setenv("RATE_LIMIT", "120")
+        monkeypatch.setenv("LIEF_MAX_FILE_SIZE", "2048")
+        monkeypatch.setenv("MCP_TRANSPORT", "websocket")
 
-    def test_allowed_workspace_resolution(self, tmp_path, monkeypatch):
-        """Test that allowed_workspace returns resolved path."""
+        config = reset_config()
+
+        assert config.workspace == workspace.resolve()
+        assert config.read_only_dirs == (
+            read_dir_one.resolve(),
+            read_dir_two.resolve(),
+        )
+        assert config.log_level == "DEBUG"
+        assert config.log_file == Path(tmp_path / "app.log")
+        assert config.log_format == "json"
+        assert config.structured_errors is True
+        assert config.rate_limit == 120
+        assert config.lief_max_file_size == 2048
+        assert config.mcp_transport == "websocket"
+
+
+class TestConfigCaching:
+    """Ensure get_config/reset_config manage the singleton correctly."""
+
+    def test_get_config_returns_cached_instance(self, monkeypatch):
+        """Multiple calls to get_config should return the same object."""
+        monkeypatch.delenv("REVERSECORE_WORKSPACE", raising=False)
+        reset_config()
+        first = get_config()
+        second = get_config()
+        assert first is second
+
+    def test_reset_config_reloads_from_env(self, monkeypatch, tmp_path):
+        """reset_config should rebuild the singleton when env changes."""
+        workspace_one = tmp_path / "ws1"
+        workspace_two = tmp_path / "ws2"
+        workspace_one.mkdir()
+        workspace_two.mkdir()
+
+        monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace_one))
+        config_one = reset_config()
+        assert config_one.workspace == workspace_one.resolve()
+
+        monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace_two))
+        config_two = reset_config()
+        assert config_two.workspace == workspace_two.resolve()
+        # After reset, get_config should return the latest snapshot
+        assert get_config() is config_two
+
+
+class TestConfigValidation:
+    """Exercise Config.validate_paths edge cases."""
+
+    def test_validate_paths_success(self, monkeypatch, tmp_path):
         workspace = tmp_path / "workspace"
-        workspace.mkdir()
-        monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
-        
-        settings = reload_settings()
-        assert settings.allowed_workspace == workspace.resolve()
-
-    def test_allowed_read_dirs_parsing(self, tmp_path, monkeypatch):
-        """Test comma-separated read dirs parsing."""
-        dir1 = tmp_path / "rules1"
-        dir2 = tmp_path / "rules2"
-        dir1.mkdir()
-        dir2.mkdir()
-        
-        monkeypatch.setenv("REVERSECORE_READ_DIRS", f"{dir1},{dir2}")
-        settings = reload_settings()
-        
-        assert len(settings.allowed_read_dirs) == 2
-        assert dir1.resolve() in settings.allowed_read_dirs
-        assert dir2.resolve() in settings.allowed_read_dirs
-
-    def test_singleton_pattern(self):
-        """Test that get_settings returns the same instance."""
-        settings1 = get_settings()
-        settings2 = get_settings()
-        assert settings1 is settings2
-
-    def test_reload_settings_creates_new_instance(self):
-        """Test that reload_settings creates a new instance."""
-        settings1 = get_settings()
-        settings2 = reload_settings()
-        # After reload, get_settings should return the new instance
-        settings3 = get_settings()
-        assert settings2 is settings3
-
-    def test_empty_read_dirs_handling(self, monkeypatch):
-        """Test handling of empty read dirs."""
-        monkeypatch.setenv("REVERSECORE_READ_DIRS", "")
-        settings = reload_settings()
-        assert settings.allowed_read_dirs == []
-
-    def test_read_dirs_with_whitespace(self, tmp_path, monkeypatch):
-        """Test that whitespace in read dirs is handled correctly."""
-        dir1 = tmp_path / "rules1"
-        dir2 = tmp_path / "rules2"
-        dir1.mkdir()
-        dir2.mkdir()
-        
-        # Add extra whitespace
-        monkeypatch.setenv("REVERSECORE_READ_DIRS", f" {dir1} , {dir2} ")
-        settings = reload_settings()
-        
-        assert len(settings.allowed_read_dirs) == 2
-        assert dir1.resolve() in settings.allowed_read_dirs
-        assert dir2.resolve() in settings.allowed_read_dirs
-
-    def test_validate_paths_success(self, tmp_path, monkeypatch):
-        """Test validate_paths succeeds when all paths exist."""
-        workspace = tmp_path / "workspace"
-        workspace.mkdir()
         read_dir = tmp_path / "rules"
+        workspace.mkdir()
         read_dir.mkdir()
-        
+
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-        settings = reload_settings()
-        
-        # Should not raise any exception
-        settings.validate_paths()
+        config = reset_config()
 
-    def test_validate_paths_workspace_missing(self, tmp_path, monkeypatch):
-        """Test validate_paths raises error when workspace doesn't exist."""
-        workspace = tmp_path / "nonexistent_workspace"
+        config.validate_paths()  # Should not raise
+
+    def test_validate_paths_workspace_missing(self, monkeypatch, tmp_path):
+        workspace = tmp_path / "missing"
         read_dir = tmp_path / "rules"
         read_dir.mkdir()
-        
+
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-        settings = reload_settings()
-        
+        config = reset_config()
+
         with pytest.raises(ValueError, match="Workspace directory does not exist"):
-            settings.validate_paths()
+            config.validate_paths()
 
-    def test_validate_paths_workspace_not_directory(self, tmp_path, monkeypatch):
-        """Test validate_paths raises error when workspace is not a directory."""
+    def test_validate_paths_workspace_not_directory(self, monkeypatch, tmp_path):
         workspace = tmp_path / "file.txt"
-        workspace.write_text("not a directory")
+        workspace.write_text("not a dir")
         read_dir = tmp_path / "rules"
         read_dir.mkdir()
-        
+
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-        settings = reload_settings()
-        
-        with pytest.raises(ValueError, match="Workspace path is not a directory"):
-            settings.validate_paths()
+        config = reset_config()
 
-    def test_validate_paths_read_dir_missing(self, tmp_path, monkeypatch):
-        """Test validate_paths raises error when read directory doesn't exist."""
+        with pytest.raises(ValueError, match="Workspace path is not a directory"):
+            config.validate_paths()
+
+    def test_validate_paths_read_dir_missing(self, monkeypatch, tmp_path):
         workspace = tmp_path / "workspace"
         workspace.mkdir()
-        read_dir = tmp_path / "nonexistent_rules"
-        
+        read_dir = tmp_path / "missing"
+
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-        settings = reload_settings()
-        
-        with pytest.raises(ValueError, match="Read directory does not exist"):
-            settings.validate_paths()
+        config = reset_config()
 
-    def test_validate_paths_read_dir_not_directory(self, tmp_path, monkeypatch):
-        """Test validate_paths raises error when read directory is not a directory."""
+        with pytest.raises(ValueError, match="Read directory does not exist"):
+            config.validate_paths()
+
+    def test_validate_paths_read_dir_not_directory(self, monkeypatch, tmp_path):
         workspace = tmp_path / "workspace"
         workspace.mkdir()
         read_dir = tmp_path / "file.txt"
-        read_dir.write_text("not a directory")
-        
+        read_dir.write_text("not a dir")
+
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-        settings = reload_settings()
-        
+        config = reset_config()
+
         with pytest.raises(ValueError, match="Read directory path is not a directory"):
-            settings.validate_paths()
+            config.validate_paths()
 
