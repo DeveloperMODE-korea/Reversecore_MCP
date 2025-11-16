@@ -31,7 +31,7 @@ An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents 
   - [Using Docker (Recommended)](#using-docker-recommended)
   - [Local Installation](#local-installation)
 - [MCP Client Integration](#mcp-client-integration)
-  - [Cursor AI Setup](#cursor-ai-setup-http-standard-connection)
+  - [Cursor AI Setup](#cursor-ai-setup-stdio-standard-connection)
   - [Other MCP Clients](#other-mcp-clients)
 - [Usage](#usage)
   - [Project Goal](#project-goal)
