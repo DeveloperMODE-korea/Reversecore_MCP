@@ -2,6 +2,7 @@
 
 from io import StringIO
 import subprocess
+import sys
 
 import pytest
 
@@ -55,6 +56,11 @@ def fake_popen(monkeypatch):
         monkeypatch.setattr(
             "reversecore_mcp.core.execution.subprocess.Popen",
             _popen,
+        )
+        # Force Windows-style polling to avoid select() on StringIO
+        monkeypatch.setattr(
+            "reversecore_mcp.core.execution.sys.platform",
+            "win32",
         )
         return process
 
