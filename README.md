@@ -47,6 +47,10 @@ An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents 
 - [Contributing](#contributing)
 - [License](#license)
 
+## 📝 Author's Note
+
+This project is a toy project created with the assistance of AI. It was developed for analyzing C++ files and serves as an educational exploration of reverse engineering tools integrated with the Model Context Protocol (MCP). While designed as a learning project, it demonstrates production-ready practices in security, performance, and architecture.
+
 ## Overview
 
 ### What is MCP?
