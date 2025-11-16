@@ -11,6 +11,7 @@
 # ============================================================================
 FROM python:3.11-slim-bookworm AS builder
 ARG YARA_VERSION=4.3.1
+ARG RADARE2_VERSION=6.0.4
 
 # Set working directory
 WORKDIR /app
@@ -28,6 +29,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     flex \
     bison \
     libssl-dev \
+    git \
+    patch \
+    xz-utils \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -42,6 +46,15 @@ RUN curl -sSL "https://github.com/VirusTotal/yara/archive/refs/tags/v${YARA_VERS
     && make install \
     && ldconfig \
     && rm -rf /tmp/yara*
+
+# Build radare2 from source to ensure availability on Debian bookworm
+RUN curl -sSL "https://github.com/radareorg/radare2/releases/download/${RADARE2_VERSION}/radare2-${RADARE2_VERSION}.tar.xz" -o /tmp/radare2.tar.xz \
+    && tar -xJf /tmp/radare2.tar.xz -C /tmp \
+    && cd /tmp/radare2-${RADARE2_VERSION} \
+    && ./configure --prefix=/opt/radare2 \
+    && make -j"$(nproc)" \
+    && make install \
+    && rm -rf /tmp/radare2*
 
 # Copy requirements file
 COPY requirements.txt .
@@ -67,37 +80,29 @@ RUN mkdir -p /app/workspace /app/rules
 # Versions are pinned to ensure consistent behavior across builds
 # To check available versions: apt-cache madison <package-name>
 #
-# Note: radare2 packages are available via Debian repositories but are
-# updated frequently, so we do not pin an exact version.
-# For stricter reproducibility, consider mirroring the package or building
-# from source in the builder stage.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # coreutils "file" command required by run_file tool
-    # Version: 1:5.44-3 (Debian 12 Bookworm)
-    file=1:5.44-3 \
-    # Binutils for strings command
-    # Version: 2.40-2 (Debian 12 Bookworm)
-    binutils=2.40-2 \
-    # Binwalk for firmware analysis and file carving
-    # Version: 2.3.4+dfsg1-1 (Debian 12 Bookworm)
-    binwalk=2.3.4+dfsg1-1 \
-    # radare2 CLI required for advanced disassembly workflows
-    radare2 \
-    # Cleanup
+# Note: radare2 is built in the builder stage to guarantee availability on bookworm.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        # coreutils "file" command required by run_file tool
+        # Version: 1:5.44-3 (Debian 12 Bookworm)
+        file=1:5.44-3 \
+        # Binutils for strings command
+        # Version: 2.40-2 (Debian 12 Bookworm)
+        binutils=2.40-2 \
+        # Binwalk for firmware analysis and file carving
+        # Version: 2.3.4+dfsg1-1 (Debian 12 Bookworm)
+        binwalk=2.3.4+dfsg1-1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy YARA 4.3.1 toolchain built in the builder stage so native libs match python bindings
+# Copy native tooling built in the builder stage so CLI tools match Python bindings
 RUN mkdir -p /usr/local/include /usr/local/lib/pkgconfig
 COPY --from=builder /usr/local/bin/yara /usr/local/bin/yara
 COPY --from=builder /usr/local/bin/yarac /usr/local/bin/yarac
 COPY --from=builder /usr/local/lib/libyara* /usr/local/lib/
 COPY --from=builder /usr/local/include/yara /usr/local/include/yara
 COPY --from=builder /usr/local/lib/pkgconfig/yara.pc /usr/local/lib/pkgconfig/yara.pc
-RUN ldconfig
-
-# Optional: Install radare2 from pip (r2pipe already provides Python bindings)
-# The r2pipe Python package can work standalone for many operations
-# For full radare2 CLI tools, build from source or use a different base image
+COPY --from=builder /opt/radare2 /opt/radare2
+RUN echo "/opt/radare2/lib" > /etc/ld.so.conf.d/radare2.conf && ldconfig
 
 # Copy Python virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
@@ -107,7 +112,7 @@ COPY reversecore_mcp/ ./reversecore_mcp/
 COPY server.py ./
 
 # Set Python path to use the venv and configure application
-ENV PATH="/opt/venv/bin:$PATH" \
+ENV PATH="/opt/radare2/bin:/opt/venv/bin:$PATH" \
     PYTHONPATH=/app \
     REVERSECORE_WORKSPACE=/app/workspace \
     MCP_TRANSPORT=http \

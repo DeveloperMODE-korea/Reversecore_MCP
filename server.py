@@ -41,7 +41,7 @@ def main():
     if transport == "http":
         # HTTP transport mode for network-based AI agents
         import uvicorn
-        from fastapi import FastAPI
+        from fastapi import FastAPI, UploadFile, File
         from fastapi.responses import JSONResponse
         from reversecore_mcp.core.metrics import metrics_collector
 
@@ -72,6 +72,57 @@ def main():
         async def metrics():
             """Metrics endpoint returning collected tool metrics."""
             return JSONResponse(content=metrics_collector.get_metrics())
+
+        # Add file upload endpoint for remote clients (e.g., Claude.ai)
+        @app.post("/upload")
+        async def upload_file(file: UploadFile = File(...)):
+            """
+            Upload a file to the workspace for analysis.
+            
+            This endpoint allows remote clients (like Claude.ai) to upload files
+            to the local workspace for analysis by MCP tools.
+            
+            Args:
+                file: The file to upload (multipart/form-data)
+            
+            Returns:
+                JSON response with file path and status
+            """
+            from pathlib import Path
+            import shutil
+            
+            try:
+                # Ensure workspace exists
+                workspace = settings.workspace
+                workspace.mkdir(parents=True, exist_ok=True)
+                
+                # Save uploaded file to workspace
+                file_path = workspace / file.filename
+                
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+                
+                logger.info(f"File uploaded: {file.filename} -> {file_path}")
+                
+                return JSONResponse(
+                    content={
+                        "status": "success",
+                        "message": f"File uploaded successfully",
+                        "file_path": str(file_path),
+                        "workspace_path": f"/app/workspace/{file.filename}" if str(workspace).endswith("workspace") else str(file_path),
+                        "filename": file.filename,
+                        "size": file_path.stat().st_size
+                    }
+                )
+            except Exception as e:
+                logger.error(f"File upload failed: {e}")
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "status": "error",
+                        "message": f"File upload failed: {str(e)}"
+                    }
+                )
 
         # Optional: apply rate limiting if slowapi is available
         try:
