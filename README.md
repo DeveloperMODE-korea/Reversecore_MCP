@@ -1577,5 +1577,108 @@ Special thanks to:
 
 ---
 
+## 🔬 Sample Analysis Reports
+
+### Malware Sample Analysis: 8bdc6cdcad8477122d419a0959b9beda78050818cb52f76d5c58826111e2cacc
+
+**Analysis Date**: 2025-11-17  
+**Sample Source**: [MalwareBazaar](https://bazaar.abuse.ch/sample/8bdc6cdcad8477122d419a0959b9beda78050818cb52f76d5c58826111e2cacc/)  
+**File Hash**: MD5: `3d0ec70fe7ed5f7245fad8b87d9451d7`  
+**Risk Level**: 🔴 **High**
+
+#### Executive Summary
+
+This file is a **PyInstaller-packaged Python malware** (12.8 MB PE32+ executable) exhibiting multiple high-risk behaviors including anti-debugging, process manipulation, privilege escalation attempts, and network communication capabilities. The analysis confirms it is likely an **Information Stealer** or **Remote Access Trojan (RAT)**.
+
+#### Key Findings
+
+**Malicious Indicators:**
+- ✅ Anti-debugging techniques (`IsDebuggerPresent`)
+- ✅ Process manipulation (`CreateProcessW`, `K32EnumProcessModules`)
+- ✅ Privilege escalation (`OpenProcessToken`, `GetTokenInformation`)
+- ✅ Dynamic code execution (`LoadLibraryExW`, `GetProcAddress`, `VirtualProtect`)
+- ✅ System shutdown blocking (`ShutdownBlockReasonCreate`)
+- ✅ Network capabilities (HTTP, WebSocket, SOCKS proxy)
+- ✅ System information gathering (`psutil`, process enumeration)
+
+**Technical Details:**
+- **File Type**: PE32+ x86-64 Windows GUI executable
+- **Compilation**: Future date (2025-11-15) - suspicious timestamp
+- **Packer**: PyInstaller with Python 3.13 runtime
+- **Security Features**: NX, ASLR, Canary enabled
+- **Overlay**: Present (suspicious additional data)
+- **Entry Point**: `0x14000da30` with anti-debugging checks
+
+**Network Components:**
+```
+- HTTP/HTTPS client (requests, urllib3)
+- WebSocket support (websocket)
+- SOCKS proxy (python_socks)
+- SSL/TLS (certifi)
+- HTTP/2 support (h2)
+```
+
+**System Manipulation:**
+```python
+# Key Python libraries found:
+- psutil          # System information gathering
+- subprocess      # Process execution
+- multiprocessing # Multi-process control
+- ctypes          # Windows API access
+- win32con, winrt # Windows Runtime
+```
+
+#### Analysis Methodology
+
+All analysis performed using **Reversecore_MCP** tools in strict compliance with analysis rules:
+
+1. **File Identification**: `run_file` - Basic metadata extraction
+2. **PE Structure**: `parse_binary_with_lief` - Section analysis, imports, security features
+3. **String Analysis**: `run_strings` - Extracted 1095.1 KB of strings
+4. **Disassembly**: `run_radare2` - Entry point analysis, import functions
+5. **Embedded Patterns**: `run_binwalk` - Detected suspicious ARM instructions
+6. **Binary Info**: `run_radare2 iI/iS/ii/iz` - Comprehensive binary metadata
+
+**Rule Compliance:**
+- ✅ **Rule 1**: All file paths used `/app/workspace/` prefix
+- ✅ **Rule 2**: Used radare2 `pd @ VA` instead of Capstone for VA-based disassembly
+- ✅ **Rule 3**: No radare2 filter syntax (`~`, `|`) used
+
+#### Recommended Actions
+
+**Immediate:**
+1. 🚨 Isolate system from network
+2. 🚫 Block all network traffic
+3. 🔍 Monitor API calls and file changes
+4. 🧹 Full system malware scan
+
+**Further Analysis:**
+1. **Dynamic Analysis**: Execute in sandbox, capture network traffic
+2. **PyInstaller Unpacking**: Extract Python bytecode, restore source
+3. **Network Analysis**: Identify C2 servers, analyze protocols
+4. **Memory Analysis**: Dump during execution, analyze injected code
+
+#### IOC Summary
+
+| Indicator Type | Details |
+|----------------|---------|
+| File Hash (MD5) | `3d0ec70fe7ed5f7245fad8b87d9451d7` |
+| File Hash (SHA256) | `8bdc6cdcad8477122d419a0959b9beda78050818cb52f76d5c58826111e2cacc` |
+| File Size | 13,378,431 bytes |
+| Entry Point | `0x14000da30` |
+| Suspicious APIs | `IsDebuggerPresent`, `CreateProcessW`, `VirtualProtect`, `OpenProcessToken` |
+| Network Libs | `requests`, `urllib3`, `websocket`, `python_socks` |
+| Timestamp | 2025-11-15 20:47:37 (future date) |
+
+**Estimated Threat Types:**
+- Information Stealer
+- Remote Access Trojan (RAT)
+- Backdoor
+- Downloader
+
+📄 **[View Full Analysis Report](docs/sample_reports/8bdc6cdcad8477122d419a0959b9beda78050818cb52f76d5c58826111e2cacc_analysis.md)**
+
+---
+
 **Built with ❤️ for the reverse engineering and security research community**
 
