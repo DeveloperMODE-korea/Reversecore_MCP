@@ -106,6 +106,7 @@ class TestExecuteSubprocessStreaming:
         original_wait_for = asyncio.wait_for
         
         async def fake_wait_for(coro, timeout):
+            coro.close()
             raise asyncio.TimeoutError()
         
         monkeypatch.setattr("asyncio.wait_for", fake_wait_for)
@@ -147,4 +148,22 @@ class TestExecuteSubprocessStreaming:
             ["no", "output"], max_output_size=1000, timeout=10
         )
         assert bytes_read == 0 or len(output.strip()) == 0
+
+    def test_detects_running_event_loop(self, fake_async_subprocess, monkeypatch):
+        """Ensure commands still run when an event loop is already active."""
+        fake_async_subprocess(stdout_data=b"loop-aware", return_code=0)
+
+        class _FakeLoop:
+            def is_running(self):
+                return True
+
+        monkeypatch.setattr(
+            "reversecore_mcp.core.execution.asyncio.get_running_loop",
+            lambda: _FakeLoop(),
+        )
+
+        output, _ = execute_subprocess_streaming(
+            ["loop", "command"], max_output_size=1000, timeout=10
+        )
+        assert "loop-aware" in output
 

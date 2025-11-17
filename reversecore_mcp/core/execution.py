@@ -10,12 +10,46 @@ This module provides functions to execute subprocess commands safely with:
 
 import asyncio
 import subprocess
-from typing import Tuple
+import threading
+from typing import Any, Coroutine, Tuple
 
 from reversecore_mcp.core.exceptions import (
     ExecutionTimeoutError,
     ToolNotFoundError,
 )
+
+
+class _BackgroundLoopRunner:
+    """Run asyncio coroutines on a dedicated background event loop."""
+
+    def __init__(self) -> None:
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(
+            target=self._run_loop,
+            name="ReversecoreAsyncLoop",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def _run_loop(self) -> None:
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_forever()
+
+    def run(self, coro: Coroutine[Any, Any, Tuple[str, int]]) -> Tuple[str, int]:
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        return future.result()
+
+
+_BACKGROUND_LOOP_LOCK = threading.Lock()
+_BACKGROUND_LOOP_RUNNER: _BackgroundLoopRunner | None = None
+
+
+def _get_background_runner() -> _BackgroundLoopRunner:
+    global _BACKGROUND_LOOP_RUNNER
+    with _BACKGROUND_LOOP_LOCK:
+        if _BACKGROUND_LOOP_RUNNER is None:
+            _BACKGROUND_LOOP_RUNNER = _BackgroundLoopRunner()
+        return _BACKGROUND_LOOP_RUNNER
 
 
 async def execute_subprocess_async(
@@ -170,13 +204,21 @@ def execute_subprocess_streaming(
         ExecutionTimeoutError: If the command exceeds the timeout
         subprocess.CalledProcessError: If the command returns non-zero exit code
     """
-    return asyncio.run(
-        execute_subprocess_async(
-            cmd,
-            max_output_size=max_output_size,
-            timeout=timeout,
-            encoding=encoding,
-            errors=errors,
-        )
+    coro = execute_subprocess_async(
+        cmd,
+        max_output_size=max_output_size,
+        timeout=timeout,
+        encoding=encoding,
+        errors=errors,
     )
+
+    try:
+        running_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        running_loop = None
+
+    if running_loop and running_loop.is_running():
+        return _get_background_runner().run(coro)
+
+    return asyncio.run(coro)
 
