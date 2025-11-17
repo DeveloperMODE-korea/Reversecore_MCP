@@ -5,6 +5,17 @@
 #
 # Note: radare2 is not available in Debian Bookworm main repo, so we skip version pinning for it
 # or install it from testing/backports if needed.
+#
+# Supported Features:
+# - Basic Analysis: file, strings, binwalk
+# - Disassembly & Analysis: radare2 (pdf, afl, ii, iz, etc.)
+# - CFG Visualization: radare2 agfj (graph JSON)
+# - ESIL Emulation: radare2 aei/aeim/aes (virtual CPU)
+# - Smart Decompile: radare2 pdc (pseudo-C generation)
+# - YARA Rule Generation: radare2 p8 (opcode extraction)
+# - Pattern Matching: YARA scanning
+# - Multi-arch Disassembly: Capstone
+# - Binary Parsing: LIEF (PE/ELF/Mach-O)
 
 # ============================================================================
 # Build Stage: Install dependencies that require compilation
@@ -48,6 +59,14 @@ RUN curl -sSL "https://github.com/VirusTotal/yara/archive/refs/tags/v${YARA_VERS
     && rm -rf /tmp/yara*
 
 # Build radare2 from source to ensure availability on Debian bookworm
+# Radare2 provides comprehensive reverse engineering capabilities:
+# - Standard disassembly (pdf, pd)
+# - Control Flow Graph generation (agfj)
+# - ESIL emulation engine (aei, aeim, aes, ar)
+# - Pseudo-C decompilation (pdc)
+# - Binary analysis (aaa, afl, afi)
+# - String and import extraction (iz, ii)
+# - Hex dump and byte printing (px, p8)
 RUN curl -sSL "https://github.com/radareorg/radare2/releases/download/${RADARE2_VERSION}/radare2-${RADARE2_VERSION}.tar.xz" -o /tmp/radare2.tar.xz \
     && tar -xJf /tmp/radare2.tar.xz -C /tmp \
     && cd /tmp/radare2-${RADARE2_VERSION} \
