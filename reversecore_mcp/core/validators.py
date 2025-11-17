@@ -23,6 +23,7 @@ def validate_tool_parameters(tool_name: str, params: Dict[str, Any]) -> None:
         "disassemble_with_capstone": _validate_capstone_params,
         "run_yara": _validate_yara_params,
         "generate_function_graph": _validate_cfg_params,
+        "emulate_machine_code": _validate_emulation_params,
     }
     
     if tool_name in validators:
@@ -84,4 +85,24 @@ def _validate_cfg_params(params: Dict[str, Any]) -> None:
     if output_format not in allowed_formats:
         raise ValidationError(
             f"Invalid format '{output_format}'. Allowed: {', '.join(allowed_formats)}"
+        )
+
+
+def _validate_emulation_params(params: Dict[str, Any]) -> None:
+    """Validate emulate_machine_code parameters."""
+    if "start_address" in params:
+        if not isinstance(params["start_address"], str):
+            raise ValidationError("start_address must be a string")
+    
+    instructions = params.get("instructions", 50)
+    if not isinstance(instructions, int):
+        raise ValidationError("instructions must be an integer")
+    
+    # Critical: Prevent infinite loops and CPU exhaustion
+    if instructions < 1:
+        raise ValidationError("instructions must be at least 1")
+    
+    if instructions > 1000:
+        raise ValidationError(
+            "instructions cannot exceed 1000 (safety limit to prevent CPU exhaustion)"
         )

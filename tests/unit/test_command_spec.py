@@ -188,6 +188,33 @@ class TestValidateR2Command:
         with pytest.raises(ValidationError):
             validate_r2_command("agfj @ main; rm -rf /")
     
+    def test_esil_emulation_commands(self):
+        """Test ESIL emulation command validation."""
+        # Valid ESIL commands - should not raise
+        validate_r2_command("aei")
+        validate_r2_command("aeim")
+        validate_r2_command("aeip")
+        validate_r2_command("aes")
+        validate_r2_command("aes 50")
+        validate_r2_command("aes 1000")
+        validate_r2_command("ar")
+        validate_r2_command("arj")
+        validate_r2_command("s main")
+        validate_r2_command("s 0x401000")
+        validate_r2_command("s sym.decrypt")
+    
+    def test_esil_commands_invalid_patterns(self):
+        """Test that ESIL commands block dangerous patterns."""
+        # Should block command injection
+        with pytest.raises(ValidationError):
+            validate_r2_command("aei; w hello")
+        
+        with pytest.raises(ValidationError):
+            validate_r2_command("aes 50 | cat")
+        
+        with pytest.raises(ValidationError):
+            validate_r2_command("s main && rm -rf /")
+    
     def test_empty_command_rejected(self):
         """Test that empty commands are rejected."""
         with pytest.raises(ValidationError) as exc_info:

@@ -31,6 +31,7 @@ def register_cli_tools(mcp: FastMCP) -> None:
     mcp.tool(copy_to_workspace)
     mcp.tool(list_workspace)
     mcp.tool(generate_function_graph)
+    mcp.tool(emulate_machine_code)
 
 
 @log_execution(tool_name="run_file")
@@ -410,3 +411,130 @@ async def generate_function_graph(
         return success(dot_output, bytes_read=dot_bytes, format="dot")
     
     return failure("INVALID_FORMAT", f"Unsupported format: {format}")
+
+
+def _parse_register_state(ar_output: str) -> dict:
+    """
+    Parse radare2 'ar' command output into structured register state.
+    
+    Args:
+        ar_output: Raw output from 'ar' command
+        
+    Returns:
+        Dictionary mapping register names to values
+        
+    Example output from 'ar':
+        rax = 0x00000000
+        rbx = 0x00401000
+        ...
+    """
+    registers = {}
+    
+    for line in ar_output.strip().split('\n'):
+        if '=' in line:
+            parts = line.split('=')
+            if len(parts) == 2:
+                reg_name = parts[0].strip()
+                reg_value = parts[1].strip()
+                registers[reg_name] = reg_value
+    
+    return registers
+
+
+@log_execution(tool_name="emulate_machine_code")
+@track_metrics("emulate_machine_code")
+@handle_tool_errors
+async def emulate_machine_code(
+    file_path: str,
+    start_address: str,
+    instructions: int = 50,
+    timeout: int = 300,
+) -> ToolResult:
+    """
+    Emulate machine code execution using radare2 ESIL (Evaluable Strings Intermediate Language).
+    
+    This tool provides safe, sandboxed emulation of binary code without actual execution.
+    Perfect for analyzing obfuscated code, understanding register states, and predicting
+    execution outcomes without security risks.
+    
+    **Key Use Cases:**
+    - De-obfuscation: Reveal hidden strings by emulating XOR/shift operations
+    - Register Analysis: See final register values after code execution
+    - Safe Malware Analysis: Predict behavior without running malicious code
+    
+    **Safety Features:**
+    - Virtual CPU simulation (no real execution)
+    - Instruction count limit (max 1000) prevents infinite loops
+    - Memory sandboxing (changes don't affect host system)
+
+    Args:
+        file_path: Path to the binary file (must be in workspace)
+        start_address: Address to start emulation (e.g., 'main', '0x401000', 'sym.decrypt')
+        instructions: Number of instructions to execute (default 50, max 1000)
+        timeout: Execution timeout in seconds
+        
+    Returns:
+        ToolResult with register states and emulation summary
+    """
+    from reversecore_mcp.core.result import failure
+    
+    # 1. Parameter validation
+    validate_tool_parameters(
+        "emulate_machine_code",
+        {"start_address": start_address, "instructions": instructions}
+    )
+    validated_path = validate_file_path(file_path)
+    
+    # 2. Security check for start address (prevent shell injection)
+    if not re.match(r'^[a-zA-Z0-9_.]+$', start_address.replace("0x", "")):
+        return failure("VALIDATION_ERROR", "Invalid start address format")
+
+    # 3. Build radare2 ESIL emulation command chain
+    # Note: Commands must be executed in specific order for ESIL to work correctly
+    cmd = [
+        "r2",
+        "-q",
+        "-c", "aaa",                    # Analyze all
+        "-c", f"s {start_address}",     # Seek to start address
+        "-c", "aei",                    # Initialize ESIL VM
+        "-c", "aeim",                   # Initialize ESIL memory (stack)
+        "-c", "aeip",                   # Initialize program counter to current seek
+        "-c", f"aes {instructions}",   # Step through N instructions
+        "-c", "ar",                     # Show all registers
+        str(validated_path)
+    ]
+
+    # 4. Execute emulation
+    try:
+        output, bytes_read = await execute_subprocess_async(
+            cmd,
+            max_output_size=10_000_000,  # Register output is typically small
+            timeout=timeout,
+        )
+        
+        # 5. Parse register state
+        register_state = _parse_register_state(output)
+        
+        if not register_state:
+            return failure(
+                "EMULATION_ERROR",
+                "Failed to extract register state from emulation output",
+                hint="The binary may not be compatible with ESIL emulation, or the start address is invalid"
+            )
+        
+        # 6. Build result with metadata
+        return success(
+            register_state,
+            bytes_read=bytes_read,
+            format="register_state",
+            instructions_executed=instructions,
+            start_address=start_address,
+            description=f"Emulated {instructions} instructions starting at {start_address}"
+        )
+        
+    except Exception as e:
+        return failure(
+            "EMULATION_ERROR",
+            f"ESIL emulation failed: {str(e)}",
+            hint="Check that the binary architecture is supported and the start address is valid"
+        )

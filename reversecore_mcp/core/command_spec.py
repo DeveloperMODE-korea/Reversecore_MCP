@@ -132,6 +132,44 @@ R2_COMMAND_SPECS: List[CommandSpec] = [
         description="Print function graph in JSON format"
     ),
     
+    # ESIL emulation commands
+    CommandSpec(
+        name="aei",
+        type="analyze",
+        regex=re.compile(r'^aei$'),
+        description="Initialize ESIL VM"
+    ),
+    CommandSpec(
+        name="aeim",
+        type="analyze",
+        regex=re.compile(r'^aeim$'),
+        description="Initialize ESIL VM memory (stack)"
+    ),
+    CommandSpec(
+        name="aeip",
+        type="analyze",
+        regex=re.compile(r'^aeip$'),
+        description="Initialize ESIL VM program counter"
+    ),
+    CommandSpec(
+        name="aes",
+        type="analyze",
+        regex=re.compile(r'^aes(\s+\d+)?$'),
+        description="ESIL step execution"
+    ),
+    CommandSpec(
+        name="ar",
+        type="read",
+        regex=re.compile(r'^ar[j]?$'),
+        description="Show all register values"
+    ),
+    CommandSpec(
+        name="s",
+        type="analyze",
+        regex=re.compile(r'^s(\s+[a-zA-Z0-9_.]+)?$'),
+        description="Seek to address"
+    ),
+    
     # Information commands
     CommandSpec(
         name="i",
