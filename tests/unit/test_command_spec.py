@@ -77,6 +77,11 @@ class TestR2CommandSpecs:
         assert afl_spec.validate("afl") is True
         assert afl_spec.validate("aflj") is True
         assert afl_spec.validate("afl -h") is False  # No args allowed
+        
+        # Test ~ filter support
+        assert afl_spec.validate("afl~entry") is True
+        assert afl_spec.validate("afl ~entry") is True
+        assert afl_spec.validate("aflj~main") is True
     
     def test_px_command_patterns(self):
         """Test px hexdump command patterns."""
@@ -311,3 +316,69 @@ class TestSecurityRegressions:
                 validate_r2_command(attempt)
             # Should be caught by either dangerous pattern or regex mismatch
             assert "Dangerous" in str(exc_info.value) or "not in allowlist" in str(exc_info.value)
+
+
+class TestRadare2InternalFilter:
+    """Tests for radare2 internal filter (~) support."""
+    
+    def test_afl_with_tilde_filter(self):
+        """Test that afl~entry pattern works (from problem statement)."""
+        # This was the specific command mentioned in the problem statement
+        validated = validate_r2_command("afl~entry")
+        assert validated == "afl~entry"
+        
+        # Also test with space
+        validated = validate_r2_command("afl ~entry")
+        assert validated == "afl ~entry"
+    
+    def test_various_commands_with_tilde_filter(self):
+        """Test ~ filter on various commands."""
+        # These should all pass
+        test_cases = [
+            "afl~main",
+            "afl ~main",
+            "aflj~sym",
+            "iz~http",
+            "iz ~http",
+            "ii~kernel",
+            "iS~.text",
+            "pdf @ main~mov",
+            "pd 10 @ 0x1000~call",
+        ]
+        
+        for cmd in test_cases:
+            validated = validate_r2_command(cmd)
+            assert validated == cmd.strip()
+    
+    def test_tilde_filter_does_not_bypass_dangerous_patterns(self):
+        """Test that ~ filter doesn't allow dangerous patterns."""
+        # Pipe should still be blocked even with ~
+        with pytest.raises(ValidationError) as exc_info:
+            validate_r2_command("afl | grep main")
+        assert "Dangerous" in str(exc_info.value)
+        
+        # Semicolon should still be blocked
+        with pytest.raises(ValidationError) as exc_info:
+            validate_r2_command("afl~entry; w hello")
+        assert "Dangerous" in str(exc_info.value)
+        
+        # Command substitution should still be blocked
+        with pytest.raises(ValidationError) as exc_info:
+            validate_r2_command("afl~$(whoami)")
+        assert "Dangerous" in str(exc_info.value)
+    
+    def test_tilde_filter_with_complex_patterns(self):
+        """Test ~ filter with more complex filter patterns."""
+        # Radare2 supports various filter patterns
+        test_cases = [
+            "afl~[0]",           # Column filter
+            "afl~:0",            # Row filter
+            "afl~main[0]",       # Combined filter
+            "iz~http:10",        # Filter + row limit
+            "ii~kernel32.dll",   # Filter with dots
+        ]
+        
+        for cmd in test_cases:
+            validated = validate_r2_command(cmd)
+            assert validated == cmd.strip()
+
