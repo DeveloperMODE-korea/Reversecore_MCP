@@ -50,6 +50,59 @@ An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents 
 
 This project is a toy project created with the assistance of AI. It was developed for analyzing C++ files and serves as an educational exploration of reverse engineering tools integrated with the Model Context Protocol (MCP). While designed as a learning project, it demonstrates production-ready practices in security, performance, and architecture.
 
+## 🚨 AI Usage Guide (Rules for AI)
+
+When using this tool, **AI agents MUST follow these 3 absolute rules**:
+
+### 1. **File Path Rules**
+- ❌ **DO NOT** use host absolute paths (e.g., `E:\...`, `/home/user/...`)
+- ✅ **ALWAYS** use Docker container paths: `/app/workspace/filename`
+- All samples must be in the mounted workspace directory
+
+**Example:**
+```json
+// ❌ WRONG - Host path
+{"file_path": "E:\\samples\\malware.exe"}
+
+// ✅ CORRECT - Container path
+{"file_path": "/app/workspace/malware.exe"}
+```
+
+### 2. **Address Specification Rules (VA vs Offset)**
+- **Virtual Address (VA)**: Use `run_radare2` with commands like `pd @ <VA>`
+  - Example: `run_radare2("file.exe", "pdf @ 0x401000")`
+- **File Offset**: Use `disassemble_with_capstone` 
+  - Example: `disassemble_with_capstone("file.exe", offset=0x1000)`
+- ⚠️ **NEVER** pass VA to Capstone - it only accepts file offsets
+
+**Why this matters:**
+- Radare2 understands virtual addresses and handles PE/ELF address translation
+- Capstone works directly on file bytes at specific offsets
+- Mixing them causes errors
+
+### 3. **Filtering Rules**
+- ❌ **PROHIBITED**: Shell metacharacters (`|`, `;`, `&&`, `||`, `` ` ``, `$()`)
+  - These are **security risks** (command injection)
+- ✅ **ALLOWED**: Radare2 internal filter (`~`)
+  - Example: `afl~entry` (filter functions containing "entry")
+  - Safe because radare2 handles it internally, not the shell
+- 💡 **For complex filtering**: Request JSON output and process it yourself
+  - Example: Use `aflj` (JSON output) instead of complex `afl` filters
+
+**Examples:**
+```python
+# ✅ CORRECT - Using radare2 internal filter
+run_radare2("file.exe", "afl~main")      # List functions containing "main"
+run_radare2("file.exe", "iz~http")       # Find strings containing "http"
+
+# ❌ WRONG - Shell pipe (blocked)
+run_radare2("file.exe", "afl | grep main")
+
+# ✅ BETTER - Use JSON and filter yourself
+result = run_radare2("file.exe", "aflj")
+# Parse JSON and filter in your code
+```
+
 ## Overview
 
 ### What is MCP?

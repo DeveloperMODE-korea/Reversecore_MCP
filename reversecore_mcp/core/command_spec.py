@@ -52,31 +52,31 @@ R2_COMMAND_SPECS: List[CommandSpec] = [
     CommandSpec(
         name="pdf",
         type="read",
-        regex=re.compile(r'^pdf(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^pdf(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Print disassembly function"
     ),
     CommandSpec(
         name="pd",
         type="read",
-        regex=re.compile(r'^pd(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^pd(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Print disassembly"
     ),
     CommandSpec(
         name="pdfj",
         type="read",
-        regex=re.compile(r'^pdfj(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^pdfj(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Print disassembly function (JSON)"
     ),
     CommandSpec(
         name="pdj",
         type="read",
-        regex=re.compile(r'^pdj(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^pdj(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Print disassembly (JSON)"
     ),
     CommandSpec(
         name="pdc",
         type="read",
-        regex=re.compile(r'^pdc(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^pdc(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Print C-like pseudo code"
     ),
     
@@ -96,13 +96,13 @@ R2_COMMAND_SPECS: List[CommandSpec] = [
     CommandSpec(
         name="afl",
         type="read",
-        regex=re.compile(r'^afl[j]?$'),
+        regex=re.compile(r'^afl[j]?(\s*~.+)?$'),
         description="Analyze functions list"
     ),
     CommandSpec(
         name="aflj",
         type="read",
-        regex=re.compile(r'^aflj$'),
+        regex=re.compile(r'^aflj(\s*~.+)?$'),
         description="Analyze functions list (JSON)"
     ),
     CommandSpec(
@@ -114,13 +114,13 @@ R2_COMMAND_SPECS: List[CommandSpec] = [
     CommandSpec(
         name="afi",
         type="read",
-        regex=re.compile(r'^afi(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^afi(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Analyze function info"
     ),
     CommandSpec(
         name="afv",
         type="read",
-        regex=re.compile(r'^afv[j]?(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^afv[j]?(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Analyze function variables"
     ),
     
@@ -128,49 +128,49 @@ R2_COMMAND_SPECS: List[CommandSpec] = [
     CommandSpec(
         name="i",
         type="read",
-        regex=re.compile(r'^i[IiSszeEhj]?$'),
+        regex=re.compile(r'^i[IiSszeEhj]?(\s*~.+)?$'),
         description="File information"
     ),
     CommandSpec(
         name="iI",
         type="read",
-        regex=re.compile(r'^iI$'),
+        regex=re.compile(r'^iI(\s*~.+)?$'),
         description="Binary info"
     ),
     CommandSpec(
         name="ii",
         type="read",
-        regex=re.compile(r'^ii[j]?$'),
+        regex=re.compile(r'^ii[j]?(\s*~.+)?$'),
         description="Imports"
     ),
     CommandSpec(
         name="iS",
         type="read",
-        regex=re.compile(r'^iS[j]?$'),
+        regex=re.compile(r'^iS[j]?(\s*~.+)?$'),
         description="Sections"
     ),
     CommandSpec(
         name="iz",
         type="read",
-        regex=re.compile(r'^iz[j]?$'),
+        regex=re.compile(r'^iz[j]?(\s*~.+)?$'),
         description="Strings in data sections"
     ),
     CommandSpec(
         name="izz",
         type="read",
-        regex=re.compile(r'^izz[j]?$'),
+        regex=re.compile(r'^izz[j]?(\s*~.+)?$'),
         description="All strings"
     ),
     CommandSpec(
         name="ie",
         type="read",
-        regex=re.compile(r'^ie[j]?$'),
+        regex=re.compile(r'^ie[j]?(\s*~.+)?$'),
         description="Entry points"
     ),
     CommandSpec(
         name="iE",
         type="read",
-        regex=re.compile(r'^iE[j]?$'),
+        regex=re.compile(r'^iE[j]?(\s*~.+)?$'),
         description="Exports"
     ),
     
@@ -178,19 +178,19 @@ R2_COMMAND_SPECS: List[CommandSpec] = [
     CommandSpec(
         name="px",
         type="read",
-        regex=re.compile(r'^px[wqd]?(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^px[wqd]?(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Print hexdump"
     ),
     CommandSpec(
         name="pxw",
         type="read",
-        regex=re.compile(r'^pxw(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^pxw(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Print hexdump (words)"
     ),
     CommandSpec(
         name="pxq",
         type="read",
-        regex=re.compile(r'^pxq(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^pxq(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Print hexdump (qwords)"
     ),
     
@@ -198,7 +198,7 @@ R2_COMMAND_SPECS: List[CommandSpec] = [
     CommandSpec(
         name="s",
         type="read",
-        regex=re.compile(r'^s(\s+[a-zA-Z0-9_.+\-]+)?$'),
+        regex=re.compile(r'^s(\s+[a-zA-Z0-9_.+\-]+)?(\s*~.+)?$'),
         description="Seek to address"
     ),
     
@@ -206,13 +206,13 @@ R2_COMMAND_SPECS: List[CommandSpec] = [
     CommandSpec(
         name="f",
         type="read",
-        regex=re.compile(r'^f[sj]?(\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^f[sj]?(\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Flags"
     ),
     CommandSpec(
         name="fs",
         type="read",
-        regex=re.compile(r'^fs(\s+[a-zA-Z0-9_.]+)?$'),
+        regex=re.compile(r'^fs(\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Flag spaces"
     ),
 ]
