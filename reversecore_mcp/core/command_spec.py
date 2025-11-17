@@ -239,6 +239,12 @@ R2_COMMAND_SPECS: List[CommandSpec] = [
         regex=re.compile(r'^pxq(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
         description="Print hexdump (qwords)"
     ),
+    CommandSpec(
+        name="p8",
+        type="read",
+        regex=re.compile(r'^p8(\s+\d+)?(\s+@\s+[a-zA-Z0-9_.]+)?(\s*~.+)?$'),
+        description="Print raw bytes in hexadecimal"
+    ),
     
     # Seek commands (read-only navigation)
     CommandSpec(
