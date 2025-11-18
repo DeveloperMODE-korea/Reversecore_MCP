@@ -7,10 +7,14 @@ DecompInterface API through PyGhidra.
 
 import tempfile
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, TYPE_CHECKING
 
 from reversecore_mcp.core.exceptions import ValidationError
 from reversecore_mcp.core.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from ghidra.program.flatapi import FlatProgramAPI
+    from ghidra.program.model.listing import Function
 
 logger = get_logger(__name__)
 
@@ -23,7 +27,7 @@ def ensure_ghidra_available() -> bool:
         True if Ghidra is available, False otherwise
     """
     try:
-        import pyghidra
+        import pyghidra  # noqa: F401
         return True
     except ImportError:
         return False
@@ -52,8 +56,6 @@ def decompile_function_with_ghidra(
     try:
         import pyghidra
         from ghidra.app.decompiler import DecompInterface, DecompileResults
-        from ghidra.program.model.listing import Function
-        from ghidra.program.flatapi import FlatProgramAPI
     except ImportError as e:
         raise ImportError(
             "PyGhidra is not installed. Install with: pip install pyghidra"

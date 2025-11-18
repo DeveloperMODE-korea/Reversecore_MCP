@@ -1,7 +1,6 @@
 """Unit tests for Ghidra decompilation integration."""
 
 import pytest
-from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
 from reversecore_mcp.tools import cli_tools
