@@ -11,7 +11,7 @@
 # - Disassembly & Analysis: radare2 (pdf, afl, ii, iz, etc.)
 # - CFG Visualization: radare2 agfj (graph JSON)
 # - ESIL Emulation: radare2 aei/aeim/aes (virtual CPU)
-# - Smart Decompile: radare2 pdc (pseudo-C generation)
+# - Smart Decompile: Ghidra DecompInterface (primary), radare2 pdc (fallback)
 # - YARA Rule Generation: radare2 p8 (opcode extraction)
 # - Pattern Matching: YARA scanning
 # - Multi-arch Disassembly: Capstone

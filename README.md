@@ -13,7 +13,7 @@ An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents 
 
 - **🔒 Security-First Design**: No shell=True, comprehensive input validation, path sanitization
 - **⚡ High Performance**: Streaming output for large files, configurable limits, adaptive polling
-- **🛠️ Comprehensive Toolset**: Radare2, strings, binwalk, YARA, Capstone, LIEF support
+- **🛠️ Comprehensive Toolset**: Ghidra, Radare2, strings, binwalk, YARA, Capstone, LIEF support
 - **🔮 Advanced Analysis**: CFG visualization, ESIL emulation, smart decompilation
 - **🛡️ Defense Integration**: Automatic YARA rule generation from analysis
 - **🐳 Docker Ready**: Pre-configured containerized deployment with all dependencies
@@ -810,18 +810,23 @@ AI Agent:
   - **Security**: Sandboxed ESIL VM, no host system impact
 
 - **`smart_decompile`**: Transform assembly into readable pseudo-C code
+  - **Decompiler Options:**
+    - **Ghidra (default)**: Industry-standard decompiler with superior type recovery
+    - **radare2 (fallback)**: Lightweight alternative for quick analysis
   - **500 lines of assembly → 20 lines of clean C**
-  - Uses radare2's `pdc` decompiler engine
-  - Extracts function metadata (variables, arguments, complexity)
+  - Uses Ghidra's DecompInterface engine or radare2's `pdc` command
+  - Extracts function metadata (variables, arguments, complexity, signature)
   - Shows logical structure (if/else, loops, calls)
   - AI-friendly output for further refinement
+  - Automatic fallback mechanism ensures decompilation always works
   - Use cases:
     - Malware analysis: Understand malicious behavior quickly
     - Vulnerability research: Find security flaws in binary code
     - Game hacking: Understand game mechanics from compiled code
     - Software auditing: Review closed-source components
   - Example: `smart_decompile("/app/workspace/sample.exe", "main")`
-  - **Value**: Exponentially faster analysis than raw assembly
+  - Example with radare2: `smart_decompile("/app/workspace/sample.exe", "main", use_ghidra=False)`
+  - **Value**: Exponentially faster analysis than raw assembly with better type information
 
 - **`generate_yara_rule`**: Automatic malware signature generation
   - **Analysis → Defense pipeline automation**
