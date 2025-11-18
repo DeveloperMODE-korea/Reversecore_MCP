@@ -5,9 +5,9 @@
 [![FastMCP](https://img.shields.io/badge/FastMCP-0.1.0%2B-green)](https://github.com/jlowin/fastmcp)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
 
-An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents to perform comprehensive reverse engineering workflows through natural language commands. From basic triage to advanced decompilation and defense signature generation, Reversecore_MCP provides a secure, performant interface to industry-standard reverse engineering tools, enabling AI assistants to conduct end-to-end malware analysis and security research.
+An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents to perform comprehensive reverse engineering workflows through natural language commands. From basic triage to advanced decompilation, structure recovery, cross-reference analysis, and defense signature generation, Reversecore_MCP provides a secure, performant interface to industry-standard reverse engineering tools, enabling AI assistants to conduct end-to-end malware analysis and security research.
 
-**Full-Cycle Capabilities**: Upload → Analysis → Visualization (CFG) → Emulation (ESIL) → Decompilation (Pseudo-C) → Defense (YARA Rules)
+**Full-Cycle Capabilities**: Upload → Analysis → X-Refs (Context) → Structures (C++ Recovery) → Visualization (CFG) → Emulation (ESIL) → Decompilation (Pseudo-C) → Defense (YARA Rules)
 
 ## 🌟 Key Features
 
@@ -15,6 +15,8 @@ An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents 
 - **⚡ High Performance**: Streaming output for large files, configurable limits, adaptive polling
 - **🛠️ Comprehensive Toolset**: Ghidra, Radare2, strings, binwalk, YARA, Capstone, LIEF support
 - **🔮 Advanced Analysis**: CFG visualization, ESIL emulation, smart decompilation
+- **🏗️ C++ Structure Recovery**: Transform "this + 0x4" → "Player.health" with Ghidra data type propagation
+- **🔗 Cross-Reference Analysis**: Discover code context - who calls what, understand program flow
 - **🛡️ Defense Integration**: Automatic YARA rule generation from analysis
 - **🐳 Docker Ready**: Pre-configured containerized deployment with all dependencies
 - **🔌 MCP Compatible**: Works with Cursor AI, Claude Desktop, and other MCP clients
@@ -843,6 +845,40 @@ AI Agent:
   - Example: `generate_yara_rule("/app/workspace/malware.exe", "main", 64, "trojan_xyz")`
   - **Value**: Bridges gap between analysis and defense
 
+- **`analyze_xrefs`**: Analyze cross-references (X-Refs) for functions and data
+  - **🥈 Priority 2: Code Context Discovery**
+  - **Find WHO calls this and WHAT it calls** - Essential for understanding behavior
+  - Identifies all references TO and FROM a given address
+  - Provides critical context: callers, callees, data references
+  - Use cases:
+    - Malware analysis: "Who calls this Connect function?" reveals C2 behavior
+    - Password hunting: "What functions reference this 'Password' string?"
+    - Vulnerability research: "What uses this vulnerable API?"
+    - Game hacking: "Where is Player health accessed from?"
+  - **AI Collaboration**: Build call graphs, identify patterns, focus token budget
+  - Supports analysis types: `"all"`, `"to"` (callers), `"from"` (callees)
+  - Returns structured JSON with caller/callee relationships
+  - Example: `analyze_xrefs("/app/workspace/malware.exe", "sym.decrypt", "to")`
+  - **Value**: Reduces hallucination by providing real code relationships
+
+- **`recover_structures`**: Recover C++ class structures and data types
+  - **🥇 Priority 1: The C++ Analysis Game-Changer**
+  - **Transform "this + 0x4" → "Player.health"** - Make code meaningful
+  - Uses Ghidra's powerful data type propagation (or radare2 fallback)
+  - Recovers structure layouts from memory access patterns
+  - Generates C structure definitions with field names and types
+  - Essential for C++ binaries (99% of game clients and commercial apps)
+  - Use cases:
+    - Game hacking: Recover Player, Entity, Weapon structures
+    - Malware analysis: Understand malware configuration structures
+    - Vulnerability research: Find buffer overflow candidates
+    - Software auditing: Document undocumented data structures
+  - **AI Collaboration**: AI identifies patterns like "Vector3", you apply definitions
+  - Supports both Ghidra (superior) and radare2 (faster) backends
+  - Example: `recover_structures("/app/workspace/game.exe", "Player::update")`
+  - Example (radare2): `recover_structures("/app/workspace/binary", "main", use_ghidra=False)`
+  - **Value**: One structure definition can clarify thousands of lines of code
+
 ### Library Tools
 
 - **`run_yara`**: Scan files using YARA rules
@@ -868,8 +904,8 @@ AI Agent:
 Reversecore_MCP now supports a complete end-to-end analysis workflow:
 
 ```
-📥 Upload/Copy → 📊 Analysis → 🔍 Visualization (CFG) → 
-🔮 Emulation (ESIL) → 📝 Decompilation (Pseudo-C) → 🛡️ Defense (YARA)
+📥 Upload/Copy → 📊 Analysis → 🔗 X-Refs (Context) → 🏗️ Structures (C++ Recovery) → 
+🔍 Visualization (CFG) → 🔮 Emulation (ESIL) → 📝 Decompilation (Pseudo-C) → 🛡️ Defense (YARA)
 ```
 
 **Example Complete Workflow:**
@@ -881,6 +917,38 @@ copy_to_workspace("/path/to/upload/malware.exe")
 # 2. Basic triage
 run_file("/app/workspace/malware.exe")
 run_strings("/app/workspace/malware.exe")
+
+# 3. Identify suspicious function
+run_radare2("/app/workspace/malware.exe", "afl~decrypt")
+
+# 4. Analyze cross-references - WHO calls this and WHAT it calls
+analyze_xrefs("/app/workspace/malware.exe", "sym.decrypt", "all")
+# Returns: callers, callees, data references - understand the context
+
+# 5. Recover C++ structures - make "this + 0x4" meaningful
+recover_structures("/app/workspace/malware.exe", "sym.decrypt")
+# Returns: struct definitions transforming offsets to named fields
+
+# 6. Visualize control flow
+generate_function_graph("/app/workspace/malware.exe", "sym.decrypt", "mermaid")
+
+# 7. Emulate to reveal obfuscated strings
+emulate_machine_code("/app/workspace/malware.exe", "sym.decrypt", 200)
+
+# 8. Decompile for high-level understanding
+smart_decompile("/app/workspace/malware.exe", "sym.decrypt")
+
+# 9. Generate detection signature
+generate_yara_rule("/app/workspace/malware.exe", "sym.decrypt", 128, "malware_decrypt")
+```
+
+**Why This Workflow Works:**
+- **X-Refs**: Provide context - understand WHO uses suspicious code
+- **Structures**: Make C++ binaries readable - transform offsets to names
+- **CFG**: Visualize logic flow for AI comprehension
+- **Emulation**: Safely predict behavior without execution
+- **Decompilation**: Get high-level pseudo-C for analysis
+- **YARA**: Bridge analysis → defense with detection signatures
 
 # 3. Identify suspicious function
 run_radare2("/app/workspace/malware.exe", "afl~decrypt")

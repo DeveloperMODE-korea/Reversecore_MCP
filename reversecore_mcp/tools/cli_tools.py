@@ -37,6 +37,8 @@ def register_cli_tools(mcp: FastMCP) -> None:
     mcp.tool(extract_rtti_info)
     mcp.tool(smart_decompile)
     mcp.tool(generate_yara_rule)
+    mcp.tool(analyze_xrefs)
+    mcp.tool(recover_structures)
 
 
 @log_execution(tool_name="run_file")
@@ -1125,3 +1127,395 @@ async def generate_yara_rule(
         hex_bytes=formatted_bytes,
         description=f"YARA rule '{rule_name}' generated from {byte_length} bytes at {function_address}"
     )
+
+
+@log_execution(tool_name="analyze_xrefs")
+@track_metrics("analyze_xrefs")
+@handle_tool_errors
+async def analyze_xrefs(
+    file_path: str,
+    address: str,
+    xref_type: str = "all",
+    timeout: int = 300,
+) -> ToolResult:
+    """
+    Analyze cross-references (X-Refs) for a function or data address.
+    
+    This tool identifies all references TO and FROM a given address, providing
+    critical context for understanding code behavior. Essential for malware
+    analysis, vulnerability research, and understanding program flow.
+    
+    **Why Cross-References Matter:**
+    - **Callers**: Who calls this function? (Find entry points to suspicious code)
+    - **Callees**: What does this function call? (Understand behavior and APIs used)
+    - **Data Refs**: What data does this access? (Find strings, configs, crypto keys)
+    - **Context**: Understand the "why" behind code execution
+    
+    **Use Cases:**
+    - Malware analysis: "Who calls this Connect function?" reveals C2 behavior
+    - Password hunting: "What functions reference this 'Password' string?"
+    - Vulnerability research: "What uses this vulnerable API?"
+    - Game hacking: "Where is Player health accessed from?"
+    
+    **AI Collaboration:**
+    AI can use xrefs to:
+    - Build call graphs automatically
+    - Identify code patterns (e.g., "all functions that write files")
+    - Focus token budget on relevant functions only
+    - Reduce hallucination by providing real relationships
+    
+    Args:
+        file_path: Path to the binary file (must be in workspace)
+        address: Function or data address (e.g., 'main', '0x401000', 'sym.decrypt')
+        xref_type: Type of references to analyze:
+            - "all" (default): Both callers and callees
+            - "to": References TO this address (callers, data reads)
+            - "from": References FROM this address (callees, data writes)
+        timeout: Execution timeout in seconds (default 300)
+        
+    Returns:
+        ToolResult with cross-reference information in structured format:
+        {
+            "address": "0x401000",
+            "function_name": "main",
+            "xrefs_to": [
+                {"from": "0x401234", "type": "call", "function": "entry0"},
+                {"from": "0x401567", "type": "call", "function": "init"}
+            ],
+            "xrefs_from": [
+                {"to": "0x401100", "type": "call", "function": "sub_401100"},
+                {"to": "0x403000", "type": "data_read", "data": "str.password"}
+            ],
+            "total_refs_to": 2,
+            "total_refs_from": 2
+        }
+        
+    Example:
+        # Find who calls the suspicious 'decrypt' function
+        analyze_xrefs("/app/workspace/malware.exe", "sym.decrypt", "to")
+        
+        # Find what APIs a malware function uses
+        analyze_xrefs("/app/workspace/malware.exe", "0x401000", "from")
+        
+        # Get complete relationship map
+        analyze_xrefs("/app/workspace/malware.exe", "main", "all")
+    """
+    from reversecore_mcp.core.result import failure
+    
+    # 1. Validate parameters
+    validated_path = validate_file_path(file_path)
+    
+    if xref_type not in ["all", "to", "from"]:
+        return failure(
+            "VALIDATION_ERROR",
+            f"Invalid xref_type: {xref_type}",
+            hint="Valid options are: 'all', 'to', 'from'"
+        )
+    
+    # 2. Validate address format
+    if not re.match(r'^[a-zA-Z0-9_.]+$', address.replace("0x", "").replace("sym.", "").replace("fcn.", "")):
+        return failure(
+            "VALIDATION_ERROR",
+            "Invalid address format",
+            hint="Address must contain only alphanumeric characters, dots, underscores, and prefixes like '0x', 'sym.', 'fcn.'"
+        )
+    
+    # 3. Build radare2 commands to get xrefs
+    # axj = analyze xrefs in JSON format
+    commands = []
+    
+    if xref_type in ["all", "to"]:
+        # axtj = xrefs TO this address (callers)
+        commands.append(f"axtj @ {address}")
+    
+    if xref_type in ["all", "from"]:
+        # axfj = xrefs FROM this address (callees)
+        commands.append(f"axfj @ {address}")
+    
+    # Build command string
+    r2_commands = "; ".join(commands)
+    
+    # 4. Execute analysis
+    cmd = [
+        "r2",
+        "-q",
+        "-c", "aaa",  # Analyze all first
+        "-c", r2_commands,
+        str(validated_path)
+    ]
+    
+    output, bytes_read = await execute_subprocess_async(
+        cmd,
+        max_output_size=10_000_000,
+        timeout=timeout,
+    )
+    
+    # 5. Parse JSON output
+    try:
+        # Output may contain multiple JSON arrays if both "to" and "from" were requested
+        # Split by lines and parse each JSON array
+        lines = [line.strip() for line in output.strip().split('\n') if line.strip()]
+        
+        xrefs_to = []
+        xrefs_from = []
+        
+        for line in lines:
+            if line.startswith('['):
+                try:
+                    refs = json.loads(line)
+                    if isinstance(refs, list) and len(refs) > 0:
+                        # Determine if this is "to" or "from" based on field names
+                        first_ref = refs[0]
+                        if "from" in first_ref:
+                            # This is xrefs TO (callers)
+                            xrefs_to = refs
+                        elif "addr" in first_ref or "fcn_addr" in first_ref:
+                            # This is xrefs FROM (callees)
+                            xrefs_from = refs
+                except json.JSONDecodeError:
+                    continue
+        
+        # 6. Format results
+        result = {
+            "address": address,
+            "xref_type": xref_type,
+            "xrefs_to": xrefs_to,
+            "xrefs_from": xrefs_from,
+            "total_refs_to": len(xrefs_to),
+            "total_refs_from": len(xrefs_from),
+        }
+        
+        # Add human-readable summary
+        summary_parts = []
+        if xrefs_to:
+            summary_parts.append(f"{len(xrefs_to)} reference(s) TO this address (callers)")
+        if xrefs_from:
+            summary_parts.append(f"{len(xrefs_from)} reference(s) FROM this address (callees)")
+        
+        if not summary_parts:
+            summary = "No cross-references found"
+        else:
+            summary = ", ".join(summary_parts)
+        
+        result["summary"] = summary
+        
+        # 7. Return structured result
+        return success(
+            result,
+            bytes_read=bytes_read,
+            address=address,
+            xref_type=xref_type,
+            total_refs=len(xrefs_to) + len(xrefs_from),
+            description=f"Cross-reference analysis for {address}: {summary}"
+        )
+        
+    except Exception as e:
+        return failure(
+            "XREF_ANALYSIS_ERROR",
+            f"Failed to parse cross-reference data: {str(e)}",
+            hint="The address may not exist or the binary may not have been analyzed. Try running 'afl' first to see available functions."
+        )
+
+
+@log_execution(tool_name="recover_structures")
+@track_metrics("recover_structures")
+@handle_tool_errors
+async def recover_structures(
+    file_path: str,
+    function_address: str,
+    use_ghidra: bool = True,
+    timeout: int = 600,
+) -> ToolResult:
+    """
+    Recover C++ class structures and data types from binary code.
+    
+    This is THE game-changer for C++ reverse engineering. Transforms cryptic
+    "this + 0x4" memory accesses into meaningful "Player.health" structure fields.
+    Uses Ghidra's powerful data type propagation and structure recovery algorithms.
+    
+    **Why Structure Recovery Matters:**
+    - **C++ Analysis**: 99% of game clients and commercial apps are C++
+    - **Understanding**: "this + 0x4" means nothing, "Player.health = 100" tells a story
+    - **AI Comprehension**: AI can't understand raw offsets, but understands named fields
+    - **Scale**: One structure definition can clarify thousands of lines of code
+    
+    **How It Works:**
+    1. Analyze memory access patterns in the function
+    2. Identify structure layouts from offset usage
+    3. Use data type propagation to infer field types
+    4. Generate C structure definitions with meaningful names
+    
+    **Use Cases:**
+    - Game hacking: Recover Player, Entity, Weapon structures
+    - Malware analysis: Understand malware configuration structures
+    - Vulnerability research: Find buffer overflow candidates in structs
+    - Software auditing: Document undocumented data structures
+    
+    **AI Collaboration:**
+    - AI: "This offset pattern looks like Vector3 (x, y, z)"
+    - You: Apply structure definition in Ghidra
+    - Result: All "this + 0x0/0x4/0x8" become "vec.x/vec.y/vec.z"
+    
+    **Ghidra vs Radare2:**
+    - Ghidra (default): Superior type recovery, structure propagation, C++ support
+    - Radare2 (fallback): Basic structure definition, faster but less intelligent
+    
+    Args:
+        file_path: Path to the binary file (must be in workspace)
+        function_address: Function to analyze for structure usage (e.g., 'main', '0x401000')
+        use_ghidra: Use Ghidra for advanced recovery (default True), or radare2 for basic
+        timeout: Execution timeout in seconds (default 600 for Ghidra analysis)
+        
+    Returns:
+        ToolResult with recovered structures in C format:
+        {
+            "structures": [
+                {
+                    "name": "Player",
+                    "size": 64,
+                    "fields": [
+                        {"offset": "0x0", "type": "int", "name": "health"},
+                        {"offset": "0x4", "type": "int", "name": "armor"},
+                        {"offset": "0x8", "type": "Vector3", "name": "position"}
+                    ]
+                }
+            ],
+            "c_definitions": "struct Player { int health; int armor; Vector3 position; };"
+        }
+        
+    Example:
+        # Recover structures used in main function
+        recover_structures("/app/workspace/game.exe", "main")
+        
+        # Analyze specific class method
+        recover_structures("/app/workspace/game.exe", "Player::update")
+        
+        # Use radare2 for quick analysis
+        recover_structures("/app/workspace/binary", "0x401000", use_ghidra=False)
+    """
+    from reversecore_mcp.core.result import failure
+    from reversecore_mcp.core.ghidra_helper import ensure_ghidra_available
+    
+    # 1. Validate parameters
+    validated_path = validate_file_path(file_path)
+    
+    # 2. Validate address format
+    if not re.match(r'^[a-zA-Z0-9_.:<>]+$', function_address.replace("0x", "").replace("sym.", "").replace("fcn.", "")):
+        return failure(
+            "VALIDATION_ERROR",
+            "Invalid function address format",
+            hint="Address must contain only alphanumeric characters, dots, underscores, colons, angle brackets, and prefixes like '0x', 'sym.'"
+        )
+    
+    # 3. Check if Ghidra is available when requested
+    if use_ghidra:
+        if not ensure_ghidra_available():
+            return failure(
+                "DEPENDENCY_MISSING",
+                "Ghidra (PyGhidra) is not available",
+                hint="Install with: pip install pyghidra. Alternatively, set use_ghidra=False to use radare2 (basic recovery)."
+            )
+        
+        # 4a. Use Ghidra for advanced structure recovery
+        try:
+            from reversecore_mcp.core.ghidra_helper import recover_structures_with_ghidra
+            
+            structures, metadata = recover_structures_with_ghidra(
+                validated_path,
+                function_address,
+                timeout
+            )
+            
+            return success(
+                structures,
+                **metadata,
+                function_address=function_address,
+                method="ghidra",
+                description=f"Structures recovered from {function_address} using Ghidra"
+            )
+            
+        except Exception as e:
+            return failure(
+                "STRUCTURE_RECOVERY_ERROR",
+                f"Ghidra structure recovery failed: {str(e)}",
+                hint="Try with use_ghidra=False for basic radare2 recovery, or verify Ghidra installation."
+            )
+    else:
+        # 4b. Use radare2 for basic structure recovery
+        # radare2's 'afvt' command shows variable types and offsets
+        cmd = [
+            "r2",
+            "-q",
+            "-c", "aaa",  # Analyze all
+            "-c", f"s {function_address}",  # Seek to function
+            "-c", "afvj",  # Get function variables in JSON
+            str(validated_path)
+        ]
+        
+        output, bytes_read = await execute_subprocess_async(
+            cmd,
+            max_output_size=10_000_000,
+            timeout=timeout,
+        )
+        
+        # 5. Parse radare2 output
+        try:
+            variables = json.loads(output) if output.strip() else []
+            
+            # Extract structure-like patterns
+            # Group variables by their base pointer (e.g., rbp, rsp)
+            structures = {}
+            
+            for var in variables:
+                if isinstance(var, dict):
+                    var_type = var.get("type", "unknown")
+                    var_name = var.get("name", "unnamed")
+                    offset = var.get("delta", 0)
+                    
+                    # Simple heuristic: group by base register
+                    base = var.get("ref", {}).get("base", "unknown") if "ref" in var else "stack"
+                    
+                    if base not in structures:
+                        structures[base] = {
+                            "name": f"struct_{base}",
+                            "fields": []
+                        }
+                    
+                    structures[base]["fields"].append({
+                        "offset": f"0x{abs(offset):x}",
+                        "type": var_type,
+                        "name": var_name
+                    })
+            
+            # 6. Generate C structure definitions
+            c_definitions = []
+            for struct_name, struct_data in structures.items():
+                fields_str = "\n    ".join([
+                    f"{field['type']} {field['name']}; // offset {field['offset']}"
+                    for field in struct_data["fields"]
+                ])
+                
+                c_def = f"struct {struct_data['name']} {{\n    {fields_str}\n}};"
+                c_definitions.append(c_def)
+            
+            result = {
+                "structures": list(structures.values()),
+                "c_definitions": "\n\n".join(c_definitions),
+                "count": len(structures)
+            }
+            
+            return success(
+                result,
+                bytes_read=bytes_read,
+                function_address=function_address,
+                method="radare2",
+                structure_count=len(structures),
+                description=f"Basic structure recovery from {function_address} using radare2 (found {len(structures)} structure(s))"
+            )
+            
+        except json.JSONDecodeError as e:
+            return failure(
+                "STRUCTURE_RECOVERY_ERROR",
+                f"Failed to parse structure data: {str(e)}",
+                hint="The function may not exist or may not use structures. Verify the address with 'afl' command."
+            )
