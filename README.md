@@ -1,5 +1,5 @@
 # Reversecore_MCP
-![Icon](image.png)
+![Icon](icon.png)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![FastMCP](https://img.shields.io/badge/FastMCP-0.1.0%2B-green)](https://github.com/jlowin/fastmcp)
