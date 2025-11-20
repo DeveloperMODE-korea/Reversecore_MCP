@@ -37,3 +37,6 @@ uvicorn>=0.23.0
 pyghidra>=2.0.0,<3.0.0
 jpype1>=1.4.0  # PyGhidra dependency
 
+# Environment variable management
+python-dotenv>=1.0.0
+

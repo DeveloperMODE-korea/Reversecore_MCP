@@ -804,27 +804,14 @@ def _radare2_json_to_mermaid(json_str: str) -> str:
 @log_execution(tool_name="generate_function_graph")
 @track_metrics("generate_function_graph")
 @handle_tool_errors
-async def generate_function_graph(
+async def _generate_function_graph_impl(
     file_path: str,
     function_address: str,
     format: str = "mermaid",
     timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
-    Generate a Control Flow Graph (CFG) for a specific function.
-
-    This tool uses radare2 to analyze the function structure and returns
-    a visualization code (Mermaid by default) that helps AI understand
-    the code flow without reading thousands of lines of assembly.
-
-    Args:
-        file_path: Path to the binary file (must be in workspace)
-        function_address: Function address (e.g., 'main', '0x140001000', 'sym.foo')
-        format: Output format ('mermaid', 'json', or 'dot'). Default is 'mermaid'.
-        timeout: Execution timeout in seconds
-
-    Returns:
-        ToolResult with CFG visualization or JSON data
+    Internal implementation of generate_function_graph with caching.
     """
     from reversecore_mcp.core.result import failure
 
@@ -879,6 +866,33 @@ async def generate_function_graph(
         return success(dot_output, bytes_read=dot_bytes, format="dot")
 
     return failure("INVALID_FORMAT", f"Unsupported format: {format}")
+
+
+async def generate_function_graph(
+    file_path: str,
+    function_address: str,
+    format: str = "mermaid",
+    timeout: int = DEFAULT_TIMEOUT,
+) -> ToolResult:
+    """
+    Generate a Control Flow Graph (CFG) for a specific function.
+
+    This tool uses radare2 to analyze the function structure and returns
+    a visualization code (Mermaid by default) that helps AI understand
+    the code flow without reading thousands of lines of assembly.
+
+    Args:
+        file_path: Path to the binary file (must be in workspace)
+        function_address: Function address (e.g., 'main', '0x140001000', 'sym.foo')
+        format: Output format ('mermaid', 'json', or 'dot'). Default is 'mermaid'.
+        timeout: Execution timeout in seconds
+
+    Returns:
+        ToolResult with CFG visualization or JSON data
+    """
+    return await _generate_function_graph_impl(
+        file_path, function_address, format, timeout
+    )
 
 
 def _parse_register_state(ar_output: str) -> dict:
@@ -1372,30 +1386,14 @@ async def extract_rtti_info(
 @log_execution(tool_name="smart_decompile")
 @track_metrics("smart_decompile")
 @handle_tool_errors
-async def smart_decompile(
+async def _smart_decompile_impl(
     file_path: str,
     function_address: str,
     timeout: int = DEFAULT_TIMEOUT,
     use_ghidra: bool = True,
 ) -> ToolResult:
     """
-    Decompile a function to pseudo C code using Ghidra or radare2.
-
-    This tool provides decompilation for a specific function in a binary,
-    making it easier to understand the logic without reading raw assembly.
-
-    **Decompiler Selection:**
-    - Ghidra (default): More accurate, better type recovery, industry-standard
-    - radare2 (fallback): Faster, lighter weight, good for quick analysis
-
-    Args:
-        file_path: Path to the binary file (must be in workspace)
-        function_address: Function address to decompile (e.g., 'main', '0x401000')
-        timeout: Execution timeout in seconds (default 300)
-        use_ghidra: Use Ghidra decompiler if available (default True)
-
-    Returns:
-        ToolResult with decompiled pseudo C code
+    Internal implementation of smart_decompile with caching.
     """
     from reversecore_mcp.core.result import failure
     from reversecore_mcp.core.logging_config import get_logger
@@ -1474,6 +1472,36 @@ async def smart_decompile(
         format="pseudo_c",
         decompiler="radare2",
         description=f"Decompiled code from function {function_address}",
+    )
+
+
+async def smart_decompile(
+    file_path: str,
+    function_address: str,
+    timeout: int = DEFAULT_TIMEOUT,
+    use_ghidra: bool = True,
+) -> ToolResult:
+    """
+    Decompile a function to pseudo C code using Ghidra or radare2.
+
+    This tool provides decompilation for a specific function in a binary,
+    making it easier to understand the logic without reading raw assembly.
+
+    **Decompiler Selection:**
+    - Ghidra (default): More accurate, better type recovery, industry-standard
+    - radare2 (fallback): Faster, lighter weight, good for quick analysis
+
+    Args:
+        file_path: Path to the binary file (must be in workspace)
+        function_address: Function address to decompile (e.g., 'main', '0x401000')
+        timeout: Execution timeout in seconds (default 300)
+        use_ghidra: Use Ghidra decompiler if available (default True)
+
+    Returns:
+        ToolResult with decompiled pseudo C code
+    """
+    return await _smart_decompile_impl(
+        file_path, function_address, timeout, use_ghidra
     )
 
 
