@@ -13,6 +13,7 @@
 # - ESIL Emulation: radare2 aei/aeim/aes (virtual CPU)
 # - Smart Decompile: Ghidra DecompInterface (primary), radare2 pdc (fallback)
 # - YARA Rule Generation: radare2 p8 (opcode extraction)
+# - Symbolic Execution: angr (path constraint solving)
 # - Pattern Matching: YARA scanning
 # - Multi-arch Disassembly: Capstone
 # - Binary Parsing: LIEF (PE/ELF/Mach-O)
@@ -42,6 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     flex \
     bison \
     libssl-dev \
+    libffi-dev \
     git \
     patch \
     xz-utils \

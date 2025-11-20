@@ -53,6 +53,7 @@ def register_cli_tools(mcp: FastMCP) -> None:
     mcp.tool(trace_execution_path)
     mcp.tool(scan_for_versions)
     mcp.tool(analyze_variant_changes)
+    mcp.tool(solve_path_constraints)
 
 
 @log_execution(tool_name="trace_execution_path")
@@ -2010,7 +2011,7 @@ async def diff_binaries(
     This tool uses radiff2 to perform binary diffing, which is essential for:
     - **Patch Analysis (1-day Exploits)**: Compare pre-patch and post-patch binaries
       to identify security vulnerabilities fixed in updates
-    - **Game Hacking**: Find offset changes after game updates to maintain functionality
+    - ** Game Hacking**: Find offset changes after game updates to maintain functionality
     - **Malware Variant Analysis**: Identify code differences between malware variants
       (e.g., "90% similar to Lazarus malware, but C2 address generation changed")
 
@@ -2458,7 +2459,7 @@ def _build_r2_cmd(file_path: str, r2_commands: list[str], analysis_level: str = 
     # or just rely on r2's behavior.
     
     # Since we can't easily check r2's internal project list without running r2,
-    # and running r2 is expensive/async, we'll use a heuristic or a sidecar file.
+    # and running r2 is expensive/async, we'll use a sidecar file.
     # Let's use a sidecar file in the workspace: .{filename}.r2_analyzed
     
     project_marker = Path(file_path).parent / f".{Path(file_path).name}.r2_project"
