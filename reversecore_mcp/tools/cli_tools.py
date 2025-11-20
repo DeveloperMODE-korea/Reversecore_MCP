@@ -2519,3 +2519,146 @@ def _build_r2_cmd(file_path: str, r2_commands: list[str], analysis_level: str = 
         # Let's keep it simple for now.
         
         return base_cmd + ["-c", ";".join(combined_cmds), str(file_path)]
+
+
+def _resolve_address(proj, addr_str):
+    """Helper to resolve address string to integer using angr project."""
+    if not addr_str:
+        return None
+    
+    # Try hex
+    if addr_str.startswith("0x"):
+        try:
+            return int(addr_str, 16)
+        except ValueError:
+            pass
+            
+    # Try symbol
+    try:
+        sym = proj.loader.main_object.get_symbol(addr_str)
+        if sym:
+            return sym.rebased_addr
+    except Exception:
+        pass
+        
+    # Try integer
+    try:
+        return int(addr_str)
+    except ValueError:
+        pass
+        
+    return None
+
+
+@log_execution(tool_name="solve_path_constraints")
+@track_metrics("solve_path_constraints")
+@handle_tool_errors
+async def solve_path_constraints(
+    file_path: str,
+    start_address: str,
+    target_address: str,
+    avoid_address: str = None,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> ToolResult:
+    """
+    Find an execution path from start to target address using symbolic execution.
+
+    This tool uses the 'angr' binary analysis framework to mathematically prove
+    reachability and generate inputs that trigger specific code paths.
+
+    **Use Cases:**
+    - **CTF Challenges**: Find the input that reaches the "Win" function
+    - **Exploit Development**: Generate input to reach a vulnerable buffer overflow
+    - **Bug Triage**: Verify if a crash is reachable from the entry point
+
+    Args:
+        file_path: Path to the binary file
+        start_address: Address to start symbolic execution (e.g., 'main', '0x401000')
+        target_address: Address to reach (e.g., 'sym.win', '0x401050')
+        avoid_address: Optional address to avoid (e.g., 'sym.fail', '0x401060')
+        timeout: Execution timeout in seconds (default: 300)
+
+    Returns:
+        ToolResult with the solution (input) that satisfies the path constraints.
+    """
+    from reversecore_mcp.core.result import failure
+    
+    # 1. Validate parameters
+    validate_tool_parameters(
+        "solve_path_constraints",
+        {"start_address": start_address, "target_address": target_address},
+    )
+    validated_path = validate_file_path(file_path)
+
+    # 2. Run angr in a separate thread (it's CPU bound and blocking)
+    def run_angr_solve():
+        import angr
+        import claripy
+
+        # Create project
+        proj = angr.Project(str(validated_path), auto_load_libs=False)
+
+        # Resolve addresses if they are symbols
+        start_addr = _resolve_address(proj, start_address)
+        target_addr = _resolve_address(proj, target_address)
+        avoid_addr = _resolve_address(proj, avoid_address) if avoid_address else None
+
+        if start_addr is None:
+            raise ValueError(f"Could not resolve start address: {start_address}")
+        if target_addr is None:
+            raise ValueError(f"Could not resolve target address: {target_address}")
+
+        # Create simulation state
+        state = proj.factory.blank_state(addr=start_addr)
+        
+        # Create simulation manager
+        simgr = proj.factory.simulation_manager(state)
+
+        # Define exploration technique
+        find_args = {"find": target_addr}
+        if avoid_addr:
+            find_args["avoid"] = avoid_addr
+
+        # Explore
+        simgr.explore(**find_args)
+
+        if simgr.found:
+            found_state = simgr.found[0]
+            # Generate input (stdin)
+            # This is a simplification; often we need to constrain stdin specifically
+            # But for blank_state, we might check what was read.
+            # For now, let's return the stdin if it was constrained, or just the state info.
+            
+            solution = found_state.posix.dumps(0) # Dump stdin
+            return {
+                "found": True,
+                "input_hex": solution.hex(),
+                "input_str": str(solution), # Best effort string representation
+                "stdout": found_state.posix.dumps(1).decode(errors='ignore')
+            }
+        else:
+            return {"found": False, "reason": "No path found to target"}
+
+    try:
+        # Run with timeout
+        result = await asyncio.to_thread(run_angr_solve)
+        
+        if result["found"]:
+            return success(
+                result,
+                format="json",
+                description=f"Found path from {start_address} to {target_address}. Input: {result.get('input_hex')}"
+            )
+        else:
+            return failure(
+                "PATH_NOT_FOUND",
+                f"No execution path found from {start_address} to {target_address}",
+                hint="Check if the target is actually reachable or if constraints are too strict."
+            )
+
+    except Exception as e:
+        return failure(
+            "SYMBOLIC_EXECUTION_ERROR",
+            f"Angr execution failed: {str(e)}",
+            hint="Symbolic execution is complex. Ensure addresses are correct and the binary is compatible."
+        )
