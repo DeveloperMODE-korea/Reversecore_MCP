@@ -113,6 +113,25 @@ result = run_radare2("file.exe", "aflj")
 # Parse JSON and filter in your code
 ```
 
+### 4. **Fail Fast Rules (Packed/Scripted Binaries)**
+- 🛑 **STOP** deep analysis if `run_strings` reveals packer signatures:
+  - "AutoIt", "Nullsoft", "PyInstaller", "MEI" (PyInstaller temp dir)
+- ⛔ **DO NOT RUN**: `analyze_xrefs`, `match_libraries`, `emulate_machine_code`, `generate_function_graph`
+  - Reason: These tools will timeout or fail on packed binaries (garbage code)
+- ✅ **INSTEAD**:
+  - Report `run_strings` findings (e.g., "Detected PyInstaller")
+  - Run `generate_yara_rule` on the entry point
+  - Move to the next file immediately
+
+### 5. **Performance Rules (Parallel Execution)**
+- ⚡ **ALWAYS** run initial triage tools in **PARALLEL** if your client supports it:
+  - `run_file`
+  - `run_strings`
+  - `run_yara`
+  - `run_binwalk`
+- **Why**: The server supports async execution. Running sequentially wastes time.
+- **Instruction**: "Analyze file.exe" → Call all 4 tools simultaneously.
+
 ### 🥇 Priority Tools for Advanced Analysis
 
 #### 🥈 Priority 1: "What Changed?" — Binary Diffing (`diff_binaries`)

@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from fastmcp import FastMCP
+from reversecore_mcp.core.config import get_config
 
 from reversecore_mcp.core.command_spec import validate_r2_command
 from reversecore_mcp.core.decorators import log_execution
@@ -17,6 +18,9 @@ from reversecore_mcp.core.metrics import track_metrics
 from reversecore_mcp.core.result import ToolResult, success
 from reversecore_mcp.core.security import validate_file_path
 from reversecore_mcp.core.validators import validate_tool_parameters
+
+# Load default timeout from configuration
+DEFAULT_TIMEOUT = get_config().default_tool_timeout
 
 
 def register_cli_tools(mcp: FastMCP) -> None:
@@ -48,7 +52,7 @@ def register_cli_tools(mcp: FastMCP) -> None:
 @log_execution(tool_name="run_file")
 @track_metrics("run_file")
 @handle_tool_errors
-async def run_file(file_path: str, timeout: int = 30) -> ToolResult:
+async def run_file(file_path: str, timeout: int = DEFAULT_TIMEOUT) -> ToolResult:
     """Identify file metadata using the ``file`` CLI utility."""
 
     validated_path = validate_file_path(file_path)
@@ -68,7 +72,7 @@ async def run_strings(
     file_path: str,
     min_length: int = 4,
     max_output_size: int = 10_000_000,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """Extract printable strings using the ``strings`` CLI."""
 
@@ -93,7 +97,7 @@ async def run_radare2(
     file_path: str,
     r2_command: str,
     max_output_size: int = 10_000_000,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """Execute vetted radare2 commands for binary triage."""
 
@@ -135,7 +139,7 @@ async def run_binwalk(
     file_path: str,
     depth: int = 8,
     max_output_size: int = 10_000_000,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """Analyze binaries for embedded content using binwalk."""
 
@@ -370,7 +374,7 @@ async def generate_function_graph(
     file_path: str,
     function_address: str,
     format: str = "mermaid",
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
     Generate a Control Flow Graph (CFG) for a specific function.
@@ -478,7 +482,7 @@ async def emulate_machine_code(
     file_path: str,
     start_address: str,
     instructions: int = 50,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
     Emulate machine code execution using radare2 ESIL (Evaluable Strings Intermediate Language).
@@ -575,7 +579,7 @@ async def emulate_machine_code(
 async def get_pseudo_code(
     file_path: str,
     address: str = "main",
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
     Generate pseudo C code (decompilation) for a function using radare2's pdc command.
@@ -656,7 +660,7 @@ async def generate_signature(
     file_path: str,
     address: str,
     length: int = 32,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
     Generate a YARA signature from opcode bytes at a specific address.
@@ -783,7 +787,7 @@ async def generate_signature(
 @handle_tool_errors
 async def extract_rtti_info(
     file_path: str,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
     Extract C++ RTTI (Run-Time Type Information) and class structure information.
@@ -936,7 +940,7 @@ async def extract_rtti_info(
 async def smart_decompile(
     file_path: str,
     function_address: str,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
     use_ghidra: bool = True,
 ) -> ToolResult:
     """
@@ -1046,7 +1050,7 @@ async def generate_yara_rule(
     function_address: str,
     rule_name: str = "auto_generated_rule",
     byte_length: int = 64,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
     Generate a YARA rule from function bytes.
@@ -1162,7 +1166,7 @@ async def analyze_xrefs(
     file_path: str,
     address: str,
     xref_type: str = "all",
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
     Analyze cross-references (X-Refs) for a function or data address.
@@ -1352,7 +1356,7 @@ async def recover_structures(
     file_path: str,
     function_address: str,
     use_ghidra: bool = True,
-    timeout: int = 600,
+    timeout: int = DEFAULT_TIMEOUT * 10,
 ) -> ToolResult:
     """
     Recover C++ class structures and data types from binary code.
@@ -1564,7 +1568,7 @@ async def diff_binaries(
     file_path_b: str,
     function_name: str = None,
     max_output_size: int = 10_000_000,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
     Compare two binary files to identify code changes and modifications.
@@ -1767,7 +1771,7 @@ async def match_libraries(
     file_path: str,
     signature_db: str = None,
     max_output_size: int = 10_000_000,
-    timeout: int = 300,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> ToolResult:
     """
     Match and filter known library functions to focus on user code.
@@ -2048,4 +2052,7 @@ def _build_r2_cmd(file_path: str, r2_commands: list[str], analysis_level: str = 
         # But this is a helper.
         
         # Ideally, we should append a command to r2 to create the marker? 
-        # r2 can run system commands with '!'.
+        # r2 can run system commands with '!'.        # But this complicates the command building.
+        # Let's keep it simple for now.
+        
+        return base_cmd + ["-c", ";".join(combined_cmds), str(file_path)]

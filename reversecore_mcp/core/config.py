@@ -51,6 +51,7 @@ class Config:
     rate_limit: int
     lief_max_file_size: int
     mcp_transport: str
+    default_tool_timeout: int
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -69,6 +70,10 @@ class Config:
             default=1_000_000_000,
         )
         mcp_transport = os.getenv("MCP_TRANSPORT", "stdio").lower()
+        default_tool_timeout = _parse_int(
+            os.getenv("DEFAULT_TOOL_TIMEOUT"),
+            default=60,
+        )
 
         return cls(
             workspace=workspace,
@@ -80,6 +85,7 @@ class Config:
             rate_limit=rate_limit,
             lief_max_file_size=lief_max_file_size,
             mcp_transport=mcp_transport,
+            default_tool_timeout=default_tool_timeout,
         )
 
         config.validate_paths()
