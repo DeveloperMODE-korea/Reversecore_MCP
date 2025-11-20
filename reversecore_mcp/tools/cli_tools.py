@@ -1170,8 +1170,21 @@ async def generate_signature(
     
     # Adaptive analysis: if address is hex, we don't need full analysis
     # If it's a symbol, we use default loading (empty string) which parses headers/symbols
+    # NOTE: For p8 (print bytes), we must ensure we are reading from the correct map.
+    # 'io.maps' might be needed if sections aren't mapped.
+    # But usually r2 maps sections automatically.
+    # If we get all FF, it might be unmapped.
+    # Let's force mapping if possible, or just rely on standard loading.
+    
     analysis_level = ""
     if address.startswith("0x") or re.match(r"^[0-9a-fA-F]+$", address):
+        # Even for hex addresses, we might need basic header parsing to map sections correctly
+        # -n skips everything. Let's try without -n if we suspect mapping issues,
+        # but -n is faster.
+        # If the user reports 0xFF, maybe we are reading from file offset instead of virtual address?
+        # r2 default is virtual address.
+        # Let's stick to -n for speed, but if it fails, we might need to revisit.
+        # Actually, let's use 'e io.cache=true' to ensure we can read? No.
         analysis_level = "-n"
         
     effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
@@ -1455,14 +1468,24 @@ async def _smart_decompile_impl(
     r2_cmds = [f"pdc @ {function_address}"]
     
     effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
+    # Use 'aaa' for analysis, but _build_r2_cmd now handles it safely without project persistence
     cmd = _build_r2_cmd(str(validated_path), r2_cmds, "aaa")
 
     # 5. Execute decompilation
-    output, bytes_read = await execute_subprocess_async(
-        cmd,
-        max_output_size=10_000_000,
-        timeout=effective_timeout,
-    )
+    try:
+        output, bytes_read = await execute_subprocess_async(
+            cmd,
+            max_output_size=10_000_000,
+            timeout=effective_timeout,
+        )
+    except Exception as e:
+        # If 'aaa' fails, try lighter analysis 'aa' or just '-n' if desperate,
+        # but pdc requires analysis.
+        return failure(
+            "DECOMPILATION_ERROR",
+            f"Radare2 decompilation failed: {str(e)}",
+            hint="Analysis failed. The binary might be packed or corrupted."
+        )
 
     # 6. Return result
     return success(
@@ -2471,54 +2494,21 @@ def _calculate_dynamic_timeout(file_path: str, base_timeout: int = 300) -> int:
 
 def _build_r2_cmd(file_path: str, r2_commands: list[str], analysis_level: str = "aaa") -> list[str]:
     """
-    Build radare2 command with project caching and adaptive analysis.
+    Build radare2 command.
     
-    Strategy:
-    1. Check if project exists for this file.
-    2. If yes, use 'Po <project>' to load analysis.
-    3. If no, use analysis_level (e.g., 'aaa') and then 'Ps <project>' to save.
+    Simplified version: Always run analysis if requested, skipping project persistence
+    to avoid permission issues and 'exit 1' errors in Docker environments.
     """
-    project_name = _get_r2_project_name(file_path)
-    
-    # Check if project exists
-    # Radare2 stores projects in ~/.local/share/radare2/projects/ or %LOCALAPPDATA%\radare2\projects\
-    # We can check using r2 -P list? Or just check filesystem if we know the path.
-    # For robustness, we'll use a marker file in the same directory as the binary, 
-    # or just rely on r2's behavior.
-    
-    # Since we can't easily check r2's internal project list without running r2,
-    # and running r2 is expensive/async, we'll use a sidecar file.
-    # Let's use a sidecar file in the workspace: .{filename}.r2_analyzed
-    
-    project_marker = Path(file_path).parent / f".{Path(file_path).name}.r2_project"
-    
     base_cmd = ["r2", "-q"]
     
     # If we just want to run commands without analysis (adaptive analysis)
     if analysis_level == "-n":
         return base_cmd + ["-n"] + ["-c", ";".join(r2_commands), str(file_path)]
         
-    if project_marker.exists():
-        # Project exists, load it
-        # Po <project_name>
-        combined_cmds = [f"Po {project_name}"] + r2_commands
-        return base_cmd + ["-c", ";".join(combined_cmds), str(file_path)]
-    else:
-        # Project doesn't exist, analyze and save
-        # aaa; Ps <project_name>
-        combined_cmds = [analysis_level, f"Ps {project_name}"] + r2_commands
-        
-        # We need to create the marker file. 
-        # Since this is a sync function, we can't easily do async IO.
-        # But we can assume the tool execution will succeed.
-        # Wait, if we create the marker here, but the command fails, we are in inconsistent state.
-        # But this is a helper.
-        
-        # Ideally, we should append a command to r2 to create the marker? 
-        # r2 can run system commands with '!'.        # But this complicates the command building.
-        # Let's keep it simple for now.
-        
-        return base_cmd + ["-c", ";".join(combined_cmds), str(file_path)]
+    # Always run analysis + commands
+    # We use 'e scr.color=0' to ensure no color codes in output
+    combined_cmds = ["e scr.color=0", analysis_level] + r2_commands
+    return base_cmd + ["-c", ";".join(combined_cmds), str(file_path)]
 
 
 def _resolve_address(proj, addr_str):
@@ -2592,11 +2582,17 @@ async def solve_path_constraints(
 
     # 2. Run angr in a separate thread (it's CPU bound and blocking)
     def run_angr_solve():
-        import angr
-        import claripy
+        try:
+            import angr
+            import claripy
+        except ImportError:
+            return {"found": False, "error": "angr or claripy not installed"}
 
         # Create project
-        proj = angr.Project(str(validated_path), auto_load_libs=False)
+        try:
+            proj = angr.Project(str(validated_path), auto_load_libs=False)
+        except Exception as e:
+            return {"found": False, "error": f"Failed to load binary with angr: {e}"}
 
         # Resolve addresses if they are symbols
         start_addr = _resolve_address(proj, start_address)
@@ -2604,12 +2600,15 @@ async def solve_path_constraints(
         avoid_addr = _resolve_address(proj, avoid_address) if avoid_address else None
 
         if start_addr is None:
-            raise ValueError(f"Could not resolve start address: {start_address}")
+            return {"found": False, "error": f"Could not resolve start address: {start_address}"}
         if target_addr is None:
-            raise ValueError(f"Could not resolve target address: {target_address}")
+            return {"found": False, "error": f"Could not resolve target address: {target_address}"}
 
         # Create simulation state
-        state = proj.factory.blank_state(addr=start_addr)
+        try:
+            state = proj.factory.blank_state(addr=start_addr)
+        except Exception as e:
+            return {"found": False, "error": f"Failed to create state: {e}"}
         
         # Create simulation manager
         simgr = proj.factory.simulation_manager(state)
@@ -2620,7 +2619,10 @@ async def solve_path_constraints(
             find_args["avoid"] = avoid_addr
 
         # Explore
-        simgr.explore(**find_args)
+        try:
+            simgr.explore(**find_args)
+        except Exception as e:
+            return {"found": False, "error": f"Exploration failed: {e}"}
 
         if simgr.found:
             found_state = simgr.found[0]
@@ -2629,13 +2631,16 @@ async def solve_path_constraints(
             # But for blank_state, we might check what was read.
             # For now, let's return the stdin if it was constrained, or just the state info.
             
-            solution = found_state.posix.dumps(0) # Dump stdin
-            return {
-                "found": True,
-                "input_hex": solution.hex(),
-                "input_str": str(solution), # Best effort string representation
-                "stdout": found_state.posix.dumps(1).decode(errors='ignore')
-            }
+            try:
+                solution = found_state.posix.dumps(0) # Dump stdin
+                return {
+                    "found": True,
+                    "input_hex": solution.hex(),
+                    "input_str": str(solution), # Best effort string representation
+                    "stdout": found_state.posix.dumps(1).decode(errors='ignore')
+                }
+            except Exception as e:
+                 return {"found": True, "input_hex": "", "input_str": "Error dumping input", "stdout": ""}
         else:
             return {"found": False, "reason": "No path found to target"}
 
@@ -2643,6 +2648,9 @@ async def solve_path_constraints(
         # Run with timeout
         result = await asyncio.to_thread(run_angr_solve)
         
+        if result.get("error"):
+             return failure("SYMBOLIC_EXECUTION_ERROR", result["error"])
+
         if result["found"]:
             return success(
                 result,
