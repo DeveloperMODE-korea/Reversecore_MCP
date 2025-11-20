@@ -54,6 +54,7 @@ def config(workspace_dirs, tmp_path) -> Config:
         rate_limit=60,
         lief_max_file_size=1_000_000_000,
         mcp_transport="stdio",
+        default_tool_timeout=60,
     )
 
 
