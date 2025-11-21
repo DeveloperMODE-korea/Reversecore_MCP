@@ -2510,7 +2510,19 @@ async def match_libraries(
         for func in functions:
             name = func.get("name", "")
             # Support both 'offset' (aflj) and 'vaddr' (isj) keys
+            # Fallback to 'realname' or other identifiers if needed
             offset = func.get("offset", func.get("vaddr", 0))
+            
+            # If offset is 0, try to parse it from the name if it looks like sym.func.0x...
+            if offset == 0 and name:
+                # Try to find hex address in name
+                import re
+                hex_match = re.search(r"(?:0x)?([0-9a-fA-F]{4,})", name)
+                if hex_match:
+                    try:
+                        offset = int(hex_match.group(1), 16)
+                    except ValueError:
+                        pass
 
             # Heuristic: library functions typically have names like:
             # - sym.imp.* (imports)

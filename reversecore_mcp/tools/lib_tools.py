@@ -62,6 +62,26 @@ def extract_iocs(
     iocs = {}
     total_count = 0
 
+    # Handle JSON input (e.g. ToolResult from another tool)
+    if text.strip().startswith("{") and text.strip().endswith("}"):
+        try:
+            data = json.loads(text)
+            # If it's a ToolResult structure, extract the 'data' or 'content'
+            if isinstance(data, dict):
+                if "data" in data:
+                    # data can be string or dict
+                    if isinstance(data["data"], str):
+                        text = data["data"]
+                    elif isinstance(data["data"], dict):
+                        text = json.dumps(data["data"]) # Convert back to string for regex
+                elif "content" in data: # Legacy or other format
+                     if isinstance(data["content"], list):
+                         text = "\n".join([c.get("text", "") for c in data["content"] if isinstance(c, dict)])
+                     else:
+                         text = str(data["content"])
+        except json.JSONDecodeError:
+            pass # Not valid JSON, treat as raw text
+
     # Handle file paths: if text is a valid file path, read its content
     # This handles cases where users pass a file path instead of content
     if len(text) < 260 and os.path.exists(text) and os.path.isfile(text):
