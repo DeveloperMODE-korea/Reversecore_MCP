@@ -569,7 +569,9 @@ async def run_radare2(
     validated_command = validate_r2_command(r2_command)
     
     # Adaptive analysis logic
-    analysis_level = "aaa"
+    # Use 'aa' (basic analysis) instead of 'aaa' (advanced analysis) for better performance
+    # 'aaa' is often overkill for automated tasks and causes timeouts on large binaries
+    analysis_level = "aa"
     
     # Simple information commands don't need analysis
     simple_commands = ["i", "iI", "iz", "il", "is", "ie", "it"]

@@ -8,9 +8,14 @@ def test_extract_iocs_basic():
     assert result.status == "success"
     data_dict = result.data
     
-    assert "192.168.1.1" in data_dict["ipv4"]
-    assert "test@example.com" in data_dict["emails"]
-    assert "https://example.com" in data_dict["urls"]
+    # Explicitly check lists to avoid CodeQL warnings about substring matching
+    ipv4_list = data_dict.get("ipv4", [])
+    email_list = data_dict.get("emails", [])
+    url_list = data_dict.get("urls", [])
+
+    assert "192.168.1.1" in ipv4_list
+    assert "test@example.com" in email_list
+    assert "https://example.com" in url_list
 
 def test_extract_iocs_empty():
     result = extract_iocs("nothing here")
