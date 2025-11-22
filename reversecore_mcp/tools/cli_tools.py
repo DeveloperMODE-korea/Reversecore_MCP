@@ -19,7 +19,7 @@ from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_handling import handle_tool_errors
 from reversecore_mcp.core.execution import execute_subprocess_async
 from reversecore_mcp.core.metrics import track_metrics
-from reversecore_mcp.core.result import ToolResult, success
+from reversecore_mcp.core.result import ToolResult, success, failure
 from reversecore_mcp.core.security import validate_file_path
 from reversecore_mcp.core.validators import validate_tool_parameters, validate_address_format
 
@@ -845,7 +845,6 @@ async def _generate_function_graph_impl(
     try:
         validate_address_format(function_address, "function_address")
     except Exception as e:
-        from reversecore_mcp.core.result import failure
         return failure("VALIDATION_ERROR", str(e))
 
     # 3. Build radare2 command
@@ -1010,7 +1009,6 @@ async def emulate_machine_code(
     try:
         validate_address_format(start_address, "start_address")
     except Exception as e:
-        from reversecore_mcp.core.result import failure
         return failure("VALIDATION_ERROR", str(e))
 
     # 3. Build radare2 ESIL emulation command chain
