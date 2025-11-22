@@ -74,127 +74,76 @@ AI 에이전트가 자연어 명령을 통해 포괄적인 리버스 엔지니�
 
 ## AI 사용 가이드 (AI 규칙)
 
-이 도구를 사용할 때, **AI 에이전트는 다음 3가지 절대 규칙을 따라야 합니다**:
+> 🎯 **중요**: AI 에이전트는 도구를 수동으로 호출하는 대신 **항상 내장된 프롬프트 시스템** (`/prompt`)을 사용해야 합니다.
 
-### 1. 파일 경로 규칙
-- ❌ **금지**: 호스트 절대 경로 사용 (예: `E:\...`, `/home/user/...`)
-- ✅ **필수**: Docker 컨테이너 경로 사용: `/app/workspace/filename`
-- 모든 샘플은 마운트된 작업 공간 디렉토리에 있어야 합니다.
+### 프롬프트를 사용해야 하는 이유
 
-**예시:**
-```json
-// ❌ 잘못됨 - 호스트 경로
-{"file_path": "E:\\samples\\malware.exe"}
+내장된 프롬프트는 다음을 자동으로 처리합니다:
+- ✅ 올바른 도구 순서 및 SOP 강제 적용
+- ✅ 파일 경로 검증 (컨테이너 경로)
+- ✅ 보안 규칙 (쉘 주입 방지)
+- ✅ 성능 최적화 (배치 작업)
+- ✅ 오류 처리 및 빠른 실패 로직
 
-// ✅ 올바름 - 컨테이너 경로
-{"file_path": "/app/workspace/malware.exe"}
+**수동 도구 호출은 오류가 발생하기 쉽고 비효율적입니다. 프롬프트를 사용하세요.**
+
+### 사용 가능한 분석 프롬프트
+
+분석 목표에 따라 적절한 프롬프트를 선택하세요:
+
+#### 🔍 `full_analysis_mode`
+**사용 목적**: 포괄적인 악성코드/바이너리 분석 (A부터 Z까지)
+- **SOP**: 정찰 → 필터링 → 심층 분석 → 보고
+- **소요 시간**: 5-15분
+- **도구**: Ghidra, 디컴파일, 에뮬레이션을 포함한 모든 도구
+
+#### ⚡ `basic_analysis_mode`
+**사용 목적**: 빠른 분류 및 위협 평가
+- **SOP**: 식별 → 문자열/IOC → API 요약 → 신속 보고
+- **소요 시간**: 1-3분
+- **도구**: 경량 도구만 사용 (Ghidra/디컴파일 제외)
+
+#### 🎮 `game_analysis_mode`
+**사용 목적**: 게임 클라이언트 리버스 엔지니어링
+- **초점**: 안티치트 탐지, 구조 복구, 네트워크 프로토콜 분석
+- **대상**: Unity/Unreal 게임, 게임 핵, 치트 탐지
+
+#### 🔧 `firmware_analysis_mode`
+**사용 목적**: 펌웨어 및 IoT 디바이스 분석
+- **초점**: 파일 시스템 추출, 아키텍처 식별, 하드코딩된 비밀
+- **대상**: 라우터 펌웨어, 임베디드 시스템, IoT 디바이스
+
+#### 🐛 `vulnerability_research_mode`
+**사용 목적**: 버그 헌팅 및 익스플로잇 개발
+- **초점**: 위험한 API 사용, 보호 기법 확인, 퍼징 후보
+- **대상**: 네트워크 서비스, 파서, 권한 있는 바이너리
+
+#### 🔐 `crypto_analysis_mode`
+**사용 목적**: 암호화 구현 분석
+- **초점**: 알고리즘 식별, 키 관리, 약한 암호화 탐지
+- **대상**: DRM, 라이선스 검증기, 암호화된 통신
+
+### 프롬프트 사용 방법
+
+**사용 예시:**
+```
+사용자: "/app/workspace/sample.exe를 악성코드 분석해줘"
+AI: [full_analysis_mode 프롬프트 선택]
+→ 자동 실행: 정찰 → 필터링 → 심층 분석 → 보고
 ```
 
-### 2. 주소 지정 규칙 (VA vs Offset)
-- **가상 주소 (VA)**: `run_radare2` 사용 시 `pd @ <VA>`와 같은 명령 사용
-  - 예: `run_radare2("file.exe", "pdf @ 0x401000")`
-- **파일 오프셋**: `disassemble_with_capstone` 사용
-  - 예: `disassemble_with_capstone("file.exe", offset=0x1000)`
-- ⚠️ **절대 금지**: Capstone에 VA 전달 - 파일 오프셋만 허용됨
+**프롬프트 선택 가이드:**
+- 알 수 없는 파일 → 먼저 `basic_analysis_mode`
+- 확인된 악성코드 → `full_analysis_mode`
+- 게임 클라이언트 → `game_analysis_mode`
+- 펌웨어 이미지 → `firmware_analysis_mode`
+- 보안 감사 → `vulnerability_research_mode`
+- 라이선스/DRM 확인 → `crypto_analysis_mode`
 
-**중요한 이유:**
-- Radare2는 가상 주소를 이해하고 PE/ELF 주소 변환을 처리합니다.
-- Capstone은 특정 오프셋의 파일 바이트에서 직접 작동합니다.
-- 이를 혼합하면 오류가 발생합니다.
-
-### 3. 필터링 규칙
-- ❌ **금지**: 쉘 메타문자 (`|`, `;`, `&&`, `||`, `` ` ``, `$()`)
-  - 이는 **보안 위험**입니다 (명령 주입).
-- ✅ **허용**: Radare2 내부 필터 (`~`)
-  - 예: `afl~entry` ("entry"를 포함하는 함수 필터링)
-  - radare2가 내부적으로 처리하므로 안전합니다.
-- 💡 **복잡한 필터링의 경우**: JSON 출력을 요청하고 직접 처리하세요.
-  - 예: 복잡한 `afl` 필터 대신 `aflj` (JSON 출력) 사용
-
-**예시:**
-```python
-# ✅ 올바름 - radare2 내부 필터 사용
-run_radare2("file.exe", "afl~main")      # "main"을 포함하는 함수 나열
-run_radare2("file.exe", "iz~http")       # "http"를 포함하는 문자열 찾기
-
-# ❌ 잘못됨 - 쉘 파이프 (차단됨)
-run_radare2("file.exe", "afl | grep main")
-
-# ✅ 더 나음 - JSON 사용 및 직접 필터링
-result = run_radare2("file.exe", "aflj")
-# JSON 파싱 및 코드 내에서 필터링
-```
-
-### 4. 빠른 실패 규칙 (패킹/스크립트된 바이너리)
-- 🛑 **중단**: `run_strings`에서 패커 시그니처가 발견되면 심층 분석을 중단하세요:
-  - "AutoIt", "Nullsoft", "PyInstaller", "MEI" (PyInstaller 임시 디렉토리)
-- ⛔ **실행 금지**: `analyze_xrefs`, `match_libraries`, `emulate_machine_code`, `generate_function_graph`
-  - 이유: 패킹된 바이너리(가비지 코드)에서는 이러한 도구가 타임아웃되거나 실패합니다.
-- ✅ **대신 수행할 작업**:
-  - `run_strings` 결과 보고 (예: "PyInstaller 감지됨")
-  - 진입점(entry point)에서 `generate_yara_rule` 실행
-  - 즉시 다음 파일로 이동
-
-### 5. 성능 규칙 (배치 스캔)
-- ⚡ **항상**: 초기 분류 시 도구를 하나씩 실행하는 대신 `scan_workspace`를 사용하세요.
-- **이유**: 모든 파일에 대해 `run_file`, `parse_binary_with_lief`, `run_yara`를 병렬로 실행합니다.
-- **지침**: "작업 공간 분석" → `scan_workspace` 호출.
-
-### 6. IOC 추출 규칙
-- 🔍 **항상**: 대용량 텍스트 출력(strings, 로그, 디컴파일된 코드)에는 `extract_iocs`를 사용하세요.
-- **이유**: 노이즈를 필터링하고 실행 가능한 인텔리전스(IP, URL, 이메일)를 추출합니다.
-- **지침**: "C2 서버 찾기" → `run_strings` 실행 후 `extract_iocs` 실행.
-
-### 고급 분석을 위한 우선순위 도구
-
-#### 우선순위 1: "무엇이 변경되었는가?" — 바이너리 비교 (`diff_binaries`)
-
-**동일한 바이너리의 두 버전을 비교해야 할 때 사용하세요:**
-
-- **패치 분석 (1-day 익스플로잇)**: 패치 전후 바이너리를 비교하여 보안 수정 사항 찾기
-  - 예: `diff_binaries("/app/workspace/app_v1.0.dll", "/app/workspace/app_v1.1.dll")`
-  - Microsoft가 보안 패치 릴리스 → 해커가 버전을 비교하여 취약점 발견
-
-- **게임 해킹**: 게임 업데이트 후 오프셋 변경 사항 찾기
-  - 예: `diff_binaries("/app/workspace/game_old.exe", "/app/workspace/game_new.exe", "Player::update")`
-  - 게임 업데이트 → Player 체력 오프셋이 어디로 이동했는지 찾기
-
-- **맬웨어 변종 분석**: 맬웨어 샘플을 비교하여 변경된 내용 찾기
-  - 예: `diff_binaries("/app/workspace/lazarus_v1.exe", "/app/workspace/lazarus_v2.exe")`
-  - "알려진 Lazarus 맬웨어와 90% 동일하지만 C2 주소 생성 방식이 변경됨"
-
-**출력 포함 내용:**
-- 유사도 점수 (0.0-1.0)
-- 주소와 함께 코드 변경 사항 목록
-- 변경 유형 (새 블록, 제거된 블록, 수정된 코드)
-
-#### 우선순위 2: "노이즈 건너뛰기" — 라이브러리 시그니처 매칭 (`match_libraries`)
-
-**사용자 코드에 집중하고 표준 라이브러리 분석을 건너뛰려면 사용하세요:**
-
-- **대용량 바이너리 분석**: 25MB+ 파일에서 OpenSSL, zlib, MFC 등을 필터링
-  - 예: `match_libraries("/app/workspace/huge_app.exe")`
-  - 분석 범위 대폭 축소 → 토큰 및 시간 절약
-
-- **게임 클라이언트 분석**: Unreal Engine/Unity 표준 라이브러리 함수 건너뛰기
-  - 예: `match_libraries("/app/workspace/game.exe")`
-  - 엔진 코드가 아닌 게임별 로직에 집중
-
-- **맬웨어 분석**: 사용자 지정 맬웨어 코드와 Windows API 래퍼 식별
-  - 예: `match_libraries("/app/workspace/malware.exe")`
-  - 실제로 악의적인 코드에 집중
-
-**출력 포함 내용:**
-- 전체 함수 vs 라이브러리 함수 vs 사용자 함수
-- 노이즈 감소 비율
-- 라이브러리 일치 목록 (strcpy, malloc 등)
-- 분석할 사용자 함수 목록
-
-**이 도구들이 중요한 이유:**
-- **바이너리 비교**: 취약점 연구 및 패치 분석에 필수적
-- **라이브러리 매칭**: 대용량 바이너리의 분석 시간을 몇 시간에서 몇 분으로 단축
+> ⚠️ **고급 사용자 전용**: 도구를 수동으로 호출해야 하는 경우(권장하지 않음), [도구 문서](#available-tools)를 참조하고 올바른 파일 경로(`/app/workspace/...`), 쉘 메타문자 없음, 올바른 VA vs Offset 사용을 보장하세요.
 
 ## 개요
+
 
 ### MCP란 무엇인가요?
 

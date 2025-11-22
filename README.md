@@ -74,127 +74,76 @@ This project is a toy project created with the assistance of AI. It was develope
 
 ## AI Usage Guide (Rules for AI)
 
-When using this tool, **AI agents MUST follow these 3 absolute rules**:
+> 🎯 **CRITICAL**: AI Agents should **ALWAYS use the built-in Prompt system** (`/prompt`) instead of manually orchestrating tool calls.
 
-### 1. File Path Rules
-- ❌ **DO NOT** use host absolute paths (e.g., `E:\...`, `/home/user/...`)
-- ✅ **ALWAYS** use Docker container paths: `/app/workspace/filename`
-- All samples must be in the mounted workspace directory
+### Why Use Prompts?
 
-**Example:**
-```json
-// ❌ WRONG - Host path
-{"file_path": "E:\\samples\\malware.exe"}
+The built-in prompts automatically handle:
+- ✅ Correct tool ordering and SOP enforcement
+- ✅ File path validation (container paths)
+- ✅ Security rules (no shell injection)
+- ✅ Performance optimization (batch operations)
+- ✅ Error handling and fail-fast logic
 
-// ✅ CORRECT - Container path
-{"file_path": "/app/workspace/malware.exe"}
+**Manual tool calls are error-prone and inefficient. Use prompts.**
+
+### Available Analysis Prompts
+
+Select the appropriate prompt based on your analysis goal:
+
+#### 🔍 `full_analysis_mode`
+**Use for**: Comprehensive malware/binary analysis (A to Z)
+- **SOP**: Reconnaissance → Filtering → Deep Analysis → Reporting
+- **Duration**: 5-15 minutes
+- **Tools**: All tools including Ghidra, Decompilation, Emulation
+
+#### ⚡ `basic_analysis_mode`
+**Use for**: Quick triage and threat assessment
+- **SOP**: Identification → Strings/IOCs → API Summary → Quick Report
+- **Duration**: 1-3 minutes
+- **Tools**: Lightweight only (no Ghidra/Decompile)
+
+#### 🎮 `game_analysis_mode`
+**Use for**: Game client reverse engineering
+- **Focus**: Anti-Cheat detection, structure recovery, network protocol analysis
+- **Targets**: Unity/Unreal games, game hacks, cheat detection
+
+#### 🔧 `firmware_analysis_mode`
+**Use for**: Firmware and IoT device analysis
+- **Focus**: File system extraction, architecture identification, hardcoded secrets
+- **Targets**: Router firmware, embedded systems, IoT devices
+
+#### 🐛 `vulnerability_research_mode`
+**Use for**: Bug hunting and exploit development
+- **Focus**: Dangerous API usage, mitigation checks, fuzzing candidates
+- **Targets**: Network services, parsers, privileged binaries
+
+#### 🔐 `crypto_analysis_mode`
+**Use for**: Cryptographic implementation analysis
+- **Focus**: Algorithm identification, key management, weak crypto detection
+- **Targets**: DRM, license validators, encrypted communications
+
+### How to Use Prompts
+
+**Example Usage:**
+```
+User: "Analyze /app/workspace/sample.exe for malware"
+AI: [Selects full_analysis_mode prompt]
+→ Automatically executes: Recon → Filter → Deep Analysis → Report
 ```
 
-### 2. Address Specification Rules (VA vs Offset)
-- **Virtual Address (VA)**: Use `run_radare2` with commands like `pd @ <VA>`
-  - Example: `run_radare2("file.exe", "pdf @ 0x401000")`
-- **File Offset**: Use `disassemble_with_capstone` 
-  - Example: `disassemble_with_capstone("file.exe", offset=0x1000)`
-- ⚠️ **NEVER** pass VA to Capstone - it only accepts file offsets
+**Prompt Selection Guide:**
+- Unknown file → `basic_analysis_mode` first
+- Confirmed malware → `full_analysis_mode`
+- Game client → `game_analysis_mode`
+- Firmware image → `firmware_analysis_mode`
+- Security audit → `vulnerability_research_mode`
+- License/DRM check → `crypto_analysis_mode`
 
-**Why this matters:**
-- Radare2 understands virtual addresses and handles PE/ELF address translation
-- Capstone works directly on file bytes at specific offsets
-- Mixing them causes errors
-
-### 3. Filtering Rules
-- ❌ **PROHIBITED**: Shell metacharacters (`|`, `;`, `&&`, `||`, `` ` ``, `$()`)
-  - These are **security risks** (command injection)
-- ✅ **ALLOWED**: Radare2 internal filter (`~`)
-  - Example: `afl~entry` (filter functions containing "entry")
-  - Safe because radare2 handles it internally, not the shell
-- 💡 **For complex filtering**: Request JSON output and process it yourself
-  - Example: Use `aflj` (JSON output) instead of complex `afl` filters
-
-**Examples:**
-```python
-# ✅ CORRECT - Using radare2 internal filter
-run_radare2("file.exe", "afl~main")      # List functions containing "main"
-run_radare2("file.exe", "iz~http")       # Find strings containing "http"
-
-# ❌ WRONG - Shell pipe (blocked)
-run_radare2("file.exe", "afl | grep main")
-
-# ✅ BETTER - Use JSON and filter yourself
-result = run_radare2("file.exe", "aflj")
-# Parse JSON and filter in your code
-```
-
-### 4. Fail Fast Rules (Packed/Scripted Binaries)
-- 🛑 **STOP** deep analysis if `run_strings` reveals packer signatures:
-  - "AutoIt", "Nullsoft", "PyInstaller", "MEI" (PyInstaller temp dir)
-- ⛔ **DO NOT RUN**: `analyze_xrefs`, `match_libraries`, `emulate_machine_code`, `generate_function_graph`
-  - Reason: These tools will timeout or fail on packed binaries (garbage code)
-- ✅ **INSTEAD**:
-  - Report `run_strings` findings (e.g., "Detected PyInstaller")
-  - Run `generate_yara_rule` on the entry point
-  - Move to the next file immediately
-
-### 5. Performance Rules (Batch Scanning)
-- ⚡ **ALWAYS** use `scan_workspace` for initial triage instead of running tools one by one.
-- **Why**: It runs `run_file`, `parse_binary_with_lief`, and `run_yara` in parallel for all files.
-- **Instruction**: "Analyze workspace" → Call `scan_workspace`.
-
-### 6. IOC Extraction Rules
-- 🔍 **ALWAYS** use `extract_iocs` on any large text output (strings, logs, decompiled code).
-- **Why**: It filters noise and extracts actionable intelligence (IPs, URLs, Emails).
-- **Instruction**: "Find C2 servers" → Run `run_strings` then `extract_iocs`.
-
-### Priority Tools for Advanced Analysis
-
-#### Priority 1: "What Changed?" — Binary Diffing (`diff_binaries`)
-
-**Use this when you need to compare two versions of the same binary:**
-
-- **Patch Analysis (1-day Exploits)**: Compare pre-patch vs post-patch binaries to find security fixes
-  - Example: `diff_binaries("/app/workspace/app_v1.0.dll", "/app/workspace/app_v1.1.dll")`
-  - Microsoft releases a security patch → hackers compare versions to find the vulnerability
-
-- **Game Hacking**: Find offset changes after game updates
-  - Example: `diff_binaries("/app/workspace/game_old.exe", "/app/workspace/game_new.exe", "Player::update")`
-  - Game updates → find where Player health offset moved to
-
-- **Malware Variant Analysis**: Compare malware samples to find what changed
-  - Example: `diff_binaries("/app/workspace/lazarus_v1.exe", "/app/workspace/lazarus_v2.exe")`
-  - "90% identical to known Lazarus malware, but C2 address generation changed"
-
-**Output includes:**
-- Similarity score (0.0-1.0)
-- List of code changes with addresses
-- Type of changes (new blocks, removed blocks, modified code)
-
-#### Priority 2: "Skip the Noise" — Library Signature Matching (`match_libraries`)
-
-**Use this to focus on user code and skip standard library analysis:**
-
-- **Large Binary Analysis**: Filter out OpenSSL, zlib, MFC, etc. from 25MB+ files
-  - Example: `match_libraries("/app/workspace/huge_app.exe")`
-  - Reduces analysis scope significantly → saves tokens and time
-
-- **Game Client Analysis**: Skip Unreal Engine/Unity standard library functions
-  - Example: `match_libraries("/app/workspace/game.exe")`
-  - Focus on game-specific logic, not engine code
-
-- **Malware Analysis**: Identify custom malware code vs Windows API wrappers
-  - Example: `match_libraries("/app/workspace/malware.exe")`
-  - Focus on code that's actually malicious
-
-**Output includes:**
-- Total functions vs library functions vs user functions
-- Noise reduction percentage
-- List of library matches (strcpy, malloc, etc.)
-- List of user functions to analyze
-
-**Why these tools matter:**
-- **Binary Diffing**: Essential for vulnerability research and patch analysis
-- **Library Matching**: Reduces analysis time from hours to minutes for large binaries
+> ⚠️ **For Advanced Users Only**: If you must manually call tools (not recommended), refer to the [Tool Documentation](#available-tools) and ensure proper file paths (`/app/workspace/...`), no shell metacharacters, and correct VA vs Offset usage.
 
 ## Overview
+
 
 ### What is MCP?
 
