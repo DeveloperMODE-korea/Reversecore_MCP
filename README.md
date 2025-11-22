@@ -7,6 +7,8 @@
 [![FastMCP](https://img.shields.io/badge/FastMCP-0.1.0%2B-green)](https://github.com/jlowin/fastmcp)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
 
+[🇰🇷 한국어 (Korean)](README_KR.md)
+
 An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents to perform comprehensive reverse engineering workflows through natural language commands. From basic triage to advanced decompilation, structure recovery, cross-reference analysis, and defense signature generation, Reversecore_MCP provides a secure, performant interface to industry-standard reverse engineering tools, enabling AI assistants to conduct end-to-end malware analysis and security research.
 
 ## 💻 System Requirements
