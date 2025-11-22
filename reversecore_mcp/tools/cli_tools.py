@@ -108,28 +108,50 @@ async def trace_execution_path(
 
     # Helper to get address of a function name
     async def get_address(func_name):
-        # Try to find exact match first
-        # Note: We cannot use ~grep with json output (isj~name) as it breaks JSON syntax
-        cmd = _build_r2_cmd(str(validated_path), ["isj"], "aaa")
+        # OPTIMIZATION: Batch both symbol and function lookups in one r2 call
+        # This eliminates the overhead of a second subprocess call when the symbol
+        # isn't found in the first lookup (common for stripped binaries)
+        cmd = _build_r2_cmd(str(validated_path), ["isj", "aflj"], "aaa")
         out, _ = await execute_subprocess_async(cmd, timeout=30)
-        try:
-            symbols = _parse_json_output(out)
-            for sym in symbols:
-                if sym.get("name") == func_name or sym.get("realname") == func_name:
-                    return sym.get("vaddr")
-        except (json.JSONDecodeError, TypeError):
-            pass
         
-        # If not found, try aflj
-        cmd = _build_r2_cmd(str(validated_path), ["aflj"], "aaa")
-        out, _ = await execute_subprocess_async(cmd, timeout=30)
-        try:
-            funcs = _parse_json_output(out)
-            for f in funcs:
-                if f.get("name") == func_name:
-                    return f.get("offset")
-        except (json.JSONDecodeError, TypeError):
-            pass
+        # Parse output: radare2 outputs one JSON per command line
+        # We expect 2 lines: first from isj (symbols), second from aflj (functions)
+        lines = [line.strip() for line in out.strip().split("\n") if line.strip()]
+        
+        # Validate we have at least one line with potential JSON
+        if not lines:
+            return None
+        
+        # Try symbols first (isj output)
+        # Use robust parsing that handles both JSON arrays and error messages
+        if len(lines) >= 1:
+            try:
+                symbols = _parse_json_output(lines[0])
+                # Validate it's a list (not an error dict or string)
+                if isinstance(symbols, list):
+                    for sym in symbols:
+                        if isinstance(sym, dict):
+                            if sym.get("name") == func_name or sym.get("realname") == func_name:
+                                return sym.get("vaddr")
+            except (json.JSONDecodeError, TypeError, IndexError):
+                # First line wasn't valid JSON or wasn't in expected format
+                # This is OK - fall through to try functions
+                pass
+        
+        # If not found in symbols, try functions (aflj output)
+        if len(lines) >= 2:
+            try:
+                funcs = _parse_json_output(lines[1])
+                # Validate it's a list (not an error dict or string)
+                if isinstance(funcs, list):
+                    for f in funcs:
+                        if isinstance(f, dict) and f.get("name") == func_name:
+                            return f.get("offset")
+            except (json.JSONDecodeError, TypeError, IndexError):
+                # Second line wasn't valid JSON or wasn't in expected format
+                # This is OK - just means function not found
+                pass
+        
         return None
 
     # Resolve target address
@@ -880,6 +902,10 @@ async def _generate_function_graph_impl(
 
     elif format.lower() == "dot":
         # For DOT format, call radare2 with agfd command
+        # NOTE: This is a separate call from agfj above, but this is optimal because:
+        # - DOT format requires a different command (agfd vs agfj)
+        # - Batching both would waste resources since we only need one format
+        # - DOT format is rarely used (mermaid and json are preferred)
         dot_cmd_str = f"agfd @ {function_address}"
         
         dot_output, dot_bytes = await _execute_r2_command(
