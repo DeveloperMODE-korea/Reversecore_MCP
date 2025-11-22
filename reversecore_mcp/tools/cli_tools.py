@@ -19,15 +19,14 @@ from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_handling import handle_tool_errors
 from reversecore_mcp.core.execution import execute_subprocess_async
 from reversecore_mcp.core.metrics import track_metrics
-from reversecore_mcp.core.result import ToolResult, success
+from reversecore_mcp.core.result import ToolResult, success, failure
 from reversecore_mcp.core.security import validate_file_path
-from reversecore_mcp.core.validators import validate_tool_parameters
+from reversecore_mcp.core.validators import validate_tool_parameters, validate_address_format
 
 # Load default timeout from configuration
 DEFAULT_TIMEOUT = get_config().default_tool_timeout
 
 # Pre-compile regex patterns for performance optimization
-_FUNCTION_ADDRESS_PATTERN = re.compile(r"^[a-zA-Z0-9_.]+$")
 _VERSION_PATTERNS = {
     "OpenSSL": re.compile(r"(OpenSSL|openssl)\s+(\d+\.\d+\.\d+[a-z]?)", re.IGNORECASE),
     "GCC": re.compile(r"GCC:\s+\(.*\)\s+(\d+\.\d+\.\d+)"),
@@ -843,22 +842,22 @@ async def _generate_function_graph_impl(
     validated_path = validate_file_path(file_path)
 
     # 2. Security check for function address (prevent shell injection)
-    # Use pre-compiled pattern for better performance
-    if not _FUNCTION_ADDRESS_PATTERN.match(function_address.replace("0x", "")):
-        return failure("VALIDATION_ERROR", "Invalid function address format")
+    try:
+        validate_address_format(function_address, "function_address")
+    except Exception as e:
+        return failure("VALIDATION_ERROR", str(e))
 
     # 3. Build radare2 command
     r2_cmd_str = f"agfj @ {function_address}"
 
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    cmd = _build_r2_cmd(str(validated_path), [r2_cmd_str], "aaa")
-
-    # 4. Execute subprocess asynchronously
+    # 4. Execute subprocess asynchronously using helper
     # Large graphs need higher output limit
-    output, bytes_read = await execute_subprocess_async(
-        cmd,
+    output, bytes_read = await _execute_r2_command(
+        validated_path,
+        [r2_cmd_str],
+        analysis_level="aaa",
         max_output_size=50_000_000,
-        timeout=effective_timeout,
+        base_timeout=timeout,
     )
 
     # Add timestamp for cache visibility
@@ -882,12 +881,13 @@ async def _generate_function_graph_impl(
     elif format.lower() == "dot":
         # For DOT format, call radare2 with agfd command
         dot_cmd_str = f"agfd @ {function_address}"
-        dot_cmd = _build_r2_cmd(str(validated_path), [dot_cmd_str], "aaa")
         
-        dot_output, dot_bytes = await execute_subprocess_async(
-            dot_cmd,
+        dot_output, dot_bytes = await _execute_r2_command(
+            validated_path,
+            [dot_cmd_str],
+            analysis_level="aaa",
             max_output_size=50_000_000,
-            timeout=effective_timeout,
+            base_timeout=timeout,
         )
         return success(dot_output, bytes_read=dot_bytes, format="dot")
 
@@ -1006,8 +1006,10 @@ async def emulate_machine_code(
     validated_path = validate_file_path(file_path)
 
     # 2. Security check for start address (prevent shell injection)
-    if not re.match(r"^[a-zA-Z0-9_.]+$", start_address.replace("0x", "")):
-        return failure("VALIDATION_ERROR", "Invalid start address format")
+    try:
+        validate_address_format(start_address, "start_address")
+    except Exception as e:
+        return failure("VALIDATION_ERROR", str(e))
 
     # 3. Build radare2 ESIL emulation command chain
     # Note: Commands must be executed in specific order for ESIL to work correctly
@@ -1020,15 +1022,14 @@ async def emulate_machine_code(
         "ar",  # Show all registers
     ]
     
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    cmd = _build_r2_cmd(str(validated_path), esil_cmds, "aaa")
-
-    # 4. Execute emulation
+    # 4. Execute emulation using helper
     try:
-        output, bytes_read = await execute_subprocess_async(
-            cmd,
-            max_output_size=10_000_000,  # Register output is typically small
-            timeout=effective_timeout,
+        output, bytes_read = await _execute_r2_command(
+            validated_path,
+            esil_cmds,
+            analysis_level="aaa",
+            max_output_size=10_000_000,
+            base_timeout=timeout,
         )
 
         # 5. Parse register state
@@ -1101,24 +1102,25 @@ async def get_pseudo_code(
     validated_path = validate_file_path(file_path)
 
     # 2. Security check for address (prevent shell injection)
-    if not re.match(r"^[a-zA-Z0-9_.]+$", address.replace("0x", "")):
+    try:
+        validate_address_format(address, "address")
+    except Exception as e:
         return failure(
             "VALIDATION_ERROR",
-            "Invalid address format",
+            str(e),
             hint="Address must contain only alphanumeric characters, dots, underscores, and '0x' prefix",
         )
 
     # 3. Build radare2 command to decompile
     r2_cmd = f"pdc @ {address}"
     
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    cmd = _build_r2_cmd(str(validated_path), [r2_cmd], "aaa")
-
-    # 4. Execute decompilation
-    output, bytes_read = await execute_subprocess_async(
-        cmd,
-        max_output_size=10_000_000,  # Decompiled code can be large
-        timeout=effective_timeout,
+    # 4. Execute decompilation using helper
+    output, bytes_read = await _execute_r2_command(
+        validated_path,
+        [r2_cmd],
+        analysis_level="aaa",
+        max_output_size=10_000_000,
+        base_timeout=timeout,
     )
 
     # 5. Check if output is valid
@@ -1193,10 +1195,12 @@ async def generate_signature(
         )
 
     # 2. Security check for address
-    if not re.match(r"^[a-zA-Z0-9_.]+$", address.replace("0x", "")):
+    try:
+        validate_address_format(address, "address")
+    except Exception as e:
         return failure(
             "VALIDATION_ERROR",
-            "Invalid address format",
+            str(e),
             hint="Address must contain only alphanumeric characters, dots, underscores, and '0x' prefix",
         )
 
@@ -1225,13 +1229,14 @@ async def generate_signature(
         # Actually, let's use 'e io.cache=true' to ensure we can read? No.
         analysis_level = "-n"
         
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    cmd = _build_r2_cmd(str(validated_path), r2_cmds, analysis_level)
-
-    output, bytes_read = await execute_subprocess_async(
-        cmd,
+    # Extract hex bytes using helper
+    # Note: analysis_level may be "" (empty) which means default r2 behavior (parse headers/symbols)
+    output, bytes_read = await _execute_r2_command(
+        validated_path,
+        r2_cmds,
+        analysis_level=analysis_level or "aaa",
         max_output_size=1_000_000,
-        timeout=effective_timeout,
+        base_timeout=timeout,
     )
 
     # 4. Validate output
@@ -1492,10 +1497,12 @@ async def _smart_decompile_impl(
     validated_path = validate_file_path(file_path)
 
     # 2. Security check for function address (prevent shell injection)
-    if not re.match(r"^[a-zA-Z0-9_.]+$", function_address.replace("0x", "")):
+    try:
+        validate_address_format(function_address, "function_address")
+    except Exception as e:
         return failure(
             "VALIDATION_ERROR",
-            "Invalid function address format",
+            str(e),
             hint="Function address must contain only alphanumeric characters, dots, underscores, and '0x' prefix",
         )
 
@@ -1541,16 +1548,14 @@ async def _smart_decompile_impl(
 
     r2_cmds = [f"pdc @ {function_address}"]
     
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    # Use 'aaa' for analysis, but _build_r2_cmd now handles it safely without project persistence
-    cmd = _build_r2_cmd(str(validated_path), r2_cmds, "aaa")
-
-    # 5. Execute decompilation
+    # 5. Execute decompilation using helper
     try:
-        output, bytes_read = await execute_subprocess_async(
-            cmd,
+        output, bytes_read = await _execute_r2_command(
+            validated_path,
+            r2_cmds,
+            analysis_level="aaa",
             max_output_size=10_000_000,
-            timeout=effective_timeout,
+            base_timeout=timeout,
         )
     except Exception as e:
         # If 'aaa' fails, try lighter analysis 'aa' or just '-n' if desperate,
@@ -1663,10 +1668,12 @@ async def generate_yara_rule(
         )
 
     # 3. Security check for function address (prevent shell injection)
-    if not re.match(r"^[a-zA-Z0-9_.]+$", function_address.replace("0x", "")):
+    try:
+        validate_address_format(function_address, "function_address")
+    except Exception as e:
         return failure(
             "VALIDATION_ERROR",
-            "Invalid function address format",
+            str(e),
             hint="Function address must contain only alphanumeric characters, dots, underscores, and '0x' prefix",
         )
 
@@ -1680,13 +1687,14 @@ async def generate_yara_rule(
     if function_address.startswith("0x") or re.match(r"^[0-9a-fA-F]+$", function_address):
         analysis_level = "-n"
         
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    cmd = _build_r2_cmd(str(validated_path), r2_cmds, analysis_level)
-
-    output, bytes_read = await execute_subprocess_async(
-        cmd,
+    # 4. Extract hex bytes using helper
+    # Note: analysis_level may be "" (empty) which means default r2 behavior (parse headers/symbols)
+    output, bytes_read = await _execute_r2_command(
+        validated_path,
+        r2_cmds,
+        analysis_level=analysis_level or "aaa",
         max_output_size=1_000_000,
-        timeout=effective_timeout,
+        base_timeout=timeout,
     )
 
     # 5. Validate output
@@ -1842,14 +1850,13 @@ async def analyze_xrefs(
     # Build command string
     r2_commands_str = "; ".join(commands)
 
-    # 4. Execute analysis
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    cmd = _build_r2_cmd(str(validated_path), [r2_commands_str], "aaa")
-
-    output, bytes_read = await execute_subprocess_async(
-        cmd,
+    # 4. Execute analysis using helper
+    output, bytes_read = await _execute_r2_command(
+        validated_path,
+        [r2_commands_str],
+        analysis_level="aaa",
         max_output_size=10_000_000,
-        timeout=effective_timeout,
+        base_timeout=timeout,
     )
 
     # 5. Parse JSON output
@@ -2636,6 +2643,43 @@ def _calculate_dynamic_timeout(file_path: str, base_timeout: int = 300) -> int:
         return int(base_timeout + additional_time)
     except Exception:
         return base_timeout
+
+
+async def _execute_r2_command(
+    file_path: Path,
+    r2_commands: list[str],
+    analysis_level: str = "aaa",
+    max_output_size: int = 10_000_000,
+    base_timeout: int = 300,
+) -> tuple[str, int]:
+    """
+    Execute radare2 commands with common pattern.
+    
+    This helper consolidates the repeated pattern of:
+    1. Calculate dynamic timeout
+    2. Build r2 command
+    3. Execute subprocess
+    
+    Args:
+        file_path: Path to the binary file (already validated)
+        r2_commands: List of radare2 commands to execute
+        analysis_level: Analysis level ("aaa", "aa", "-n")
+        max_output_size: Maximum output size in bytes
+        base_timeout: Base timeout in seconds
+        
+    Returns:
+        Tuple of (output, bytes_read)
+    """
+    effective_timeout = _calculate_dynamic_timeout(str(file_path), base_timeout)
+    cmd = _build_r2_cmd(str(file_path), r2_commands, analysis_level)
+    
+    output, bytes_read = await execute_subprocess_async(
+        cmd,
+        max_output_size=max_output_size,
+        timeout=effective_timeout,
+    )
+    
+    return output, bytes_read
 
 
 def _build_r2_cmd(file_path: str, r2_commands: list[str], analysis_level: str = "aaa") -> list[str]:
