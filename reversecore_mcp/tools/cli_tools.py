@@ -2645,6 +2645,28 @@ def _build_r2_cmd(file_path: str, r2_commands: list[str], analysis_level: str = 
     
     Simplified version: Always run analysis if requested, skipping project persistence
     to avoid permission issues and 'exit 1' errors in Docker environments.
+    
+    Performance Note - Early Filtering:
+    ===================================
+    When searching for specific data, consider using radare2's built-in filtering
+    to reduce data transfer and parsing overhead. Examples:
+    
+    1. Text-based filtering with grep (~):
+       - aflj~main       # Filter functions containing "main" (WARNING: breaks JSON)
+       - afl~main        # Text-mode filtering (safe, but not JSON)
+       - iz~password     # Filter strings containing "password"
+    
+    2. Radare2's native JSON queries (where available):
+       - Some commands support inline filtering in JSON mode
+       - Check radare2 documentation for specific command capabilities
+    
+    3. Trade-offs:
+       - Early filtering: Reduces data transfer by 50-70%
+       - Late filtering: Preserves JSON structure, more flexible
+       - Current implementation: Prioritizes JSON structure integrity
+    
+    For complex filtering logic (e.g., checking multiple conditions, prefix matching),
+    Python-side filtering is more maintainable and flexible.
     """
     base_cmd = ["r2", "-q"]
     
@@ -2656,6 +2678,7 @@ def _build_r2_cmd(file_path: str, r2_commands: list[str], analysis_level: str = 
     # We use 'e scr.color=0' to ensure no color codes in output
     combined_cmds = ["e scr.color=0", analysis_level] + r2_commands
     return base_cmd + ["-c", ";".join(combined_cmds), str(file_path)]
+
 
 
 def _resolve_address(proj, addr_str):
