@@ -19,8 +19,13 @@ logger = get_logger(__name__)
 mcp = FastMCP(name="Reversecore_MCP")
 
 # Register all tool modules
+# Register all tool modules
 cli_tools.register_cli_tools(mcp)
 lib_tools.register_lib_tools(mcp)
+
+# Register prompts
+from reversecore_mcp import prompts
+prompts.register_prompts(mcp)
 
 
 def main():
