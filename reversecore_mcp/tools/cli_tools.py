@@ -583,6 +583,7 @@ async def run_radare2(
     r2_command: str,
     max_output_size: int = 10_000_000,
     timeout: int = DEFAULT_TIMEOUT,
+    ctx: Context = None,
 ) -> ToolResult:
     """Execute vetted radare2 commands for binary triage."""
 
@@ -1605,6 +1606,7 @@ async def smart_decompile(
     function_address: str,
     timeout: int = DEFAULT_TIMEOUT,
     use_ghidra: bool = True,
+    ctx: Context = None,
 ) -> ToolResult:
     """
     Decompile a function to pseudo C code using Ghidra or radare2.
@@ -1952,6 +1954,7 @@ async def recover_structures(
     function_address: str,
     use_ghidra: bool = True,
     timeout: int = DEFAULT_TIMEOUT * 10,
+    ctx: Context = None,
 ) -> ToolResult:
     """
     Recover C++ class structures and data types from binary code.
@@ -2375,6 +2378,7 @@ async def match_libraries(
     signature_db: str = None,
     max_output_size: int = 10_000_000,
     timeout: int = DEFAULT_TIMEOUT,
+    ctx: Context = None,
 ) -> ToolResult:
     """
     Match and filter known library functions to focus on user code.
