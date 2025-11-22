@@ -1393,9 +1393,8 @@ async def generate_signature(
 
     # 5. Format as YARA hex string (space-separated pairs)
     # Convert: "4883ec20" -> "48 83 ec 20"
-    formatted_bytes = " ".join(
-        [hex_bytes[i : i + 2] for i in range(0, len(hex_bytes), 2)]
-    )
+    # OPTIMIZED: Use generator expression to avoid intermediate list
+    formatted_bytes = _format_hex_bytes(hex_bytes)
 
     # 6. Generate YARA rule template
     # Extract filename for rule name using cached helper
@@ -1814,9 +1813,8 @@ async def generate_yara_rule(
         )
 
     # 6. Format as YARA hex string (space-separated pairs)
-    formatted_bytes = " ".join(
-        [hex_bytes[i : i + 2] for i in range(0, len(hex_bytes), 2)]
-    )
+    # OPTIMIZED: Use generator expression to avoid intermediate list
+    formatted_bytes = _format_hex_bytes(hex_bytes)
 
     # 7. Generate YARA rule
     file_name = _sanitize_filename_for_rule(file_path)
@@ -2717,6 +2715,22 @@ def _extract_library_name(function_name: str) -> str:
         return "import"
     else:
         return "unknown"
+
+
+def _format_hex_bytes(hex_string: str) -> str:
+    """
+    Efficiently format hex string as space-separated byte pairs.
+    
+    Optimized to avoid intermediate list creation by using a generator.
+    
+    Args:
+        hex_string: Hex string without spaces (e.g., "4883ec20")
+        
+    Returns:
+        Space-separated hex bytes (e.g., "48 83 ec 20")
+    """
+    # Use generator expression to avoid creating intermediate list
+    return " ".join(hex_string[i:i+2] for i in range(0, len(hex_string), 2))
 
 
 @lru_cache(maxsize=128)
