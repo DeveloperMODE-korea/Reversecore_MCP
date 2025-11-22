@@ -6,17 +6,106 @@ It includes health and metrics endpoints for monitoring in HTTP mode.
 """
 
 from fastmcp import FastMCP
+from contextlib import asynccontextmanager
+import shutil
+from pathlib import Path
 
 from reversecore_mcp.core.logging_config import setup_logging, get_logger
 from reversecore_mcp.core.config import get_config
-from reversecore_mcp.tools import cli_tools, lib_tools
 
 # Setup logging
 setup_logging()
 logger = get_logger(__name__)
 
-# Initialize the FastMCP server
-mcp = FastMCP(name="Reversecore_MCP")
+
+@asynccontextmanager
+async def server_lifespan(server: FastMCP):
+    """
+    Manage server lifecycle events.
+    
+    Startup:
+        - Validate dependencies (radare2, java, etc.)
+        - Ensure workspace directory exists
+        - Initialize metrics collector
+        
+    Shutdown:
+        - Cleanup temporary files
+        - Log final statistics
+    """
+    # ============================================================================
+    # STARTUP
+    # ============================================================================
+    logger.info("🚀 Reversecore MCP Server starting...")
+    
+    config = get_config()
+    
+    # 1. Ensure workspace exists
+    try:
+        config.workspace.mkdir(parents=True, exist_ok=True)
+        logger.info(f"✅ Workspace ready: {config.workspace}")
+    except Exception as e:
+        logger.error(f"❌ Failed to create workspace: {e}")
+        raise
+    
+    # 2. Check critical dependencies
+    dependencies_ok = True
+    
+    # Check radare2
+    if not shutil.which("radare2"):
+        logger.warning("⚠️ radare2 not found in PATH")
+        dependencies_ok = False
+    else:
+        logger.info("✅ radare2 found")
+    
+    # Check Java (for Ghidra)
+    if not shutil.which("java"):
+        logger.warning("⚠️ Java not found - Ghidra decompilation unavailable")
+    else:
+        logger.info("✅ Java found")
+    
+    # Check graphviz (for PNG CFG generation)
+    if not shutil.which("dot"):
+        logger.warning("⚠️ graphviz not found - PNG CFG generation unavailable")
+    else:
+        logger.info("✅ graphviz found")
+    
+    if not dependencies_ok:
+        logger.warning("⚠️ Some dependencies missing, functionality may be limited")
+    
+    logger.info("✅ Server startup complete")
+    
+    # ============================================================================
+    # SERVER RUNNING (yield control)
+    # ============================================================================
+    yield
+    
+    # ============================================================================
+    # SHUTDOWN
+    # ============================================================================
+    logger.info("🛑 Reversecore MCP Server shutting down...")
+    
+    # Cleanup temporary files
+    try:
+        temp_files = list(config.workspace.glob("*.tmp"))
+        temp_files.extend(config.workspace.glob(".r2_*"))  # radare2 temp files
+        
+        for temp_file in temp_files:
+            try:
+                temp_file.unlink()
+                logger.debug(f"Cleaned up: {temp_file.name}")
+            except:
+                pass
+        
+        if temp_files:
+            logger.info(f"🧹 Cleaned up {len(temp_files)} temporary files")
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+    
+    logger.info("👋 Server shutdown complete")
+
+
+# Initialize the FastMCP server with lifespan management
+mcp = FastMCP(name="Reversecore_MCP", lifespan=server_lifespan)
 
 # Register all tool modules
 # Register all tool modules

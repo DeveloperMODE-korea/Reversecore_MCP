@@ -69,6 +69,9 @@ def register_cli_tools(mcp: FastMCP) -> None:
     mcp.tool(scan_for_versions)
     mcp.tool(analyze_variant_changes)
     mcp.tool(solve_path_constraints)
+    # AI-powered tools (using LLM sampling)
+    mcp.tool(analyze_with_ai)
+    mcp.tool(suggest_function_name)
 
 
 @log_execution(tool_name="trace_execution_path")
@@ -3147,4 +3150,188 @@ async def solve_path_constraints(
             "SYMBOLIC_EXECUTION_ERROR",
             f"Angr execution failed: {str(e)}",
             hint="Symbolic execution is complex. Ensure addresses are correct and the binary is compatible."
+        )
+
+
+# ============================================================================
+# AI-Powered Tools (Using LLM Sampling)
+# ============================================================================
+
+@log_execution(tool_name="analyze_with_ai")
+@track_metrics("analyze_with_ai")
+@handle_tool_errors
+async def analyze_with_ai(
+    file_path: str,
+    question: str,
+    ctx: Context = None,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> ToolResult:
+    """
+    Ask AI to analyze specific aspects of a binary.
+    
+    This tool leverages LLM sampling to get AI's opinion on ambiguous data.
+    Use this when automated analysis produces unclear results and you need
+    AI interpretation.
+    
+    **Use Cases:**
+    - Identifying obfuscation techniques: "Is this function obfuscated?"
+    - Naming suggestions: "What would be a good name for this function?"
+    - Pattern recognition: "Does this look like malware behavior?"
+    
+    Args:
+        file_path: Path to the binary file
+        question: Question to ask AI about the binary
+        ctx: FastMCP Context for AI sampling (auto-injected)
+        timeout: Execution timeout in seconds
+    
+    Returns:
+        ToolResult with AI's analysis
+    """
+    from reversecore_mcp.core.result import failure
+    
+    validated_path = validate_file_path(file_path)
+    
+    if not ctx:
+        return failure(
+            "NO_CONTEXT",
+            "AI sampling requires Context parameter",
+            hint="This tool needs to be called from an MCP client that supports sampling"
+        )
+    
+    try:
+        # 1. Get basic info about the file
+        file_info_result = await run_file(str(validated_path))
+        file_info = file_info_result.content[0].text if file_info_result.content else "Unknown"
+        
+        # 2. Get strings sample
+        strings_result = await run_strings(str(validated_path), max_output_size=100_000)
+        strings_sample = (strings_result.content[0].text if strings_result.content else "")[:5000]  # First 5KB
+        
+        # 3. Ask AI via sampling
+        prompt = f"""You are a reverse engineering expert analyzing a binary file.
+
+File: {validated_path.name}
+Type: {file_info}
+
+Sample strings from the binary:
+```
+{strings_sample}
+```
+
+Question: {question}
+
+Please provide a concise, technical analysis based on the available information.
+"""
+        
+        response = await ctx.sample(
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }],
+            max_tokens=500
+        )
+        
+        ai_analysis = response.content.text if hasattr(response.content, 'text') else str(response.content)
+        
+        return success(
+            ai_analysis,
+            question=question,
+            file=validated_path.name,
+            description=f"AI analysis completed for: {question}"
+        )
+        
+    except Exception as e:
+        return failure(
+            "AI_SAMPLING_ERROR",
+            f"AI sampling failed: {str(e)}",
+            hint="Ensure the MCP client supports sampling feature"
+        )
+
+
+@log_execution(tool_name="suggest_function_name")
+@track_metrics("suggest_function_name")
+@handle_tool_errors
+async def suggest_function_name(
+    file_path: str,
+    function_address: str,
+    ctx: Context = None,
+    timeout: int = DEFAULT_TIMEOUT,
+) -> ToolResult:
+    """
+    Use AI to suggest a meaningful name for a function based on its code.
+    
+    This tool decompiles a function and asks AI to suggest a descriptive name
+    based on the logic and patterns in the code.
+    
+    Args:
+        file_path: Path to the binary file
+        function_address: Function address to analyze
+        ctx: FastMCP Context for AI sampling (auto-injected)
+        timeout: Execution timeout in seconds
+    
+    Returns:
+        ToolResult with suggested function name and reasoning
+    """
+    from reversecore_mcp.core.result import failure
+    
+    validated_path = validate_file_path(file_path)
+    
+    if not ctx:
+        return failure(
+            "NO_CONTEXT",
+            "AI sampling requires Context parameter",
+            hint="This tool needs to be called from an MCP client that supports sampling"
+        )
+    
+    try:
+        # 1. Decompile the function
+        decompile_result = await smart_decompile(
+            str(validated_path),
+            function_address,
+            use_ghidra=True
+        )
+        
+        if decompile_result.is_error:
+            return decompile_result
+        
+        code = decompile_result.content[0].text if decompile_result.content else decompile_result.data
+        
+        # 2. Ask AI for name suggestion
+        prompt = f"""You are a reverse engineering expert. Analyze this decompiled function and suggest a descriptive function name.
+
+Decompiled code:
+```c
+{code[:2000]}  // Showing first 2000 chars
+```
+
+Based on the code logic, suggest:
+1. A concise function name (e.g., decrypt_config, send_http_request)
+2. Brief reasoning (1 sentence)
+
+Format your response as:
+Name: <function_name>
+Reason: <why this name>
+"""
+        
+        response = await ctx.sample(
+            messages=[{
+                "role": "user",
+                "content": prompt
+            }],
+            max_tokens=150
+        )
+        
+        ai_suggestion = response.content.text if hasattr(response.content, 'text') else str(response.content)
+        
+        return success(
+            ai_suggestion,
+            function_address=function_address,
+            description=f"AI suggested name for function @ {function_address}"
+        )
+        
+    except Exception as e:
+        return failure(
+            "NAMING_SUGGESTION_ERROR",
+            f"Failed to suggest function name: {str(e)}",
+            hint="Ensure the function can be decompiled and client supports sampling"
         )
