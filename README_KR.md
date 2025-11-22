@@ -25,6 +25,7 @@ AI 에이전트가 자연어 명령을 통해 포괄적인 리버스 엔지니�
 
 ## 주요 기능
 
+### 핵심 리버스 엔지니어링 기능
 - **보안 우선 설계**: shell=True 미사용, 포괄적인 입력 검증, 경로 위생화(sanitization)
 - **고성능**: 대용량 파일을 위한 스트리밍 출력, 구성 가능한 제한, 적응형 폴링
 - **포괄적인 도구 세트**: Ghidra, Radare2, strings, binwalk, YARA, Capstone, LIEF 지원
@@ -37,6 +38,35 @@ AI 에이전트가 자연어 명령을 통해 포괄적인 리버스 엔지니�
 - **프로덕션 준비 완료**: 광범위한 오류 처리, 로깅, 속도 제한 및 모니터링
 - **스레드 안전성**: 비동기/동기 지원을 통한 동시성 안전 메트릭 수집
 - **AI 최적화**: 업로드부터 방어 시그니처 생성까지의 전체 주기 워크플로우
+
+### FastMCP 고급 기능 ⭐ 신규
+- **진행률 표시 (Progress Reporting)**: 장시간 작업에 대한 실시간 진행 상황 표시
+  - `scan_workspace`: 실시간 파일 개수 업데이트
+  - `match_libraries`: 함수 분류 진행률
+- **클라이언트 로깅 (Client Logging)**: 오류 메시지 및 경고를 클라이언트에 직접 표시
+  - 컨텍스트가 포함된 향상된 디버깅
+  - 투명한 폴백 알림
+- **이미지 콘텐츠 (Image Content)**: CFG를 위한 직접 PNG 이미지 생성
+  - 채팅 내 시각적 함수 흐름 그래프
+  - 자동화된 graphviz 통합
+- **동적 리소스 (Dynamic Resources)**: URI 템플릿을 통한 바이너리 가상 파일 시스템
+  - `reversecore://{filename}/strings` - 문자열 추출
+  - `reversecore://{filename}/iocs` - IOC 요약
+  - `reversecore://{filename}/func/{address}/code` - 디컴파일된 코드
+  - `reversecore://{filename}/func/{address}/asm` - 어셈블리
+  - `reversecore://{filename}/func/{address}/cfg` - 제어 흐름 그래프
+- **생명주기 관리 (Lifespan Management)**: 자동 서버 생명주기 처리
+  - 시작 시 의존성 검증
+  - 종료 시 임시 파일 자동 정리
+- **AI 샘플링 (AI Sampling)**: 실행 중 도구가 AI에게 도움 요청 가능
+  - `analyze_with_ai`: 모호한 데이터에 대한 AI 의견 얻기
+  - `suggest_function_name`: AI 기반 함수 이름 제안
+- **서버 합성 (Server Composition)**: 마이크로서비스 아키텍처를 위한 서브 서버 마운트
+  - 모듈식 배포 지원
+  - 전문 분석 서버와 쉬운 통합
+- **인증 (Authentication)**: HTTP 모드용 엔터프라이즈급 API 키 인증
+  - 안전한 팀 배포
+  - 환경 기반 구성
 
 ## 📑 목차
 

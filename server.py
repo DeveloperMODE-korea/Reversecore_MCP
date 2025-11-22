@@ -108,7 +108,7 @@ async def server_lifespan(server: FastMCP):
 mcp = FastMCP(name="Reversecore_MCP", lifespan=server_lifespan)
 
 # Register all tool modules
-# Register all tool modules
+from reversecore_mcp.tools import cli_tools, lib_tools
 cli_tools.register_cli_tools(mcp)
 lib_tools.register_lib_tools(mcp)
 
@@ -119,6 +119,63 @@ prompts.register_prompts(mcp)
 # Register resources
 from reversecore_mcp import resources
 resources.register_resources(mcp)
+
+# ============================================================================
+# Server Composition (Mounting Sub-servers)
+# ============================================================================
+# If you have specialized sub-servers (e.g., Ghidra-only, Dynamic-analysis-only),
+# you can mount them here to create a unified platform:
+#
+# Example:
+#   from ghidra_server import ghidra_mcp
+#   mcp.mount("ghidra", ghidra_mcp)
+#
+# Now clients can access ghidra tools with prefix: ghidra.tool_name
+# This allows microservice-style architecture for large deployments.
+# ============================================================================
+
+
+# ============================================================================
+# Authentication (HTTP mode only)
+# ============================================================================
+def setup_authentication():
+    """
+    Setup API Key authentication for HTTP transport mode.
+    
+    To enable authentication, set environment variable:
+        MCP_API_KEY=your-secret-key
+        
+    All HTTP requests must include header:
+        X-API-Key: your-secret-key
+    """
+    import os
+    from fastapi import Depends, HTTPException, status, Request
+    from fastapi.security import APIKeyHeader
+    
+    api_key = os.getenv("MCP_API_KEY")
+    
+    if not api_key:
+        logger.info("🔓 API Key authentication disabled (MCP_API_KEY not set)")
+        return None
+    
+    logger.info("🔐 API Key authentication enabled")
+    
+    api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+    
+    async def verify_api_key(request: Request, key: str = Depends(api_key_header)):
+        # Allow health endpoint without authentication
+        if request.url.path == "/health":
+            return
+            
+        if key != api_key:
+            logger.warning(f"⚠️ Unauthorized access attempt from {request.client.host}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid or missing API key"
+            )
+        return key
+    
+    return Depends(verify_api_key)
 
 
 
@@ -144,12 +201,19 @@ def main():
         from fastapi.responses import JSONResponse
         from reversecore_mcp.core.metrics import metrics_collector
 
+        # Setup authentication (if MCP_API_KEY is set)
+        auth_dependency = setup_authentication()
+        
         # Build a host FastAPI app with docs enabled and mount FastMCP under /mcp
+        # Apply authentication to all endpoints if enabled
+        dependencies = [auth_dependency] if auth_dependency else []
+        
         app = FastAPI(
             title="Reversecore_MCP",
             docs_url="/docs",
             redoc_url="/redoc",
             openapi_url="/openapi.json",
+            dependencies=dependencies,  # Apply authentication globally
         )
         mcp_app = mcp.http_app()
         app.mount("/mcp", mcp_app)

@@ -25,6 +25,7 @@ An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents 
 
 ## Key Features
 
+### Core Reverse Engineering
 - **Security-First Design**: No shell=True, comprehensive input validation, path sanitization
 - **High Performance**: Streaming output for large files, configurable limits, adaptive polling
 - **Comprehensive Toolset**: Ghidra, Radare2, strings, binwalk, YARA, Capstone, LIEF support
@@ -37,6 +38,35 @@ An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents 
 - **Production Ready**: Extensive error handling, logging, rate limiting, and monitoring
 - **Thread-Safe**: Concurrent-safe metrics collection with async/sync support
 - **AI-Optimized**: Full-cycle workflow from upload to defense signature generation
+
+### FastMCP Advanced Features ⭐ NEW
+- **Progress Reporting**: Real-time progress indicators for long-running operations
+  - `scan_workspace`: Live file count updates
+  - `match_libraries`: Function categorization progress
+- **Client Logging**: Error messages and warnings displayed directly in client
+  - Enhanced debugging with contextual error messages
+  - Transparent fallback notifications
+- **Image Content**: Direct PNG image generation for CFGs
+  - Visual function flow graphs in chat
+  - Automated graphviz integration
+- **Dynamic Resources**: Binary Virtual File System with URI templates
+  - `reversecore://{filename}/strings` - Extract strings
+  - `reversecore://{filename}/iocs` - IOC summary
+  - `reversecore://{filename}/func/{address}/code` - Decompiled code
+  - `reversecore://{filename}/func/{address}/asm` - Assembly
+  - `reversecore://{filename}/func/{address}/cfg` - Control flow graph
+- **Lifespan Management**: Automated server lifecycle handling
+  - Dependency validation on startup
+  - Automatic temp file cleanup on shutdown
+- **AI Sampling**: Tools can ask AI for help during execution
+  - `analyze_with_ai`: Get AI opinions on ambiguous data
+  - `suggest_function_name`: AI-powered function naming
+- **Server Composition**: Mount sub-servers for microservice architecture
+  - Modular deployment support
+  - Easy integration with specialized analysis servers
+- **Authentication**: Enterprise-ready API key authentication for HTTP mode
+  - Secure team deployments
+  - Environment-based configuration
 
 ## 📑 Table of Contents
 
