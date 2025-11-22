@@ -33,8 +33,13 @@ def register_resources(mcp: FastMCP):
         log_file = Path("/var/log/reversecore/app.log")
         if log_file.exists():
             try:
-                lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
-                return "\n".join(lines[-100:])
+                # OPTIMIZED: Use deque to read only last N lines efficiently
+                # This avoids loading the entire log file into memory
+                from collections import deque
+                with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+                    # deque with maxlen automatically keeps only last N items
+                    last_lines = deque(f, maxlen=100)
+                    return "".join(last_lines)
             except Exception as e:
                 return f"Error reading logs: {e}"
         return "No logs found."
