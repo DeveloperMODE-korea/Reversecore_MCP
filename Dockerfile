@@ -130,6 +130,8 @@ RUN apt-get update \
         binwalk=2.3.4+dfsg1-1 \
         # OpenJDK 17 required for Ghidra and PyGhidra
         openjdk-17-jre-headless \
+        # Graphviz for CFG image generation (FastMCP Image support)
+        graphviz \
     && rm -rf /var/lib/apt/lists/*
 
 # Set JAVA_HOME environment variable (required for PyGhidra to find Java)

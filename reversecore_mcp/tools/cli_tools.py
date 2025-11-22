@@ -607,14 +607,20 @@ async def run_radare2(
         validated_command = validated_command.replace("aaa", "").replace("aa", "").strip(" ;")
     
     # Use helper function to execute radare2 command
-    output, bytes_read = await _execute_r2_command(
-        validated_path,
-        [validated_command],
-        analysis_level=analysis_level,
-        max_output_size=max_output_size,
-        base_timeout=timeout,
-    )
-    return success(output, bytes_read=bytes_read)
+    try:
+        output, bytes_read = await _execute_r2_command(
+            validated_path,
+            [validated_command],
+            analysis_level=analysis_level,
+            max_output_size=max_output_size,
+            base_timeout=timeout,
+        )
+        return success(output, bytes_read=bytes_read)
+    except Exception as e:
+        # Log error to client if context is available
+        if ctx:
+            await ctx.error(f"radare2 command '{validated_command}' failed: {str(e)}")
+        raise
 
 
 @log_execution(tool_name="run_binwalk")
@@ -940,19 +946,79 @@ async def generate_function_graph(
     Generate a Control Flow Graph (CFG) for a specific function.
 
     This tool uses radare2 to analyze the function structure and returns
-    a visualization code (Mermaid by default) that helps AI understand
+    a visualization code (Mermaid by default) or PNG image that helps AI understand
     the code flow without reading thousands of lines of assembly.
 
     Args:
         file_path: Path to the binary file (must be in workspace)
         function_address: Function address (e.g., 'main', '0x140001000', 'sym.foo')
-        format: Output format ('mermaid', 'json', or 'dot'). Default is 'mermaid'.
+        format: Output format ('mermaid', 'json', 'dot', or 'png'). Default is 'mermaid'.
         timeout: Execution timeout in seconds
 
     Returns:
-        ToolResult with CFG visualization or JSON data
+        ToolResult with CFG visualization, JSON data, or PNG image
     """
     import time
+    
+    # If PNG format requested, generate DOT first then convert
+    if format.lower() == "png":
+        # Get DOT format first
+        result = await _generate_function_graph_impl(
+            file_path, function_address, "dot", timeout
+        )
+        
+        if result.is_error:
+            return result
+            
+        # Convert DOT to PNG using graphviz
+        try:
+            import subprocess
+            import tempfile
+            from pathlib import Path as PathlibPath
+            
+            # Get DOT content from result
+            dot_content = result.content[0].text if result.content else ""
+            
+            # Create temp files
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.dot', delete=False) as dot_file:
+                dot_file.write(dot_content)
+                dot_path = dot_file.name
+            
+            png_path = dot_path.replace('.dot', '.png')
+            
+            try:
+                # Use graphviz's dot command to convert DOT to PNG
+                subprocess.run(
+                    ['dot', '-Tpng', dot_path, '-o', png_path],
+                    check=True,
+                    timeout=30,
+                    capture_output=True
+                )
+                
+                # Read PNG file
+                png_data = PathlibPath(png_path).read_bytes()
+                
+                # Return Image object
+                return Image(data=png_data, mime_type="image/png")
+                
+            finally:
+                # Cleanup temp files
+                try:
+                    PathlibPath(dot_path).unlink()
+                    if PathlibPath(png_path).exists():
+                        PathlibPath(png_path).unlink()
+                except:
+                    pass
+                    
+        except Exception as e:
+            from reversecore_mcp.core.result import failure
+            return failure(
+                "IMAGE_GENERATION_ERROR",
+                f"Failed to generate PNG image: {str(e)}",
+                hint="Ensure graphviz is installed in the container"
+            )
+    
+    # For other formats, use existing implementation
     result = await _generate_function_graph_impl(
         file_path, function_address, format, timeout
     )
@@ -2501,7 +2567,12 @@ async def match_libraries(
         library_functions = []
         user_functions = []
 
-        for func in functions:
+        total_functions = len(functions)
+        for idx, func in enumerate(functions):
+            # Report progress
+            if ctx and idx % 10 == 0:  # Report every 10 functions to avoid spam
+                await ctx.report_progress(idx, total_functions)
+            
             name = func.get("name", "")
             # Support both 'offset' (aflj) and 'vaddr' (isj) keys
             # Fallback to 'realname' or other identifiers if needed
@@ -2541,6 +2612,10 @@ async def match_libraries(
                 )
             else:
                 user_functions.append({"address": f"0x{offset:x}", "name": name})
+        
+        # Final progress report
+        if ctx:
+            await ctx.report_progress(total_functions, total_functions)
 
         total_functions = len(functions)
         library_count = len(library_functions)
