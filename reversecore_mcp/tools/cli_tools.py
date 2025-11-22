@@ -851,15 +851,14 @@ async def _generate_function_graph_impl(
     # 3. Build radare2 command
     r2_cmd_str = f"agfj @ {function_address}"
 
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    cmd = _build_r2_cmd(str(validated_path), [r2_cmd_str], "aaa")
-
-    # 4. Execute subprocess asynchronously
+    # 4. Execute subprocess asynchronously using helper
     # Large graphs need higher output limit
-    output, bytes_read = await execute_subprocess_async(
-        cmd,
+    output, bytes_read = await _execute_r2_command(
+        validated_path,
+        [r2_cmd_str],
+        analysis_level="aaa",
         max_output_size=50_000_000,
-        timeout=effective_timeout,
+        base_timeout=timeout,
     )
 
     # Add timestamp for cache visibility
@@ -883,12 +882,13 @@ async def _generate_function_graph_impl(
     elif format.lower() == "dot":
         # For DOT format, call radare2 with agfd command
         dot_cmd_str = f"agfd @ {function_address}"
-        dot_cmd = _build_r2_cmd(str(validated_path), [dot_cmd_str], "aaa")
         
-        dot_output, dot_bytes = await execute_subprocess_async(
-            dot_cmd,
+        dot_output, dot_bytes = await _execute_r2_command(
+            validated_path,
+            [dot_cmd_str],
+            analysis_level="aaa",
             max_output_size=50_000_000,
-            timeout=effective_timeout,
+            base_timeout=timeout,
         )
         return success(dot_output, bytes_read=dot_bytes, format="dot")
 
@@ -1024,15 +1024,14 @@ async def emulate_machine_code(
         "ar",  # Show all registers
     ]
     
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    cmd = _build_r2_cmd(str(validated_path), esil_cmds, "aaa")
-
-    # 4. Execute emulation
+    # 4. Execute emulation using helper
     try:
-        output, bytes_read = await execute_subprocess_async(
-            cmd,
-            max_output_size=10_000_000,  # Register output is typically small
-            timeout=effective_timeout,
+        output, bytes_read = await _execute_r2_command(
+            validated_path,
+            esil_cmds,
+            analysis_level="aaa",
+            max_output_size=10_000_000,
+            base_timeout=timeout,
         )
 
         # 5. Parse register state
@@ -1117,14 +1116,13 @@ async def get_pseudo_code(
     # 3. Build radare2 command to decompile
     r2_cmd = f"pdc @ {address}"
     
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    cmd = _build_r2_cmd(str(validated_path), [r2_cmd], "aaa")
-
-    # 4. Execute decompilation
-    output, bytes_read = await execute_subprocess_async(
-        cmd,
-        max_output_size=10_000_000,  # Decompiled code can be large
-        timeout=effective_timeout,
+    # 4. Execute decompilation using helper
+    output, bytes_read = await _execute_r2_command(
+        validated_path,
+        [r2_cmd],
+        analysis_level="aaa",
+        max_output_size=10_000_000,
+        base_timeout=timeout,
     )
 
     # 5. Check if output is valid
@@ -1551,16 +1549,14 @@ async def _smart_decompile_impl(
 
     r2_cmds = [f"pdc @ {function_address}"]
     
-    effective_timeout = _calculate_dynamic_timeout(str(validated_path), timeout)
-    # Use 'aaa' for analysis, but _build_r2_cmd now handles it safely without project persistence
-    cmd = _build_r2_cmd(str(validated_path), r2_cmds, "aaa")
-
-    # 5. Execute decompilation
+    # 5. Execute decompilation using helper
     try:
-        output, bytes_read = await execute_subprocess_async(
-            cmd,
+        output, bytes_read = await _execute_r2_command(
+            validated_path,
+            r2_cmds,
+            analysis_level="aaa",
             max_output_size=10_000_000,
-            timeout=effective_timeout,
+            base_timeout=timeout,
         )
     except Exception as e:
         # If 'aaa' fails, try lighter analysis 'aa' or just '-n' if desperate,
@@ -2648,6 +2644,43 @@ def _calculate_dynamic_timeout(file_path: str, base_timeout: int = 300) -> int:
         return int(base_timeout + additional_time)
     except Exception:
         return base_timeout
+
+
+async def _execute_r2_command(
+    file_path: Path,
+    r2_commands: list[str],
+    analysis_level: str = "aaa",
+    max_output_size: int = 10_000_000,
+    base_timeout: int = 300,
+) -> tuple[str, int]:
+    """
+    Execute radare2 commands with common pattern.
+    
+    This helper consolidates the repeated pattern of:
+    1. Calculate dynamic timeout
+    2. Build r2 command
+    3. Execute subprocess
+    
+    Args:
+        file_path: Path to the binary file (already validated)
+        r2_commands: List of radare2 commands to execute
+        analysis_level: Analysis level ("aaa", "aa", "-n")
+        max_output_size: Maximum output size in bytes
+        base_timeout: Base timeout in seconds
+        
+    Returns:
+        Tuple of (output, bytes_read)
+    """
+    effective_timeout = _calculate_dynamic_timeout(str(file_path), base_timeout)
+    cmd = _build_r2_cmd(str(file_path), r2_commands, analysis_level)
+    
+    output, bytes_read = await execute_subprocess_async(
+        cmd,
+        max_output_size=max_output_size,
+        timeout=effective_timeout,
+    )
+    
+    return output, bytes_read
 
 
 def _build_r2_cmd(file_path: str, r2_commands: list[str], analysis_level: str = "aaa") -> list[str]:
