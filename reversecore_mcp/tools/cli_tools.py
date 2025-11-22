@@ -1863,21 +1863,20 @@ async def analyze_xrefs(
 
         for line in lines:
             # Robust JSON extraction from line
-            json_str = _extract_first_json(line)
-            if json_str is not None:
-                try:
-                    refs = json.loads(json_str)
-                    if isinstance(refs, list) and len(refs) > 0:
-                        # Determine if this is "to" or "from" based on field names
-                        first_ref = refs[0]
-                        if "from" in first_ref:
-                            # This is xrefs TO (callers)
-                            xrefs_to = refs
-                        elif "addr" in first_ref or "fcn_addr" in first_ref:
-                            # This is xrefs FROM (callees)
-                            xrefs_from = refs
-                except json.JSONDecodeError:
-                    continue
+            try:
+                refs = _parse_json_output(line)
+                if isinstance(refs, list) and len(refs) > 0:
+                    # Determine if this is "to" or "from" based on field names
+                    first_ref = refs[0]
+                    if "from" in first_ref:
+                        # This is xrefs TO (callers)
+                        xrefs_to = refs
+                    elif "addr" in first_ref or "fcn_addr" in first_ref:
+                        # This is xrefs FROM (callees)
+                        xrefs_from = refs
+            except json.JSONDecodeError:
+                # Skip lines that don't contain valid JSON
+                continue
 
         # 6. Format results
         result = {

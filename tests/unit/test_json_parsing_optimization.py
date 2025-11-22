@@ -197,7 +197,7 @@ class TestEdgeCases:
 
     def test_json_with_escaped_characters(self):
         """Should handle JSON with escaped characters."""
-        text = r'{"message": "Line 1\nLine 2\tTabbed", "path": "C:\\Windows\\System32"}'
+        text = '{"message": "Line 1\\nLine 2\\tTabbed", "path": "C:\\\\Windows\\\\System32"}'
         result = _parse_json_output(text)
         assert result["message"] == "Line 1\nLine 2\tTabbed"
         assert result["path"] == "C:\\Windows\\System32"
