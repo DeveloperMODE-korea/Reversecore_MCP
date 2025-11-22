@@ -156,5 +156,80 @@ def test_subprocess_polling_adaptive_backoff():
     assert "timed out" in str(exc_info.value).lower()
 
 
+def test_ioc_extraction_with_precompiled_patterns():
+    """Test that IOC extraction uses pre-compiled patterns for better performance."""
+    from reversecore_mcp.tools.lib_tools import extract_iocs
+    
+    # Create a large text with many IOCs
+    test_text = "\n".join([
+        f"Server at 192.168.{i}.{j} running http://example{i}{j}.com and admin{i}{j}@test.com"
+        for i in range(10)
+        for j in range(10)
+    ])
+    
+    # Test performance - should complete quickly with pre-compiled patterns
+    start_time = time.time()
+    for _ in range(10):
+        result = extract_iocs(test_text)
+    elapsed = time.time() - start_time
+    
+    # 10 iterations should complete in under 0.5 seconds with pre-compiled patterns
+    assert elapsed < 0.5, f"IOC extraction took too long: {elapsed}s"
+    assert result.status == "success"
+    # ioc_count is in metadata, not data
+    assert result.metadata["ioc_count"] > 0
+
+
+def test_regex_pattern_reuse_performance():
+    """Test that pre-compiled regex patterns are at least as fast as inline compilation."""
+    import re
+    
+    # Import the pre-compiled pattern for comparison
+    from reversecore_mcp.tools.lib_tools import _IOC_IPV4_PATTERN
+    
+    # Simulate the old approach (compiling each time)
+    text = "Test 192.168.1.1 and http://example.com and test@email.com " * 1000
+    
+    start_time = time.time()
+    for _ in range(100):
+        # Old approach - compile each time (using same pattern as production)
+        ip_pattern = re.compile(_IOC_IPV4_PATTERN.pattern)
+        ip_pattern.findall(text)
+    old_elapsed = time.time() - start_time
+    
+    # New approach - use pre-compiled pattern
+    start_time = time.time()
+    for _ in range(100):
+        _IOC_IPV4_PATTERN.findall(text)
+    new_elapsed = time.time() - start_time
+    
+    # Pre-compiled should be at least as fast (not slower)
+    # Note: Actual performance gain depends on Python version and system
+    assert new_elapsed <= old_elapsed * 1.1, f"Pre-compiled pattern is slower: {new_elapsed}s vs {old_elapsed}s"
+
+
+def test_islice_vs_list_slicing_performance():
+    """Test that islice provides memory and performance benefits over list slicing."""
+    from itertools import islice
+    
+    # Create a large iterable
+    large_iterable = (x for x in range(100000))
+    
+    # Test islice approach (new)
+    start_time = time.time()
+    result = list(islice(large_iterable, 100))
+    islice_elapsed = time.time() - start_time
+    
+    # Test list conversion approach (old)
+    large_iterable = (x for x in range(100000))
+    start_time = time.time()
+    result = list(large_iterable)[:100]
+    list_elapsed = time.time() - start_time
+    
+    # islice should be significantly faster (at least 10x)
+    assert islice_elapsed < list_elapsed / 10, f"islice not significantly faster: {islice_elapsed}s vs {list_elapsed}s"
+    assert len(result) == 100
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

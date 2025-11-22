@@ -25,6 +25,18 @@ from reversecore_mcp.core.validators import validate_tool_parameters
 # Load default timeout from configuration
 DEFAULT_TIMEOUT = get_config().default_tool_timeout
 
+# Pre-compile regex patterns for performance optimization
+_FUNCTION_ADDRESS_PATTERN = re.compile(r"^[a-zA-Z0-9_.]+$")
+_VERSION_PATTERNS = {
+    "OpenSSL": re.compile(r"(OpenSSL|openssl)\s+(\d+\.\d+\.\d+[a-z]?)", re.IGNORECASE),
+    "GCC": re.compile(r"GCC:\s+\(.*\)\s+(\d+\.\d+\.\d+)"),
+    "Python": re.compile(r"(Python|python)\s+([23]\.\d+\.\d+)", re.IGNORECASE),
+    "Curl": re.compile(r"curl\s+(\d+\.\d+\.\d+)", re.IGNORECASE),
+    "BusyBox": re.compile(r"BusyBox\s+v(\d+\.\d+\.\d+)", re.IGNORECASE),
+    "Generic_Version": re.compile(r"[vV]er(?:sion)?\s?[:.]?\s?(\d+\.\d+\.\d+)"),
+    "Copyright": re.compile(r"Copyright.*(19|20)\d{2}"),
+}
+
 
 def register_cli_tools(mcp: FastMCP) -> None:
     """
@@ -251,24 +263,21 @@ async def scan_for_versions(
     
     text = output
     
-    # Regex patterns for common libraries
-    patterns = {
-        "OpenSSL": r"OpenSSL\s+([0-9]+\.[0-9]+\.[0-9]+[a-z]?)",
-        "GCC": r"GCC:\s+\(.*\)\s+([0-9]+\.[0-9]+\.[0-9]+)",
-        "Python": r"Python\s+([23]\.[0-9]+\.[0-9]+)",
-        "Curl": r"curl\s+([0-9]+\.[0-9]+\.[0-9]+)",
-        "BusyBox": r"BusyBox\s+v([0-9]+\.[0-9]+\.[0-9]+)",
-        "Generic_Version": r"[vV]er(?:sion)?\s?[:.]?\s?([0-9]+\.[0-9]+\.[0-9]+)",
-        "Copyright": r"Copyright.*(19|20)[0-9]{2}",
-    }
-    
+    # Use pre-compiled patterns for better performance
     detected = {}
     
-    for name, pattern in patterns.items():
-        matches = list(set(re.findall(pattern, text, re.IGNORECASE)))
+    # Process all version patterns
+    for name, pattern in _VERSION_PATTERNS.items():
+        matches = []
+        for match in pattern.finditer(text):
+            # Extract version from appropriate group (1 or 2 depending on pattern)
+            if name in ["OpenSSL", "Python"]:
+                matches.append(match.group(2))
+            else:
+                matches.append(match.group(1))
         if matches:
-            detected[name] = matches
-
+            detected[name] = list(set(matches))
+    
     return success(
         detected,
         bytes_read=bytes_read,
@@ -855,7 +864,8 @@ async def _generate_function_graph_impl(
     validated_path = validate_file_path(file_path)
 
     # 2. Security check for function address (prevent shell injection)
-    if not re.match(r"^[a-zA-Z0-9_.]+$", function_address.replace("0x", "")):
+    # Use pre-compiled pattern for better performance
+    if not _FUNCTION_ADDRESS_PATTERN.match(function_address.replace("0x", "")):
         return failure("VALIDATION_ERROR", "Invalid function address format")
 
     # 3. Build radare2 command
