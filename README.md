@@ -1233,8 +1233,6 @@ TOOL_TIMEOUT=300  # 5 minutes default
 RATE_LIMIT=60  # 60 requests/minute default
 ```
 
-For detailed performance optimization documentation, see [docs/PERFORMANCE_OPTIMIZATIONS.md](docs/PERFORMANCE_OPTIMIZATIONS.md).
-
 ## Security
 
 Security is a top priority in Reversecore_MCP. The server implements multiple layers of protection:
@@ -1299,7 +1297,7 @@ docker run -d \
 - ✅ No arbitrary code execution capabilities
 - ✅ Comprehensive input validation
 - ✅ Error messages don't leak sensitive information
-- ✅ CodeQL security scanning enabled (see [PERFORMANCE_SUMMARY.md](PERFORMANCE_SUMMARY.md))
+- ✅ CodeQL security scanning enabled
 
 For security issues, please see our security policy or contact the maintainers directly.
 
@@ -1567,7 +1565,6 @@ MCP_TRANSPORT=stdio python -m reversecore_mcp.server
    ```bash
    export PYTHONPATH=/path/to/Reversecore_MCP:$PYTHONPATH
    ```
-   See [docs/pythonpath_setup.md](docs/pythonpath_setup.md) for details.
 
 #### Radare2 command failures
 
@@ -1655,9 +1652,8 @@ docker logs -f reversecore-mcp
 If you encounter issues not covered here:
 
 1. Check [GitHub Issues](https://github.com/sjkim1127/Reversecore_MCP/issues)
-2. Review [Performance Documentation](docs/PERFORMANCE_OPTIMIZATIONS.md)
-3. Enable debug logging and review output
-4. Create a new issue with:
+2. Enable debug logging and review output
+3. Create a new issue with:
    - Detailed description of the problem
    - Steps to reproduce
    - Log output (with sensitive data removed)
