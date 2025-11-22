@@ -10,6 +10,7 @@ from pathlib import Path
 import time
 
 from async_lru import alru_cache
+from functools import lru_cache
 from fastmcp import FastMCP
 from reversecore_mcp.core.config import get_config
 
@@ -1297,8 +1298,8 @@ async def generate_signature(
     )
 
     # 6. Generate YARA rule template
-    # Extract filename for rule name
-    file_name = Path(file_path).stem.replace("-", "_").replace(".", "_")
+    # Extract filename for rule name using cached helper
+    file_name = _sanitize_filename_for_rule(file_path)
     rule_name = f"suspicious_{file_name}_{address.replace('0x', 'x')}"
 
     yara_rule = f"""rule {rule_name} {{
@@ -1733,7 +1734,7 @@ async def generate_yara_rule(
     )
 
     # 7. Generate YARA rule
-    file_name = Path(file_path).stem.replace("-", "_").replace(".", "_")
+    file_name = _sanitize_filename_for_rule(file_path)
 
     yara_rule = f"""rule {rule_name} {{
     meta:
@@ -2608,9 +2609,12 @@ async def match_libraries(
         )
 
 
+@lru_cache(maxsize=256)
 def _extract_library_name(function_name: str) -> str:
     """
     Extract library name from function name.
+    
+    Cached to avoid repeated string comparisons for common function names.
 
     Args:
         function_name: Function name (e.g., "sym.imp.strcpy")
@@ -2631,17 +2635,40 @@ def _extract_library_name(function_name: str) -> str:
         return "unknown"
 
 
+@lru_cache(maxsize=128)
+def _sanitize_filename_for_rule(file_path: str) -> str:
+    """
+    Extract and sanitize filename for use in YARA rule names.
+    
+    Cached to avoid repeated Path operations and string replacements.
+    
+    Args:
+        file_path: Path to the file
+        
+    Returns:
+        Sanitized filename with special characters replaced
+    """
+    return Path(file_path).stem.replace("-", "_").replace(".", "_")
+
+
+@lru_cache(maxsize=128)
 def _get_r2_project_name(file_path: str) -> str:
-    """Generate a unique project name based on file path hash."""
+    """Generate a unique project name based on file path hash.
+    
+    Cached to avoid repeated MD5 computation for the same file path.
+    """
     # Use absolute path to ensure uniqueness
     abs_path = str(Path(file_path).resolve())
     return hashlib.md5(abs_path.encode()).hexdigest()
 
 
+@lru_cache(maxsize=128)
 def _calculate_dynamic_timeout(file_path: str, base_timeout: int = 300) -> int:
     """
     Calculate timeout based on file size.
     Strategy: Base timeout + 1 second per MB of file size.
+    
+    Cached to avoid repeated file stat calls for the same file.
     """
     try:
         size_mb = os.path.getsize(file_path) / (1024 * 1024)
