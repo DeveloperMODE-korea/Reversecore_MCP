@@ -7,6 +7,7 @@ import shutil
 import hashlib
 import os
 from pathlib import Path
+from typing import Optional
 import time
 
 from async_lru import alru_cache
@@ -2902,7 +2903,7 @@ def _parse_json_output(output: str):
     return json.loads(output)
 
 
-def _validate_address_or_fail(address: str, param_name: str = "address") -> ToolResult:
+def _validate_address_or_fail(address: str, param_name: str = "address") -> Optional[ToolResult]:
     """
     Validate address format and return failure ToolResult if invalid.
     
