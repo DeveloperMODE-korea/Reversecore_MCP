@@ -441,12 +441,11 @@ def _extract_symbols(binary: Any) -> Dict[str, Any]:
         formatted_imports: List[Dict[str, Any]] = []
         for imp in islice(binary.imports, 20):
             entries = getattr(imp, "entries", [])
-            # Convert entries to list only if necessary for slicing
-            entry_list = list(islice(entries, 20)) if entries else []
+            # Process entries directly without intermediate list conversion
             formatted_imports.append(
                 {
                     "name": getattr(imp, "name", "unknown"),
-                    "functions": [str(f) for f in entry_list],
+                    "functions": [str(f) for f in islice(entries, 20)] if entries else [],
                 }
             )
         if formatted_imports:

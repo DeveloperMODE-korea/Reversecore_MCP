@@ -27,13 +27,15 @@ DEFAULT_TIMEOUT = get_config().default_tool_timeout
 
 # Pre-compile regex patterns for performance optimization
 _FUNCTION_ADDRESS_PATTERN = re.compile(r"^[a-zA-Z0-9_.]+$")
-_VERSION_PATTERNS = [
-    re.compile(r"(OpenSSL|openssl)\s+(\d+\.\d+\.\d+[a-z]?)", re.IGNORECASE),
-    re.compile(r"(GCC|gcc)\s+(\d+\.\d+\.\d+)", re.IGNORECASE),
-    re.compile(r"(Python|python)\s+(\d+\.\d+\.\d+)", re.IGNORECASE),
-    re.compile(r"(zlib|ZLIB)\s+(\d+\.\d+\.\d+)", re.IGNORECASE),
-    re.compile(r"(libcurl|curl)\s+(\d+\.\d+\.\d+)", re.IGNORECASE),
-]
+_VERSION_PATTERNS = {
+    "OpenSSL": re.compile(r"(OpenSSL|openssl)\s+(\d+\.\d+\.\d+[a-z]?)", re.IGNORECASE),
+    "GCC": re.compile(r"GCC:\s+\(.*\)\s+(\d+\.\d+\.\d+)"),
+    "Python": re.compile(r"(Python|python)\s+([23]\.\d+\.\d+)", re.IGNORECASE),
+    "Curl": re.compile(r"curl\s+(\d+\.\d+\.\d+)", re.IGNORECASE),
+    "BusyBox": re.compile(r"BusyBox\s+v(\d+\.\d+\.\d+)", re.IGNORECASE),
+    "Generic_Version": re.compile(r"[vV]er(?:sion)?\s?[:.]?\s?(\d+\.\d+\.\d+)"),
+    "Copyright": re.compile(r"Copyright.*(19|20)\d{2}"),
+}
 
 
 def register_cli_tools(mcp: FastMCP) -> None:
@@ -264,54 +266,18 @@ async def scan_for_versions(
     # Use pre-compiled patterns for better performance
     detected = {}
     
-    # Check OpenSSL
-    for match in _VERSION_PATTERNS[0].finditer(text):
-        if "OpenSSL" not in detected:
-            detected["OpenSSL"] = []
-        detected["OpenSSL"].append(match.group(2))
+    # Process all version patterns
+    for name, pattern in _VERSION_PATTERNS.items():
+        matches = []
+        for match in pattern.finditer(text):
+            # Extract version from appropriate group (1 or 2 depending on pattern)
+            if name in ["OpenSSL", "Python"]:
+                matches.append(match.group(2))
+            else:
+                matches.append(match.group(1))
+        if matches:
+            detected[name] = list(set(matches))
     
-    # Check GCC
-    gcc_pattern = re.compile(r"GCC:\s+\(.*\)\s+([0-9]+\.[0-9]+\.[0-9]+)")
-    for match in gcc_pattern.finditer(text):
-        if "GCC" not in detected:
-            detected["GCC"] = []
-        detected["GCC"].append(match.group(1))
-    
-    # Check Python
-    for match in _VERSION_PATTERNS[2].finditer(text):
-        if "Python" not in detected:
-            detected["Python"] = []
-        detected["Python"].append(match.group(2))
-    
-    # Check other patterns
-    curl_pattern = re.compile(r"curl\s+([0-9]+\.[0-9]+\.[0-9]+)", re.IGNORECASE)
-    for match in curl_pattern.finditer(text):
-        if "Curl" not in detected:
-            detected["Curl"] = []
-        detected["Curl"].append(match.group(1))
-    
-    busybox_pattern = re.compile(r"BusyBox\s+v([0-9]+\.[0-9]+\.[0-9]+)", re.IGNORECASE)
-    for match in busybox_pattern.finditer(text):
-        if "BusyBox" not in detected:
-            detected["BusyBox"] = []
-        detected["BusyBox"].append(match.group(1))
-    
-    # Generic version
-    generic_pattern = re.compile(r"[vV]er(?:sion)?\s?[:.]?\s?([0-9]+\.[0-9]+\.[0-9]+)")
-    matches = generic_pattern.findall(text)
-    if matches:
-        detected["Generic_Version"] = list(set(matches))
-    
-    # Copyright
-    copyright_pattern = re.compile(r"Copyright.*(19|20)[0-9]{2}")
-    matches = copyright_pattern.findall(text)
-    if matches:
-        detected["Copyright"] = list(set(matches))
-    
-    # Deduplicate all detected versions
-    for key in detected:
-        detected[key] = list(set(detected[key]))
-
     return success(
         detected,
         bytes_read=bytes_read,

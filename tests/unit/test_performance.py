@@ -184,19 +184,20 @@ def test_regex_pattern_reuse_performance():
     """Test that pre-compiled regex patterns are at least as fast as inline compilation."""
     import re
     
+    # Import the pre-compiled pattern for comparison
+    from reversecore_mcp.tools.lib_tools import _IOC_IPV4_PATTERN
+    
     # Simulate the old approach (compiling each time)
     text = "Test 192.168.1.1 and http://example.com and test@email.com " * 1000
     
     start_time = time.time()
     for _ in range(100):
-        # Old approach - compile each time
-        ip_pattern = re.compile(r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b")
+        # Old approach - compile each time (using same pattern as production)
+        ip_pattern = re.compile(_IOC_IPV4_PATTERN.pattern)
         ip_pattern.findall(text)
     old_elapsed = time.time() - start_time
     
     # New approach - use pre-compiled pattern
-    from reversecore_mcp.tools.lib_tools import _IOC_IPV4_PATTERN
-    
     start_time = time.time()
     for _ in range(100):
         _IOC_IPV4_PATTERN.findall(text)
