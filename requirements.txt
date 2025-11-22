@@ -1,7 +1,7 @@
 # Reversecore_MCP Python Dependencies
 #
-# Core MCP framework
-fastmcp>=0.1.0
+# Core MCP framework (Latest: v2.13.1 - Nov 15, 2025)
+fastmcp>=2.13.0
 
 # Data validation for tool responses
 pydantic>=2.6.0
