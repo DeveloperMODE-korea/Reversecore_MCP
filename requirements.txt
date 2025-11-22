@@ -31,6 +31,7 @@ angr>=9.2.0
 # fastmcp may include these, but we need them explicitly for server.py
 fastapi>=0.100.0
 uvicorn>=0.23.0
+python-multipart>=0.0.20  
 
 # Ghidra Python bindings (optional for enhanced decompilation)
 # Note: pyghidra 2.2.0 is compatible with Ghidra 11.2 installed in Dockerfile
@@ -39,4 +40,3 @@ jpype1>=1.4.0  # PyGhidra dependency
 
 # Environment variable management
 python-dotenv>=1.0.0
-
