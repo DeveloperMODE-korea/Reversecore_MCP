@@ -48,7 +48,8 @@ class TestBinaryMetadataCache:
 
     def test_cache_invalidation_on_file_modification(self, tmp_path):
         """Test that cache is invalidated when file is modified."""
-        cache = BinaryMetadataCache()
+        # Use 0-second TTL to always check mtime
+        cache = BinaryMetadataCache(ttl_seconds=0)
         test_file = tmp_path / "test.bin"
         test_file.write_text("original")
         
@@ -147,7 +148,8 @@ class TestBinaryMetadataCache:
 
     def test_is_valid_method(self, tmp_path):
         """Test the _is_valid method."""
-        cache = BinaryMetadataCache()
+        # Use 0-second TTL to always check mtime
+        cache = BinaryMetadataCache(ttl_seconds=0)
         test_file = tmp_path / "test.bin"
         test_file.write_text("test")
         
