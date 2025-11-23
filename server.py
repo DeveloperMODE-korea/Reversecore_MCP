@@ -12,6 +12,7 @@ from pathlib import Path
 
 from reversecore_mcp.core.logging_config import setup_logging, get_logger
 from reversecore_mcp.core.config import get_config
+from reversecore_mcp.core.resource_manager import resource_manager
 
 # Setup logging
 setup_logging()
@@ -74,6 +75,9 @@ async def server_lifespan(server: FastMCP):
     
     logger.info("✅ Server startup complete")
     
+    # 3. Start Resource Manager
+    await resource_manager.start()
+    
     # ============================================================================
     # SERVER RUNNING (yield control)
     # ============================================================================
@@ -83,6 +87,9 @@ async def server_lifespan(server: FastMCP):
     # SHUTDOWN
     # ============================================================================
     logger.info("🛑 Reversecore MCP Server shutting down...")
+    
+    # Stop Resource Manager
+    await resource_manager.stop()
     
     # Cleanup temporary files
     try:

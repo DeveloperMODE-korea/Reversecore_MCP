@@ -71,3 +71,12 @@ class ValidationError(ReversecoreError):
         self.details = details or {}
         super().__init__(message, self.error_code, self.error_type)
 
+
+class ToolExecutionError(ReversecoreError):
+    """Raised when a tool execution fails."""
+
+    error_code = "RCMCP-E005"
+    error_type = "EXECUTION_ERROR"
+
+    def __init__(self, message: str):
+        super().__init__(message, self.error_code, self.error_type)

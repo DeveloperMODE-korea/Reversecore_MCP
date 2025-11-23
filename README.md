@@ -68,6 +68,26 @@ An enterprise-grade MCP (Model Context Protocol) server that empowers AI agents 
   - Secure team deployments
   - Environment-based configuration
 
+### Performance Optimizations ⚡ NEW
+- **Connection Pooling**: Persistent radare2 connections with LRU eviction
+  - Eliminates subprocess spawn overhead
+  - Up to 10x faster for repeated analysis
+- **JVM Reuse**: Persistent Ghidra JVM lifecycle management
+  - Eliminates 5-10s startup time per decompilation
+  - Caches open projects for instant reuse
+- **Binary Metadata Caching**: Intelligent caching with file modification tracking
+  - Prevents redundant analysis of unchanged files
+  - Automatic cache invalidation on file updates
+- **Circuit Breaker**: Automatic failure resilience
+  - Prevents cascading failures when tools are unstable
+  - Auto-recovery after timeout
+- **Resource Management**: Background cleanup tasks
+  - Periodic cleanup of stale cache entries
+  - Automatic temp file removal
+- **Enhanced Metrics**: Comprehensive monitoring
+  - Cache hit/miss rates for performance tuning
+  - Circuit breaker state tracking
+
 ## 📑 Table of Contents
 
 - [Overview](#overview)

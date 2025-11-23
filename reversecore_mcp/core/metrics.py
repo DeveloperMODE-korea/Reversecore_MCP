@@ -31,6 +31,11 @@ class MetricsCollector:
             "max_time": 0.0,
             "min_time": float('inf'),
         })
+        self.cache_metrics: Dict[str, Dict[str, int]] = defaultdict(lambda: {
+            "hits": 0,
+            "misses": 0,
+        })
+        self.circuit_breaker_states: Dict[str, str] = {}
     
     def record_tool_execution(self, tool_name: str, execution_time: float, success: bool = True):
         """
@@ -52,16 +57,37 @@ class MetricsCollector:
             metrics["avg_time"] = metrics["total_time"] / metrics["calls"]
             metrics["max_time"] = max(metrics["max_time"], execution_time)
             metrics["min_time"] = min(metrics["min_time"], execution_time)
+
+    def record_cache_hit(self, cache_name: str):
+        """Record a cache hit."""
+        with self._lock:
+            self.cache_metrics[cache_name]["hits"] += 1
+
+    def record_cache_miss(self, cache_name: str):
+        """Record a cache miss."""
+        with self._lock:
+            self.cache_metrics[cache_name]["misses"] += 1
+            
+    def record_circuit_breaker_state(self, tool_name: str, state: str):
+        """Record circuit breaker state change."""
+        with self._lock:
+            self.circuit_breaker_states[tool_name] = state
     
-    def get_metrics(self) -> Dict[str, Dict[str, Any]]:
+    def get_metrics(self) -> Dict[str, Any]:
         """Get all collected metrics (thread-safe)."""
         with self._lock:
-            return dict(self.tool_metrics)
+            return {
+                "tools": dict(self.tool_metrics),
+                "cache": dict(self.cache_metrics),
+                "circuit_breakers": dict(self.circuit_breaker_states)
+            }
     
     def reset(self):
         """Reset all metrics (thread-safe)."""
         with self._lock:
             self.tool_metrics.clear()
+            self.cache_metrics.clear()
+            self.circuit_breaker_states.clear()
 
 
 # Global metrics collector
