@@ -8,6 +8,7 @@ These tests verify:
 4. JSON utilities exception handling
 """
 
+import inspect
 import time
 import pytest
 from pathlib import Path
@@ -99,10 +100,7 @@ def test_resource_manager_cleanup_uses_chain():
         # Verify chain is used in the code by checking the cleanup logic
         # The optimization uses itertools.chain to combine multiple glob patterns
         # This test verifies the pattern exists in the code
-        import inspect
-        from reversecore_mcp.core import resource_manager
-        
-        source = inspect.getsource(resource_manager.ResourceManager.cleanup)
+        source = inspect.getsource(ResourceManager.cleanup)
         assert "chain" in source, "Resource manager should use itertools.chain for optimization"
 
 
