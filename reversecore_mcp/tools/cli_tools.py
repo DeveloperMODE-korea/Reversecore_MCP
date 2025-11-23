@@ -869,13 +869,14 @@ def _radare2_json_to_mermaid(json_str: str) -> str:
 
             # 2. Generate node label from assembly opcodes
             ops = block.get("ops", [])
-            # OPTIMIZATION: Use islice and generator to avoid materializing full list
-            # when we only need first 5 items
-            op_codes = [op.get("opcode", "") for op in islice(ops, 6)]  # Get up to 6 items
+            # OPTIMIZATION: Use islice to efficiently get first 6 items to check if truncation needed
+            # This avoids materializing the entire ops list for blocks with 100+ instructions
+            first_six = list(islice(ops, 6))
+            op_codes = [op.get("opcode", "") for op in first_six[:5]]
 
-            # Token efficiency: limit to 5 lines per block
-            if len(op_codes) > 5:
-                op_codes = op_codes[:5] + ["..."]
+            # Add ellipsis if there are more operations (indicated by getting 6 items)
+            if len(first_six) > 5:
+                op_codes.append("...")
 
             # Escape Mermaid special characters
             label_content = (

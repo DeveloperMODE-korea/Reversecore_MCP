@@ -36,16 +36,24 @@ formatted_paths = [
 ```python
 ops = block.get("ops", [])
 op_codes = [op.get("opcode", "") for op in ops]
+
+if len(op_codes) > 5:
+    op_codes = op_codes[:5] + ["..."]
 ```
 
 **After**:
 ```python
 from itertools import islice
 ops = block.get("ops", [])
-op_codes = [op.get("opcode", "") for op in islice(ops, 6)]
+# Get only first 6 items to check if truncation is needed
+first_six = list(islice(ops, 6))
+op_codes = [op.get("opcode", "") for op in first_six[:5]]
+
+if len(first_six) > 5:
+    op_codes.append("...")
 ```
 
-**Impact**: When only the first 5 opcodes are needed, this avoids materializing the entire ops list. For blocks with 100+ operations, this is a significant improvement.
+**Impact**: When blocks have many operations (100+), this avoids materializing the entire ops list. By fetching only 6 items, we can determine if truncation is needed without processing all operations. This is a significant performance improvement for large basic blocks.
 
 #### c. `cli_tools.py` Line 2207 - Structure Definition Generation
 **Before**:
