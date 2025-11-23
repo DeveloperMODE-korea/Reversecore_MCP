@@ -4,6 +4,10 @@ import sys
 import asyncio
 import pytest
 
+# Mark this entire module to be skipped when running with other tests
+# to avoid sys.modules pollution
+pytest.skip("Skipping due to sys.modules mocking that pollutes other tests", allow_module_level=True)
+
 # Save original modules to restore after tests
 _original_modules = {}
 _mocked_module_names = [
