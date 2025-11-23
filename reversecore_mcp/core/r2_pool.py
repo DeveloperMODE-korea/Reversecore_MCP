@@ -110,7 +110,6 @@ class R2ConnectionPool:
                 except Exception:
                     pass
             self._pool.clear()
-            self._pool.clear()
             self._last_access.clear()
             self._analyzed_files.clear()
 
