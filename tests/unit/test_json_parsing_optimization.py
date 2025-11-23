@@ -163,8 +163,13 @@ class TestPerformanceImprovement:
             _parse_json_output("definitely not json")
             assert False, "Should have raised JSONDecodeError"
         except json.JSONDecodeError as e:
-            # Error should be clear and from json.loads, not hidden
-            assert "Expecting value" in str(e)
+            # orjson and stdlib json have different error messages
+            # orjson: "unexpected character: line 1 column 1 (char 0)"
+            # stdlib: "Expecting value: line 1 column 1 (char 0)"
+            # Both are clear, so we accept either
+            error_msg = str(e)
+            assert ("unexpected character" in error_msg or "Expecting value" in error_msg), \
+                f"Error message should be clear: {error_msg}"
 
 
 class TestEdgeCases:
