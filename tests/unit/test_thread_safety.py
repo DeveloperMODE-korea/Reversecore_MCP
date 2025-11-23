@@ -41,14 +41,14 @@ def test_metrics_collector_thread_safety():
     metrics = collector.get_metrics()
     
     # Each of 3 tools should have been called from multiple threads
-    assert len(metrics) == 3
+    assert len(metrics["tools"]) == 3
     
     # Total calls across all tools should be 10 threads * 100 calls = 1000
-    total_calls = sum(m["calls"] for m in metrics.values())
+    total_calls = sum(m["calls"] for m in metrics["tools"].values())
     assert total_calls == 1000
     
     # Verify error counts (50% error rate per thread)
-    total_errors = sum(m["errors"] for m in metrics.values())
+    total_errors = sum(m["errors"] for m in metrics["tools"].values())
     assert total_errors == 500
 
 
@@ -93,8 +93,8 @@ def test_track_metrics_sync_function():
     # Note: Uses global metrics_collector, so we check it exists
     from reversecore_mcp.core.metrics import metrics_collector
     metrics = metrics_collector.get_metrics()
-    assert "sync_tool" in metrics
-    assert metrics["sync_tool"]["calls"] >= 1
+    assert "sync_tool" in metrics["tools"]
+    assert metrics["tools"]["sync_tool"]["calls"] >= 1
 
 
 @pytest.mark.asyncio
@@ -113,8 +113,8 @@ async def test_track_metrics_async_function():
     # Check metrics were recorded
     from reversecore_mcp.core.metrics import metrics_collector
     metrics = metrics_collector.get_metrics()
-    assert "async_tool" in metrics
-    assert metrics["async_tool"]["calls"] >= 1
+    assert "async_tool" in metrics["tools"]
+    assert metrics["tools"]["async_tool"]["calls"] >= 1
 
 
 def test_track_metrics_error_handling():
@@ -130,8 +130,8 @@ def test_track_metrics_error_handling():
     # Verify error was recorded
     from reversecore_mcp.core.metrics import metrics_collector
     metrics = metrics_collector.get_metrics()
-    assert "error_tool" in metrics
-    assert metrics["error_tool"]["errors"] >= 1
+    assert "error_tool" in metrics["tools"]
+    assert metrics["tools"]["error_tool"]["errors"] >= 1
 
 
 @pytest.mark.asyncio
@@ -149,8 +149,8 @@ async def test_track_metrics_async_error():
     # Verify error was recorded
     from reversecore_mcp.core.metrics import metrics_collector
     metrics = metrics_collector.get_metrics()
-    assert "async_error_tool" in metrics
-    assert metrics["async_error_tool"]["errors"] >= 1
+    assert "async_error_tool" in metrics["tools"]
+    assert metrics["tools"]["async_error_tool"]["errors"] >= 1
 
 
 def test_metrics_concurrent_get_metrics():
@@ -167,7 +167,7 @@ def test_metrics_concurrent_get_metrics():
         """Get metrics multiple times."""
         for _ in range(50):
             metrics = collector.get_metrics()
-            results.append(len(metrics))
+            results.append(len(metrics["tools"]))
     
     threads = [threading.Thread(target=get_metrics_repeatedly) for _ in range(5)]
     
@@ -197,6 +197,6 @@ def test_metrics_timing_accuracy():
     from reversecore_mcp.core.metrics import metrics_collector
     metrics = metrics_collector.get_metrics()
     
-    assert "timed_tool" in metrics
+    assert "timed_tool" in metrics["tools"]
     # Execution time should be around 50ms (with some tolerance)
-    assert 0.04 < metrics["timed_tool"]["avg_time"] < 0.1
+    assert 0.04 < metrics["tools"]["timed_tool"]["avg_time"] < 0.1

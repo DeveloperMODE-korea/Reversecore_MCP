@@ -21,13 +21,13 @@ def test_metrics_collector_tracks_tools():
     metrics = metrics_collector.get_metrics()
     
     # Verify metrics were recorded
-    assert "test_tool" in metrics
-    assert metrics["test_tool"]["calls"] == 3
-    assert metrics["test_tool"]["errors"] == 1
-    assert metrics["test_tool"]["total_time"] == 4.0
-    assert metrics["test_tool"]["avg_time"] == pytest.approx(4.0 / 3, 0.01)
-    assert metrics["test_tool"]["max_time"] == 2.0
-    assert metrics["test_tool"]["min_time"] == 0.5
+    assert "test_tool" in metrics["tools"]
+    assert metrics["tools"]["test_tool"]["calls"] == 3
+    assert metrics["tools"]["test_tool"]["errors"] == 1
+    assert metrics["tools"]["test_tool"]["total_time"] == 4.0
+    assert metrics["tools"]["test_tool"]["avg_time"] == pytest.approx(4.0 / 3, 0.01)
+    assert metrics["tools"]["test_tool"]["max_time"] == 2.0
+    assert metrics["tools"]["test_tool"]["min_time"] == 0.5
 
 
 def test_track_metrics_decorator():
@@ -54,7 +54,7 @@ def test_track_metrics_decorator():
     metrics = metrics_collector.get_metrics()
     
     # Verify metrics were recorded
-    assert "test_decorated_tool" in metrics
-    assert metrics["test_decorated_tool"]["calls"] == 3
-    assert metrics["test_decorated_tool"]["errors"] == 1  # One error from error string
+    assert "test_decorated_tool" in metrics["tools"]
+    assert metrics["tools"]["test_decorated_tool"]["calls"] == 3
+    assert metrics["tools"]["test_decorated_tool"]["errors"] == 1  # One error from error string
 
