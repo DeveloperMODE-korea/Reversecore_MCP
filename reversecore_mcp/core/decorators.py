@@ -6,8 +6,8 @@ by centralizing logging, error handling, and execution time measurement.
 """
 
 import functools
+import os
 import time
-from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar
 
 from reversecore_mcp.core.logging_config import get_logger
@@ -49,15 +49,18 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
                 start_time = time.time()
                 file_name = None
 
-                # Try to extract file_name from arguments
+                # OPTIMIZATION: Extract filename without creating Path object
+                # Using os.path.basename() for cross-platform path handling
                 for arg_name in ["file_path", "path", "file"]:
                     if arg_name in kwargs:
-                        file_name = Path(kwargs[arg_name]).name
+                        path_str = kwargs[arg_name]
+                        if path_str:  # Handle empty strings
+                            file_name = os.path.basename(path_str)
                         break
                 if not file_name and args:
                     first_arg = args[0]
-                    if isinstance(first_arg, str):
-                        file_name = Path(first_arg).name
+                    if isinstance(first_arg, str) and first_arg:
+                        file_name = os.path.basename(first_arg)
 
                 # Log start
                 log_extra = {"tool_name": actual_tool_name}
@@ -101,17 +104,19 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
             start_time = time.time()
             file_name = None
 
-            # Try to extract file_name from arguments
-            # Common patterns: file_path, path, file
+            # OPTIMIZATION: Extract filename without creating Path object
+            # Using os.path.basename() for cross-platform path handling
             for arg_name in ["file_path", "path", "file"]:
                 if arg_name in kwargs:
-                    file_name = Path(kwargs[arg_name]).name
+                    path_str = kwargs[arg_name]
+                    if path_str:  # Handle empty strings
+                        file_name = os.path.basename(path_str)
                     break
             if not file_name and args:
                 # Check first positional argument
                 first_arg = args[0]
-                if isinstance(first_arg, str):
-                    file_name = Path(first_arg).name
+                if isinstance(first_arg, str) and first_arg:
+                    file_name = os.path.basename(first_arg)
 
             # Log start
             log_extra = {"tool_name": actual_tool_name}
