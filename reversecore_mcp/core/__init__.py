@@ -19,6 +19,10 @@ from reversecore_mcp.core.execution import execute_subprocess_streaming, execute
 from reversecore_mcp.core.logging_config import get_logger, setup_logging
 from reversecore_mcp.core.security import validate_file_path
 
+# Import performance optimization modules
+from reversecore_mcp.core.r2_pool import R2ConnectionPool, r2_pool
+from reversecore_mcp.core.resource_manager import ResourceManager, resource_manager
+
 __all__ = [
     "ReversecoreError",
     "ToolNotFoundError",
@@ -33,5 +37,10 @@ __all__ = [
     "get_logger",
     "setup_logging",
     "log_execution",
+    "R2ConnectionPool",
+    "r2_pool",
+    "ResourceManager",
+    "resource_manager",
 ]
+
 
