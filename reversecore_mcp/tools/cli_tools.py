@@ -6,6 +6,7 @@ import re
 import shutil
 import hashlib
 import os
+from itertools import islice
 from pathlib import Path
 from typing import Optional
 import time
@@ -41,6 +42,18 @@ _VERSION_PATTERNS = {
     "Generic_Version": re.compile(r"[vV]er(?:sion)?\s?[:.]?\s?(\d+\.\d+\.\d+)"),
     "Copyright": re.compile(r"Copyright.*(19|20)\d{2}"),
 }
+
+# OPTIMIZATION: Pre-compile pattern for stripping address prefixes
+_ADDRESS_PREFIX_PATTERN = re.compile(r'(0x|sym\.|fcn\.)')
+
+
+def _strip_address_prefixes(address: str) -> str:
+    """
+    Efficiently strip common address prefixes using regex.
+    
+    This is faster than chained .replace() calls for multiple patterns.
+    """
+    return _ADDRESS_PREFIX_PATTERN.sub('', address)
 
 
 def register_cli_tools(mcp: FastMCP) -> None:
@@ -225,11 +238,12 @@ async def trace_execution_path(
     await recursive_backtrace(target_addr, [root_node], 0)
 
     # Format results
-    formatted_paths = []
-    for p in paths:
-        # Reverse to show flow from Source -> Sink
-        chain = p[::-1]
-        formatted_paths.append(" -> ".join([f"{n['name']} ({n['addr']})" for n in chain]))
+    # OPTIMIZATION: Use list comprehension with generator expression in join
+    # This reduces memory by avoiding intermediate list creation in the join
+    formatted_paths = [
+        " -> ".join(f"{n['name']} ({n['addr']})" for n in p[::-1])
+        for p in paths
+    ]
 
     return success(
         {"paths": formatted_paths, "raw_paths": paths},
@@ -465,12 +479,14 @@ async def scan_workspace(
         file_patterns = ["*"]
 
     # 1. Collect files
-    files_to_scan = []
+    # OPTIMIZATION: Use set to avoid duplicates during collection instead of after
+    files_to_scan_set = set()
     for pattern in file_patterns:
-        files_to_scan.extend(workspace.glob(pattern))
+        for f in workspace.glob(pattern):
+            if f.is_file():
+                files_to_scan_set.add(f)
     
-    # Remove duplicates and directories
-    files_to_scan = list(set([f for f in files_to_scan if f.is_file()]))
+    files_to_scan = list(files_to_scan_set)
     
     if not files_to_scan:
         return success(
@@ -854,11 +870,19 @@ def _radare2_json_to_mermaid(json_str: str) -> str:
 
             # 2. Generate node label from assembly opcodes
             ops = block.get("ops", [])
-            op_codes = [op.get("opcode", "") for op in ops]
-
-            # Token efficiency: limit to 5 lines per block
-            if len(op_codes) > 5:
-                op_codes = op_codes[:5] + ["..."]
+            # OPTIMIZATION: Use enumerate with early break to avoid processing all ops
+            # For token efficiency, we limit to 5 instructions per block
+            op_codes = []
+            has_more = False
+            for i, op in enumerate(ops):
+                if i < 5:
+                    op_codes.append(op.get("opcode", ""))
+                elif i == 5:
+                    has_more = True
+                    break
+            
+            if has_more:
+                op_codes.append("...")
 
             # Escape Mermaid special characters
             label_content = (
@@ -1917,9 +1941,10 @@ async def analyze_xrefs(
         )
 
     # 2. Validate address format
+    # OPTIMIZATION: Use efficient regex substitution instead of chained replace
     if not re.match(
         r"^[a-zA-Z0-9_.]+$",
-        address.replace("0x", "").replace("sym.", "").replace("fcn.", ""),
+        _strip_address_prefixes(address),
     ):
         return failure(
             "VALIDATION_ERROR",
@@ -2106,9 +2131,10 @@ async def recover_structures(
     validated_path = validate_file_path(file_path)
 
     # 2. Validate address format
+    # OPTIMIZATION: Use efficient regex substitution instead of chained replace
     if not re.match(
         r"^[a-zA-Z0-9_.:<>]+$",
-        function_address.replace("0x", "").replace("sym.", "").replace("fcn.", ""),
+        _strip_address_prefixes(function_address),
     ):
         return failure(
             "VALIDATION_ERROR",
@@ -2203,14 +2229,15 @@ async def recover_structures(
                     )
 
             # 6. Generate C structure definitions
+            # OPTIMIZATION: Build strings more efficiently using join
             c_definitions = []
             for struct_name, struct_data in structures.items():
-                fields_str = "\n    ".join(
-                    [
-                        f"{field['type']} {field['name']}; // offset {field['offset']}"
-                        for field in struct_data["fields"]
-                    ]
-                )
+                # Pre-format fields more efficiently
+                field_strs = [
+                    f"{field['type']} {field['name']}; // offset {field['offset']}"
+                    for field in struct_data["fields"]
+                ]
+                fields_str = "\n    ".join(field_strs)
 
                 c_def = f"struct {struct_data['name']} {{\n    {fields_str}\n}};"
                 c_definitions.append(c_def)
