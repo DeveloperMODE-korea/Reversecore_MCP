@@ -1,0 +1,83 @@
+import unittest
+from unittest.mock import AsyncMock, patch, MagicMock
+import sys
+
+# Mock dependencies
+sys.modules["fastmcp"] = MagicMock()
+sys.modules["fastmcp.Context"] = MagicMock()
+sys.modules["reversecore_mcp.core.logging_config"] = MagicMock()
+sys.modules["reversecore_mcp.core.result"] = MagicMock()
+sys.modules["reversecore_mcp.core.decorators"] = MagicMock()
+sys.modules["reversecore_mcp.core.security"] = MagicMock()
+sys.modules["reversecore_mcp.core"] = MagicMock()
+
+# Mock decorators
+def log_execution(tool_name):
+    def decorator(func):
+        return func
+    return decorator
+sys.modules["reversecore_mcp.core.decorators"].log_execution = log_execution
+
+# Mock result helpers
+def success(data):
+    return data
+def failure(msg):
+    return {"error": msg}
+sys.modules["reversecore_mcp.core.result"].success = success
+sys.modules["reversecore_mcp.core.result"].failure = failure
+
+# Import tool
+from reversecore_mcp.tools.neural_decompiler import _refine_code, neural_decompile
+
+class TestNeuralDecompiler(unittest.IsolatedAsyncioTestCase):
+    
+    def test_refine_code_socket(self):
+        """Test variable renaming for socket API."""
+        raw_code = """
+        void func() {
+            int iVar1;
+            iVar1 = socket(2, 1, 0);
+            if (iVar1 < 0) return;
+            connect(iVar1, addr, 16);
+        }
+        """
+        refined = _refine_code(raw_code)
+        self.assertIn("sock_fd = socket", refined)
+        self.assertIn("connect(sock_fd", refined)
+        self.assertIn("Renamed from iVar1", refined)
+
+    def test_refine_code_structure(self):
+        """Test structure inference from pointer arithmetic."""
+        raw_code = """
+        void func(void *ptr) {
+            *(int *)(ptr + 4) = 100;
+            *(long *)(ptr + 0x10) = 200;
+        }
+        """
+        refined = _refine_code(raw_code)
+        self.assertIn("ptr->field_4 = 100", refined)
+        self.assertIn("ptr->field_0x10 = 200", refined)
+
+    def test_refine_code_magic(self):
+        """Test magic value annotation."""
+        raw_code = """
+        if (val == 0xCAFEBABE) {
+            return;
+        }
+        """
+        refined = _refine_code(raw_code)
+        self.assertIn("0xCAFEBABE /* Magic Value */", refined)
+
+    async def test_neural_decompile_tool(self):
+        """Test the main tool function."""
+        # Mock ghidra helper
+        with patch("reversecore_mcp.core.ghidra_helper.decompile_function_with_ghidra") as mock_decomp:
+            mock_decomp.return_value = ("iVar1 = socket(2,1,0);", {})
+            
+            result = await neural_decompile("/tmp/test", "main")
+            
+            self.assertIn("neural_code", result)
+            self.assertIn("sock_fd", result["neural_code"])
+
+if __name__ == '__main__':
+    unittest.main()

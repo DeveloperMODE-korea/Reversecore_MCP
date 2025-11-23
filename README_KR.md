@@ -23,6 +23,16 @@ Ghost Trace는 정적 분석과 동적 분석의 한계를 뛰어넘는 Reversec
 
 > *Ghost Trace는 아직 발생하지 않은 미래의 악성 행위를 예측할 수 있게 해줍니다.*
 
+## 🧠 Reversecore Signature: Neural Decompiler (뉴럴 디컴파일러)
+
+**"개발자의 의도를 복원하다"**
+
+Neural Decompiler는 딱딱하고 기계적인 C 코드를 "인간이 작성한 것 같은" 자연스러운 코드로 변환하여 기존 디컴파일의 한계를 뛰어넘습니다. 고급 휴리스틱과 패턴 매칭(AI 이해 시뮬레이션)을 사용하여 원본 개발자의 의도를 복원합니다.
+
+- **📝 의미론적 변수 명명 (Semantic Variable Renaming)**: API 사용 문맥을 기반으로 `iVar1`, `v2`와 같은 무의미한 변수명을 `sock_fd`, `file_handle`과 같은 직관적인 이름으로 자동 변경합니다.
+- **🏗️ 구조체 추론 (Structure Inference)**: 포인터 연산 패턴(`*(ptr + 4)`)을 감지하고 지능적으로 구조체 필드 접근(`ptr->field_4`)으로 변환합니다.
+- **💡 스마트 주석 (Smart Annotation)**: "매직 값(Magic Values)"과 복잡한 로직 블록에 대한 고수준 설명을 주석으로 추가하여 코드를 즉시 이해할 수 있게 만듭니다.
+
 ## 💻 시스템 요구 사항
 
 | 범주 | 최소 사양 | 권장 사양 |
