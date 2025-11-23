@@ -1,6 +1,7 @@
 """Library-backed MCP tools that emit structured ToolResult payloads."""
 
-import json
+# Use high-performance JSON implementation (3-5x faster)
+from reversecore_mcp.core import json_utils as json
 import os
 import re
 from itertools import islice

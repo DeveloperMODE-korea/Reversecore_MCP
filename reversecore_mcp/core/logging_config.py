@@ -2,9 +2,11 @@
 Logging configuration for Reversecore_MCP.
 
 This module provides structured logging with JSON output option and log rotation.
+Uses high-performance JSON serialization when available.
 """
 
-import json
+# Use high-performance JSON implementation for log serialization
+from reversecore_mcp.core import json_utils as json
 import logging
 from logging.handlers import RotatingFileHandler
 from typing import Any, Dict
