@@ -10,10 +10,10 @@ This module acts as a facade that imports and exposes tools from specialized mod
 from fastmcp import FastMCP
 
 # Import all tools from specialized modules
-from reversecore_mcp.tools.ioc_tools import extract_iocs
-from reversecore_mcp.tools.yara_tools import run_yara
+from reversecore_mcp.tools.ioc_tools import extract_iocs, _IOC_IPV4_PATTERN
+from reversecore_mcp.tools.yara_tools import run_yara, _format_yara_match
 from reversecore_mcp.tools.capstone_tools import disassemble_with_capstone
-from reversecore_mcp.tools.lief_tools import parse_binary_with_lief
+from reversecore_mcp.tools.lief_tools import parse_binary_with_lief, _format_lief_output
 
 # Re-export all tools so existing imports continue to work
 __all__ = [
@@ -22,6 +22,10 @@ __all__ = [
     'disassemble_with_capstone',
     'parse_binary_with_lief',
     'register_lib_tools',
+    # Internal symbols for backward compatibility (used by tests)
+    '_IOC_IPV4_PATTERN',
+    '_format_yara_match',
+    '_format_lief_output',
 ]
 
 

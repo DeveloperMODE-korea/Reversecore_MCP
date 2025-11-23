@@ -188,9 +188,21 @@ async def ghost_trace(
     
     # Let's implement `find_orphan_functions` and `identify_conditional_paths` properly.
     
+    if ctx:
+        await ctx.report_progress(30, 100)
+        await ctx.info("👻 Ghost Trace: Identifying orphan functions...")
+
     orphans = await _find_orphan_functions(validated_path, functions)
-    suspicious_logic = await _identify_conditional_paths(validated_path, functions[:20]) # Limit to top 20 for speed in MVP
+
+    if ctx:
+        await ctx.report_progress(60, 100)
+        await ctx.info("👻 Ghost Trace: Analyzing conditional logic...")
+
+    suspicious_logic = await _identify_conditional_paths(validated_path, functions[:20], ctx) # Limit to top 20 for speed in MVP
     
+    if ctx:
+        await ctx.report_progress(100, 100)
+
     return success({
         "scan_type": "discovery",
         "orphan_functions": orphans,
@@ -226,14 +238,18 @@ async def _find_orphan_functions(file_path: Path, functions: List[Dict[str, Any]
     return orphans
 
 
-async def _identify_conditional_paths(file_path: Path, functions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+async def _identify_conditional_paths(file_path: Path, functions: List[Dict[str, Any]], ctx: Context = None) -> List[Dict[str, Any]]:
     """Identify functions with suspicious conditional logic (Magic Values)."""
     suspicious = []
     
     # Batch process functions for better performance
     # Build a single command chain to analyze multiple functions
     batch_size = 10
-    for i in range(0, len(functions), batch_size):
+    total_functions = len(functions)
+    for i in range(0, total_functions, batch_size):
+        if ctx:
+             await ctx.report_progress(60 + int((i / total_functions) * 30), 100)
+
         batch = functions[i:i + batch_size]
         
         # Create batch command

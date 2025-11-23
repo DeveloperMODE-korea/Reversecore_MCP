@@ -72,7 +72,7 @@ class Config:
         mcp_transport = os.getenv("MCP_TRANSPORT", "stdio").lower()
         default_tool_timeout = _parse_int(
             os.getenv("DEFAULT_TOOL_TIMEOUT"),
-            default=60,
+            default=120,
         )
 
         return cls(

@@ -15,7 +15,7 @@ class TestCliToolsMocked:
         # Mock output should be continuous hex string (p8 output)
         mock_output = "4883ec20"
         
-        with patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", 
+        with patch("reversecore_mcp.tools.r2_analysis.execute_subprocess_async", 
                    new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = (mock_output, len(mock_output))
             
@@ -46,7 +46,7 @@ class TestCliToolsMocked:
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE")
         
-        with patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", 
+        with patch("reversecore_mcp.tools.r2_analysis.execute_subprocess_async", 
                    new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = ("", 0)
             
@@ -59,43 +59,39 @@ class TestCliToolsMocked:
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE")
         
-        classes_json = json.dumps([
-            {"classname": "MyClass", "addr": "0x1000", "methods": [], "vtable": "0x2000"}
-        ])
-        symbols_json = json.dumps([
-            {"name": "_Z7MyClass", "vaddr": "0x1000", "type": "FUNC", "size": 100},
-            {"name": "vtable_MyClass", "vaddr": "0x2000"}
-        ])
+        # Mock output for strings command
+        mock_output = """
+_ZTSMyClass
+class MyClass
+_ZTIMyClass
+"""
         
-        with patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", 
+        with patch("reversecore_mcp.tools.static_analysis.execute_subprocess_async", 
                    new_callable=AsyncMock) as mock_exec:
-            mock_exec.side_effect = [
-                (classes_json, len(classes_json)),
-                (symbols_json, len(symbols_json))
-            ]
+            mock_exec.return_value = (mock_output, len(mock_output))
             
             result = await cli_tools.extract_rtti_info(str(test_file))
             
             assert result.status == "success"
             data = result.data
-            assert data["class_count"] == 1
-            assert data["classes"][0]["name"] == "MyClass"
-            assert data["method_count"] == 1
-            assert data["vtable_count"] == 1
-            assert data["binary_type"] == "C++"
+            assert "MyClass" in data["class_names"]
+            assert data["total_classes"] >= 1
+            assert data["total_rtti_entries"] >= 1
 
-    async def test_extract_rtti_info_parse_error(self, workspace_dir, patched_workspace_config):
+    async def test_extract_rtti_info_no_results(self, workspace_dir, patched_workspace_config):
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE")
         
-        with patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", 
+        with patch("reversecore_mcp.tools.static_analysis.execute_subprocess_async", 
                    new_callable=AsyncMock) as mock_exec:
-            mock_exec.return_value = ("INVALID JSON", 10)
+            mock_exec.return_value = ("NO RTTI HERE", 10)
             
             result = await cli_tools.extract_rtti_info(str(test_file))
             
-            assert result.status == "error"
-            assert "Failed to parse RTTI output" in result.message
+            # Should succeed but return empty results
+            assert result.status == "success"
+            assert result.data["total_classes"] == 0
+            assert result.data["total_rtti_entries"] == 0
 
     async def test_analyze_xrefs_success(self, workspace_dir, patched_workspace_config):
         test_file = workspace_dir / "test.exe"
@@ -106,7 +102,7 @@ class TestCliToolsMocked:
         
         output = f"{xrefs_to_json}\n{xrefs_from_json}"
         
-        with patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", 
+        with patch("reversecore_mcp.tools.r2_analysis.execute_subprocess_async", 
                    new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = (output, len(output))
             
@@ -135,7 +131,7 @@ class TestCliToolsMocked:
             {"type": "char *", "name": "field2", "delta": 8, "ref": {"base": "rbp"}}
         ])
         
-        with patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", 
+        with patch("reversecore_mcp.tools.r2_analysis.execute_subprocess_async", 
                    new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = (vars_json, len(vars_json))
             
@@ -174,7 +170,7 @@ class TestCliToolsMocked:
         ])
 
         with patch("reversecore_mcp.core.ghidra_helper.ensure_ghidra_available", return_value=False), \
-             patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", new_callable=AsyncMock) as mock_exec:
+             patch("reversecore_mcp.tools.r2_analysis.execute_subprocess_async", new_callable=AsyncMock) as mock_exec:
             
             mock_exec.return_value = (vars_json, len(vars_json))
             
@@ -194,7 +190,7 @@ class TestCliToolsMocked:
         diff_output = "0x401000 code_change instruction modified"
         sim_output = "similarity: 0.95"
         
-        with patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", 
+        with patch("reversecore_mcp.tools.diff_tools.execute_subprocess_async", 
                    new_callable=AsyncMock) as mock_exec:
             mock_exec.side_effect = [
                 (diff_output, len(diff_output)),
@@ -218,7 +214,7 @@ class TestCliToolsMocked:
             {"name": "main", "offset": 0x2000}
         ])
         
-        with patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", 
+        with patch("reversecore_mcp.tools.r2_analysis.execute_subprocess_async", 
                    new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = (funcs_json, len(funcs_json))
             
@@ -235,7 +231,7 @@ class TestCliToolsMocked:
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE")
         
-        with patch("reversecore_mcp.tools.cli_tools.execute_subprocess_async", 
+        with patch("reversecore_mcp.tools.r2_analysis.execute_subprocess_async", 
                    new_callable=AsyncMock) as mock_exec:
             mock_exec.return_value = ("INVALID", 10)
             
