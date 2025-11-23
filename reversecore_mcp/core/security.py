@@ -21,6 +21,10 @@ from reversecore_mcp.core.config import get_config
 from reversecore_mcp.core.exceptions import ValidationError
 
 
+# Configuration constants
+PATH_VALIDATION_CACHE_SIZE = 256  # Number of path resolutions to cache
+
+
 @dataclass(frozen=True)
 class WorkspaceConfig:
     """Immutable configuration for workspace-aware file validation."""
@@ -51,7 +55,7 @@ def refresh_workspace_config() -> WorkspaceConfig:
     return WORKSPACE_CONFIG
 
 
-@lru_cache(maxsize=256)
+@lru_cache(maxsize=PATH_VALIDATION_CACHE_SIZE)
 def _resolve_path_cached(path_str: str) -> Tuple[Path, bool, str]:
     """
     Cached path resolution to avoid repeated filesystem calls.

@@ -16,6 +16,9 @@ from reversecore_mcp.core.metrics import metrics_collector
 
 logger = get_logger(__name__)
 
+# Configuration constants
+DEFAULT_CACHE_TTL_SECONDS = 60  # Default time-to-live for cache validation
+
 
 class BinaryMetadataCache:
     """
@@ -29,7 +32,7 @@ class BinaryMetadataCache:
     - Configurable cache lifetime (default: 60 seconds)
     """
     
-    def __init__(self, ttl_seconds: int = 60):
+    def __init__(self, ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS):
         self._cache: Dict[str, Any] = {}
         # Store (mtime, last_check_time) tuple to reduce stat() calls
         self._file_timestamps: Dict[str, Tuple[float, float]] = {}
@@ -58,7 +61,8 @@ class BinaryMetadataCache:
         current_time = time.time()
         
         # Fast path: If within TTL window, trust the cache without stat()
-        if current_time - last_check_time < self._ttl_seconds:
+        # Using <= to include the exact boundary case for consistent caching
+        if current_time - last_check_time <= self._ttl_seconds:
             return True
         
         # Slow path: TTL expired, need to check file modification time
@@ -128,5 +132,5 @@ class BinaryMetadataCache:
             self._file_timestamps.clear()
 
 
-# Global instance with 60 second TTL
-binary_cache = BinaryMetadataCache(ttl_seconds=60)
+# Global instance with default TTL
+binary_cache = BinaryMetadataCache(ttl_seconds=DEFAULT_CACHE_TTL_SECONDS)
