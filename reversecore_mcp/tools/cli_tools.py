@@ -1,7 +1,6 @@
 """CLI tool wrappers that return structured ToolResult payloads."""
 
 import asyncio
-import json
 import re
 import shutil
 import hashlib
@@ -10,6 +9,9 @@ from itertools import islice
 from pathlib import Path
 from typing import Optional
 import time
+
+# Use high-performance JSON implementation (3-5x faster)
+from reversecore_mcp.core import json_utils as json
 
 from async_lru import alru_cache
 from functools import lru_cache

@@ -40,3 +40,6 @@ jpype1>=1.4.0  # PyGhidra dependency
 
 # Environment variable management
 python-dotenv>=1.0.0
+
+# High-performance JSON parsing (3-5x faster than standard json)
+orjson>=3.9.0
