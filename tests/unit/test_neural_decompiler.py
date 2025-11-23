@@ -68,6 +68,24 @@ class TestNeuralDecompiler(unittest.IsolatedAsyncioTestCase):
         refined = _refine_code(raw_code)
         self.assertIn("0xCAFEBABE /* Magic Value */", refined)
 
+    def test_unique_variable_naming(self):
+        """Test that multiple variables using same API get unique names."""
+        raw_code = """
+        void func() {
+            int fd1 = socket(2, 1, 0);
+            int fd2 = socket(2, 1, 0);
+            connect(fd1, addr1, 16);
+            connect(fd2, addr2, 16);
+        }
+        """
+        refined = _refine_code(raw_code)
+        # First socket should be sock_fd, second should be sock_fd_2
+        self.assertIn("sock_fd =", refined)
+        self.assertIn("sock_fd_2 =", refined)
+        # Both should be renamed in connect calls
+        self.assertIn("connect(sock_fd,", refined)
+        self.assertIn("connect(sock_fd_2,", refined)
+
     async def test_neural_decompile_tool(self):
         """Test the main tool function."""
         # Mock ghidra helper
