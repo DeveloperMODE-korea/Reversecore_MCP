@@ -1,7 +1,11 @@
 """Tests for high-performance JSON utilities."""
 
+import time
 import pytest
 from reversecore_mcp.core import json_utils
+
+# Test constants
+MAX_EXPECTED_SERIALIZATION_TIME = 1.0  # seconds for 100 iterations
 
 
 class TestJSONUtils:
@@ -110,7 +114,6 @@ class TestJSONUtils:
         # When orjson is available: 3-5x faster than stdlib json
         # When not available: fallback to stdlib json (same performance)
         
-        import time
         obj = {"data": list(range(1000)), "nested": [{"key": i} for i in range(100)]}
         
         # Warm up
@@ -124,7 +127,8 @@ class TestJSONUtils:
         duration = time.time() - start
         
         # Should complete in reasonable time (sanity check)
-        assert duration < 1.0, f"JSON serialization too slow: {duration}s"
+        assert duration < MAX_EXPECTED_SERIALIZATION_TIME, \
+            f"JSON serialization too slow: {duration}s (max: {MAX_EXPECTED_SERIALIZATION_TIME}s)"
         
         # Log whether we're using orjson or fallback
         print(f"\nUsing orjson: {json_utils.is_orjson_available()}")
