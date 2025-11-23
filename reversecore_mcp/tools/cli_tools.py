@@ -660,6 +660,20 @@ async def run_strings(
         max_output_size=max_output_size,
         timeout=timeout,
     )
+    
+    # Truncate output for LLM consumption if too large
+    # 50KB is roughly 12-15k tokens, which is a safe limit for most models
+    LLM_SAFE_LIMIT = 50 * 1024 
+    
+    if len(output) > LLM_SAFE_LIMIT:
+        truncated_output = output[:LLM_SAFE_LIMIT]
+        warning_msg = (
+            f"\n\n[WARNING] Output truncated! Total size: {len(output)} bytes. "
+            f"Showing first {LLM_SAFE_LIMIT} bytes.\n"
+            "To analyze the full content, consider using 'grep' or processing the file directly."
+        )
+        return success(truncated_output + warning_msg, bytes_read=bytes_read, truncated=True)
+        
     return success(output, bytes_read=bytes_read)
 
 
@@ -1723,7 +1737,7 @@ async def _smart_decompile_impl(
         output, bytes_read = await _execute_r2_command(
             validated_path,
             r2_cmds,
-            analysis_level="aaa",
+            analysis_level="aa",
             max_output_size=10_000_000,
             base_timeout=timeout,
         )
@@ -2094,7 +2108,8 @@ async def analyze_xrefs(
     # If the user wants faster, they can use 'aa'.
     # Let's try to be smart: if file size is large (>5MB), use 'aa'.
     
-    analysis_level = "aaa"
+    # Use 'aa' (basic analysis) as default to prevent timeouts on obfuscated binaries
+    analysis_level = "aa"
     try:
         if os.path.getsize(validated_path) > 5 * 1024 * 1024:
             analysis_level = "aa"
