@@ -1817,3 +1817,37 @@ Reason: <why this name>
             f"Failed to suggest function name: {str(e)}",
             hint="Ensure the function can be decompiled and client supports sampling"
         )
+
+
+def register_cli_tools(mcp: FastMCP) -> None:
+    """
+    Register all CLI tool wrappers with the FastMCP server.
+
+    Args:
+        mcp: The FastMCP server instance to register tools with
+    """
+    mcp.tool(run_file)
+    mcp.tool(run_strings)
+    mcp.tool(run_radare2)
+    mcp.tool(run_binwalk)
+    mcp.tool(copy_to_workspace)
+    mcp.tool(list_workspace)
+    mcp.tool(generate_function_graph)
+    mcp.tool(emulate_machine_code)
+    mcp.tool(get_pseudo_code)
+    mcp.tool(generate_signature)
+    mcp.tool(extract_rtti_info)
+    mcp.tool(smart_decompile)
+    mcp.tool(generate_yara_rule)
+    mcp.tool(analyze_xrefs)
+    mcp.tool(recover_structures)
+    mcp.tool(diff_binaries)
+    mcp.tool(match_libraries)
+    mcp.tool(scan_workspace)
+    mcp.tool(trace_execution_path)
+    mcp.tool(scan_for_versions)
+    mcp.tool(analyze_variant_changes)
+    mcp.tool(solve_path_constraints)
+    # AI-powered tools (using LLM sampling)
+    mcp.tool(analyze_with_ai)
+    mcp.tool(suggest_function_name)
