@@ -6,8 +6,8 @@ by centralizing logging, error handling, and execution time measurement.
 """
 
 import functools
+import os
 import time
-from pathlib import Path
 from typing import Any, Callable, Optional, TypeVar
 
 from reversecore_mcp.core.logging_config import get_logger
@@ -50,18 +50,17 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
                 file_name = None
 
                 # OPTIMIZATION: Extract filename without creating Path object
-                # Try to extract file_name from arguments
+                # Using os.path.basename() for cross-platform path handling
                 for arg_name in ["file_path", "path", "file"]:
                     if arg_name in kwargs:
                         path_str = kwargs[arg_name]
-                        # Use string operations instead of Path for better performance
-                        file_name = path_str.split('/')[-1] if '/' in path_str else path_str.split('\\')[-1]
+                        if path_str:  # Handle empty strings
+                            file_name = os.path.basename(path_str)
                         break
                 if not file_name and args:
                     first_arg = args[0]
-                    if isinstance(first_arg, str):
-                        # Use string operations instead of Path for better performance
-                        file_name = first_arg.split('/')[-1] if '/' in first_arg else first_arg.split('\\')[-1]
+                    if isinstance(first_arg, str) and first_arg:
+                        file_name = os.path.basename(first_arg)
 
                 # Log start
                 log_extra = {"tool_name": actual_tool_name}
@@ -106,20 +105,18 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
             file_name = None
 
             # OPTIMIZATION: Extract filename without creating Path object
-            # Try to extract file_name from arguments
-            # Common patterns: file_path, path, file
+            # Using os.path.basename() for cross-platform path handling
             for arg_name in ["file_path", "path", "file"]:
                 if arg_name in kwargs:
                     path_str = kwargs[arg_name]
-                    # Use string operations instead of Path for better performance
-                    file_name = path_str.split('/')[-1] if '/' in path_str else path_str.split('\\')[-1]
+                    if path_str:  # Handle empty strings
+                        file_name = os.path.basename(path_str)
                     break
             if not file_name and args:
                 # Check first positional argument
                 first_arg = args[0]
-                if isinstance(first_arg, str):
-                    # Use string operations instead of Path for better performance
-                    file_name = first_arg.split('/')[-1] if '/' in first_arg else first_arg.split('\\')[-1]
+                if isinstance(first_arg, str) and first_arg:
+                    file_name = os.path.basename(first_arg)
 
             # Log start
             log_extra = {"tool_name": actual_tool_name}

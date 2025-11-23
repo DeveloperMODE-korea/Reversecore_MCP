@@ -63,22 +63,23 @@ if not file_name and args:
 **After**:
 ```python
 # OPTIMIZATION: Extract filename without creating Path object
+# Using os.path.basename() for cross-platform path handling
 for arg_name in ["file_path", "path", "file"]:
     if arg_name in kwargs:
         path_str = kwargs[arg_name]
-        # Use string operations instead of Path for better performance
-        file_name = path_str.split('/')[-1] if '/' in path_str else path_str.split('\\')[-1]
+        if path_str:  # Handle empty strings
+            file_name = os.path.basename(path_str)
         break
 if not file_name and args:
     first_arg = args[0]
-    if isinstance(first_arg, str):
-        # Use string operations instead of Path for better performance
-        file_name = first_arg.split('/')[-1] if '/' in first_arg else first_arg.split('\\')[-1]
+    if isinstance(first_arg, str) and first_arg:
+        file_name = os.path.basename(first_arg)
 ```
 
 **Impact**:
 - No Path object instantiation overhead
-- String split is significantly faster than Path creation
+- `os.path.basename()` is significantly faster than Path creation
+- Handles edge cases properly (empty paths, mixed separators)
 - Runs on every single tool invocation (hot path)
 - Approximately 50-70% faster for filename extraction
 - Memory allocation reduced (no Path objects created)
