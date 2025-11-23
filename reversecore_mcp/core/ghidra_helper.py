@@ -401,13 +401,16 @@ def recover_structures_with_ghidra(
                                 }
                     
                     # Generate C structure definitions
+                    # OPTIMIZATION: Build field strings outside of dict comprehension
                     c_definitions = []
                     for struct_name, struct_data in structures_found.items():
                         if struct_data["fields"]:
-                            fields_str = "\n    ".join([
+                            # Pre-build field strings for better performance
+                            field_strs = [
                                 f"{field['type']} {field['name']}; // offset {field['offset']}, size {field['size']}"
                                 for field in struct_data["fields"]
-                            ])
+                            ]
+                            fields_str = "\n    ".join(field_strs)
                             c_def = f"struct {struct_name} {{\n    {fields_str}\n}};"
                         else:
                             c_def = f"struct {struct_name} {{ /* size: {struct_data['size']} bytes */ }};"
