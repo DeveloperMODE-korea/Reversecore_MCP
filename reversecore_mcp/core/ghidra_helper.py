@@ -5,6 +5,7 @@ This module provides utilities for decompiling binaries using Ghidra's
 DecompInterface API through PyGhidra.
 """
 
+import re
 import tempfile
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, TYPE_CHECKING
@@ -17,6 +18,9 @@ if TYPE_CHECKING:
     from ghidra.program.model.listing import Function
 
 logger = get_logger(__name__)
+
+# OPTIMIZATION: Pre-compile pattern for hex prefix removal (case insensitive)
+_HEX_PREFIX_PATTERN = re.compile(r'^0[xX]')
 
 
 def _extract_structure_fields(data_type) -> list:
@@ -212,10 +216,11 @@ def _resolve_function(flat_api: "FlatProgramAPI", address_str: str) -> Optional[
         address = symbol.getAddress()
         return function_manager.getFunctionAt(address)
     
-    # Try as hex address
+    # Try as hex address (remove prefix once for both attempts)
+    # OPTIMIZATION: Use pre-compiled regex pattern instead of chained replace
+    addr_str = _HEX_PREFIX_PATTERN.sub('', address_str)
+    
     try:
-        # Remove 0x prefix if present
-        addr_str = address_str.replace("0x", "").replace("0X", "")
         address = flat_api.toAddr(int(addr_str, 16))
         func = function_manager.getFunctionAt(address)
         if func is not None:
@@ -223,9 +228,8 @@ def _resolve_function(flat_api: "FlatProgramAPI", address_str: str) -> Optional[
     except (ValueError, Exception):
         pass
     
-    # Try to find function containing this address
+    # Try to find function containing this address (reuse cleaned addr_str)
     try:
-        addr_str = address_str.replace("0x", "").replace("0X", "")
         address = flat_api.toAddr(int(addr_str, 16))
         return function_manager.getFunctionContaining(address)
     except (ValueError, Exception):
