@@ -4,8 +4,8 @@ import time
 import pytest
 from reversecore_mcp.core import json_utils
 
-# Test constants
-MAX_EXPECTED_SERIALIZATION_TIME = 1.0  # seconds for 100 iterations
+# Test configuration constants
+MAX_EXPECTED_SERIALIZATION_TIME = 1.0  # seconds for 100 iterations of test data
 
 
 class TestJSONUtils:

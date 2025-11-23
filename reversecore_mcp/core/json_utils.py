@@ -38,15 +38,20 @@ try:
         """
         Serialize object to JSON with orjson (fast path).
         
+        Note: orjson only supports 2-space indentation when indent is provided.
+        Any non-None indent value will result in 2-space pretty-printing.
+        This differs slightly from stdlib json which respects the exact indent value.
+        
         Args:
             obj: Python object to serialize
-            indent: If provided, pretty-print with indentation
+            indent: If provided (any non-None value), pretty-print with 2-space indentation
             
         Returns:
             JSON string
         """
         if indent is not None:
-            # orjson uses OPT_INDENT_2 flag for pretty printing
+            # orjson only supports 2-space indentation via OPT_INDENT_2
+            # For compatibility, any indent value triggers pretty-printing
             result = orjson.dumps(obj, option=orjson.OPT_INDENT_2)
         else:
             result = orjson.dumps(obj)
