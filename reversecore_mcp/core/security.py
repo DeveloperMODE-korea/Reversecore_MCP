@@ -13,6 +13,7 @@ import base64
 import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -45,7 +46,27 @@ def refresh_workspace_config() -> WorkspaceConfig:
     """Recompute the default workspace configuration (mainly for tests)."""
     global WORKSPACE_CONFIG
     WORKSPACE_CONFIG = _build_workspace_config()
+    # Clear the path resolution cache when config changes
+    _resolve_path_cached.cache_clear()
     return WORKSPACE_CONFIG
+
+
+@lru_cache(maxsize=256)
+def _resolve_path_cached(path_str: str) -> Tuple[Path, bool, str]:
+    """
+    Cached path resolution to avoid repeated filesystem calls.
+    
+    Returns:
+        Tuple of (resolved_path, is_file, error_message)
+        If resolution fails, returns (original_path, False, error_message)
+    """
+    try:
+        file_path = Path(path_str)
+        abs_path = file_path.resolve(strict=True)
+        is_file = abs_path.is_file()
+        return (abs_path, is_file, "")
+    except (OSError, RuntimeError) as e:
+        return (Path(path_str), False, str(e))
 
 
 def validate_file_path(
@@ -65,6 +86,9 @@ def validate_file_path(
     The workspace directory is determined by an immutable WorkspaceConfig that
     is loaded once from environment variables (REVERSECORE_WORKSPACE and
     REVERSECORE_READ_DIRS).
+    
+    Performance: Uses LRU cache for path resolution to avoid repeated
+    filesystem calls for frequently accessed files.
 
     Args:
         path: The file path to validate
@@ -80,20 +104,17 @@ def validate_file_path(
     """
     active_config = config or WORKSPACE_CONFIG
 
-    # Convert to Path object for easier manipulation
-    file_path = Path(path)
-
-    # Resolve to absolute path (removes symlinks and relative components)
-    try:
-        abs_path = file_path.resolve(strict=True)
-    except (OSError, RuntimeError) as e:
+    # Use cached path resolution to avoid repeated filesystem calls
+    abs_path, is_file, error = _resolve_path_cached(path)
+    
+    if error:
         raise ValidationError(
-            f"Invalid file path: {path}. Error: {e}",
-            details={"path": path, "error": str(e)},
+            f"Invalid file path: {path}. Error: {error}",
+            details={"path": path, "error": error},
         )
 
     # Check that it's a file, not a directory
-    if not abs_path.is_file():
+    if not is_file:
         raise ValidationError(
             f"Path does not point to a file: {abs_path}",
             details={"path": str(abs_path)},
