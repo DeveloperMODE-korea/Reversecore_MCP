@@ -8,6 +8,7 @@ These tests verify:
 4. JSON utilities exception handling
 """
 
+import inspect
 import time
 import pytest
 from pathlib import Path
@@ -76,7 +77,6 @@ def test_resource_manager_cleanup_uses_chain():
     """Test that resource manager uses itertools.chain for efficient cleanup."""
     from reversecore_mcp.core.resource_manager import ResourceManager
     import tempfile
-    import inspect
     
     # Create a temporary workspace with test files
     with tempfile.TemporaryDirectory() as tmpdir:
