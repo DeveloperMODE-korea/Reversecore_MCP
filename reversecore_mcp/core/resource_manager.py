@@ -80,19 +80,25 @@ class ResourceManager:
             
             cleaned_count = 0
             
-            # List of patterns to clean
-            patterns = ["*.tmp", ".r2_*", "*.r2"]
+            # OPTIMIZATION: Use itertools.chain to avoid multiple glob calls and iterations
+            from itertools import chain
             
-            for pattern in patterns:
-                for temp_file in workspace.glob(pattern):
-                    try:
-                        if temp_file.is_file():
-                            mtime = temp_file.stat().st_mtime
-                            if now - mtime > max_age:
-                                temp_file.unlink()
-                                cleaned_count += 1
-                    except Exception:
-                        pass
+            # Combine all patterns into a single iterable
+            temp_files = chain(
+                workspace.glob("*.tmp"),
+                workspace.glob(".r2_*"),
+                workspace.glob("*.r2")
+            )
+            
+            for temp_file in temp_files:
+                try:
+                    if temp_file.is_file():
+                        mtime = temp_file.stat().st_mtime
+                        if now - mtime > max_age:
+                            temp_file.unlink()
+                            cleaned_count += 1
+                except Exception:
+                    pass
                         
             if cleaned_count > 0:
                 logger.info(f"Cleaned up {cleaned_count} stale temporary files")

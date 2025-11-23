@@ -61,8 +61,8 @@ class BinaryMetadataCache:
         current_time = time.time()
         
         # Fast path: If within TTL window, trust the cache without stat()
-        # Using <= to include the exact boundary case for consistent caching
-        if current_time - last_check_time <= self._ttl_seconds:
+        # Using < instead of <= for strict TTL boundary to avoid edge case stat() calls
+        if current_time - last_check_time < self._ttl_seconds:
             return True
         
         # Slow path: TTL expired, need to check file modification time

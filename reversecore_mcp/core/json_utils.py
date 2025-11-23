@@ -19,6 +19,8 @@ try:
     import orjson
     
     _ORJSON_AVAILABLE = True
+    # Expose orjson's JSONDecodeError for compatibility
+    JSONDecodeError = orjson.JSONDecodeError
     
     def loads(s: Union[str, bytes]) -> Any:
         """
@@ -62,6 +64,8 @@ try:
 except ImportError:
     # Fallback to standard library json
     _ORJSON_AVAILABLE = False
+    # Use stdlib JSONDecodeError for compatibility
+    JSONDecodeError = _stdlib_json.JSONDecodeError
     
     def loads(s: Union[str, bytes]) -> Any:
         """
@@ -102,4 +106,4 @@ def is_orjson_available() -> bool:
 
 
 # For compatibility, expose the same interface as json module
-__all__ = ['loads', 'dumps', 'is_orjson_available']
+__all__ = ['loads', 'dumps', 'is_orjson_available', 'JSONDecodeError']

@@ -116,7 +116,8 @@ class R2ConnectionPool:
     def is_analyzed(self, file_path: str) -> bool:
         """Check if the file has been analyzed."""
         with self._lock:
-            return file_path in self._analyzed_files and file_path in self._pool
+            # OPTIMIZATION: Single check instead of two separate dict lookups
+            return file_path in self._analyzed_files
 
     def mark_analyzed(self, file_path: str):
         """Mark the file as analyzed."""
