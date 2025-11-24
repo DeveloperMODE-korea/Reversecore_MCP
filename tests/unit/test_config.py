@@ -136,7 +136,7 @@ class TestConfigValidation:
 
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-        
+
         with pytest.raises(ValueError, match="Workspace directory does not exist"):
             reset_config()
 
@@ -148,7 +148,7 @@ class TestConfigValidation:
 
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-        
+
         with pytest.raises(ValueError, match="Workspace path is not a directory"):
             reset_config()
 
@@ -159,7 +159,7 @@ class TestConfigValidation:
 
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-        
+
         with pytest.raises(ValueError, match="Read directory does not exist"):
             reset_config()
 
@@ -171,7 +171,7 @@ class TestConfigValidation:
 
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-        
+
         with pytest.raises(ValueError, match="Read directory path is not a directory"):
             reset_config()
 
