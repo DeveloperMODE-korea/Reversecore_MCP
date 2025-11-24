@@ -226,7 +226,6 @@ async def solve_path_constraints(
     def run_angr_solve():
         try:
             import angr
-            import claripy
         except ImportError:
             return {"found": False, "error": "angr or claripy not installed"}
 

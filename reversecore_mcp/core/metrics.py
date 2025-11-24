@@ -2,7 +2,6 @@
 Performance metrics collection for monitoring.
 """
 
-import asyncio
 import inspect
 import threading
 import time

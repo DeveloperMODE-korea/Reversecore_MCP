@@ -1,6 +1,5 @@
 """YARA scanning tools for binary analysis with rule matching."""
 
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 from reversecore_mcp.core.decorators import log_execution

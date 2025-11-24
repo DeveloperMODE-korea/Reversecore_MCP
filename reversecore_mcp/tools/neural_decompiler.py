@@ -6,8 +6,6 @@ using advanced heuristics and pattern matching to restore developer intent.
 """
 
 import re
-from typing import Dict, Any, Optional
-from pathlib import Path
 
 from fastmcp import FastMCP, Context
 from reversecore_mcp.core.logging_config import get_logger

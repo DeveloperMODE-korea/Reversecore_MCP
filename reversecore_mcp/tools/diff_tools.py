@@ -1,6 +1,5 @@
 """Binary diffing and library matching tools for comparing binaries and identifying library code."""
 
-import os
 import re
 from functools import lru_cache
 

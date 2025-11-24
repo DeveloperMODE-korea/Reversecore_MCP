@@ -10,7 +10,7 @@ This tool generates defensive measures against detected threats:
 import re
 import shutil
 import lief
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
 

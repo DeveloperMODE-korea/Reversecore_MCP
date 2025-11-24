@@ -766,7 +766,6 @@ async def generate_function_graph(
             result.metadata["cache_hit"] = True
             # Update description to indicate cached result
             # Note: ToolSuccess has 'data' field, not 'content'
-            pass
                 
     return result
 

@@ -5,11 +5,10 @@ This module implements the Circuit Breaker pattern to prevent cascading failures
 when external tools (like Radare2 or Ghidra) become unstable.
 """
 
-import asyncio
 import time
 import functools
 from enum import Enum
-from typing import Dict, Any, Callable, Optional
+from typing import Dict
 
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.exceptions import ToolExecutionError

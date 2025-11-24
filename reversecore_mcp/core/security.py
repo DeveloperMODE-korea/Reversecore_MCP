@@ -9,9 +9,6 @@ Note: For radare2 command validation, use the improved regex-based validation
 in command_spec.py which provides stronger security guarantees.
 """
 
-import base64
-import tempfile
-from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path

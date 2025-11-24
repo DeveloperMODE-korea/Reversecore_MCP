@@ -5,9 +5,7 @@ This module provides caching for binary analysis results.
 It prevents redundant analysis of the same files.
 """
 
-import hashlib
 import time
-import asyncio
 from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 

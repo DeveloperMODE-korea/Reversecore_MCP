@@ -8,7 +8,6 @@ It ensures the JVM is started only once and projects are cached for performance.
 import asyncio
 import threading
 from typing import Dict, Any, Optional
-from pathlib import Path
 
 from reversecore_mcp.core.logging_config import get_logger
 

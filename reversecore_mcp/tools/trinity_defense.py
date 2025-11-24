@@ -9,10 +9,8 @@ This orchestrator coordinates three signature technologies:
 Architecture: DISCOVER → UNDERSTAND → NEUTRALIZE
 """
 
-import re
 import asyncio
-from typing import Dict, Any, List, Optional, Tuple
-from pathlib import Path
+from typing import Dict, Any, List, Tuple
 
 from fastmcp import FastMCP, Context
 from reversecore_mcp.core.logging_config import get_logger

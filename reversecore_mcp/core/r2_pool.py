@@ -9,7 +9,7 @@ import asyncio
 import threading
 import time
 from collections import OrderedDict
-from typing import Dict, Optional, Any
+from typing import Dict, Any
 
 try:
     import r2pipe

@@ -8,7 +8,7 @@ commands like "pdf @ main; w hello" could bypass simple prefix matching.
 
 import re
 from dataclasses import dataclass
-from typing import Literal, List, Optional, NewType
+from typing import Literal, List, NewType
 from reversecore_mcp.core.exceptions import ValidationError
 
 

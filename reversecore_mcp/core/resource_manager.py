@@ -7,14 +7,10 @@ to prevent resource exhaustion over time.
 
 import asyncio
 import time
-import shutil
-from pathlib import Path
 from typing import Optional
 
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core import config
-from reversecore_mcp.core.binary_cache import binary_cache
-from reversecore_mcp.core.r2_pool import r2_pool
 
 logger = get_logger(__name__)
 
