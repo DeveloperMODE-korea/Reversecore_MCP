@@ -446,7 +446,7 @@ docker run -it \
 
 **🚀 Performance Tip: Using RAM Disk (tmpfs)**
 
-For significantly faster analysis (especially for I/O-heavy tools like radare2), mount the workspace as a RAM disk:
+For 5-10x faster analysis (especially for I/O-heavy tools like radare2), mount the workspace as a RAM disk:
 
 ```bash
 docker run -it \
@@ -457,7 +457,7 @@ docker run -it \
   reversecore-mcp
 ```
 
-**Note:** When using tmpfs, the workspace starts empty. You must copy files from `/app/samples` to `/app/workspace` using the `copy_to_workspace` tool before analysis. This approach can provide 5-10x performance improvement for repeated analysis operations.
+**Note:** When using tmpfs, the workspace starts empty. You must copy files from `/app/samples` to `/app/workspace` using the `copy_to_workspace` tool before analysis. This approach provides 5-10x performance improvement for repeated analysis operations.
 
 **HTTP Mode (Alternative):**
 
@@ -1555,7 +1555,7 @@ pytest tests/ --cov=reversecore_mcp --cov-report=html --cov-report=term --cov-fa
 
 # Current test stats (as of latest commit)
 # - Total tests: 533 passed, 33 skipped
-# - Coverage: 73%+ (target: 80%+)
+# - Coverage: 73% (working toward 80% target)
 # - Key test suites:
 #   - Unit tests: Comprehensive coverage of core functionality
 #   - Integration tests: End-to-end workflow validation
