@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 from fastmcp import FastMCP
-from reversecore_mcp.resources import register_resources, RESOURCES_PATH
+from reversecore_mcp.resources import register_resources
 
 
 class TestStaticResources:

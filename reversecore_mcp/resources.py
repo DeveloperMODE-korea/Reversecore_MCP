@@ -9,7 +9,8 @@ import asyncio
 # These imports are used by resource functions below
 from reversecore_mcp.tools import cli_tools, lib_tools
 from reversecore_mcp.core import json_utils as json  # Use optimized JSON (3-5x faster)
-from reversecore_mcp.core.decorators import log_execution, track_metrics
+from reversecore_mcp.core.decorators import log_execution
+from reversecore_mcp.core.metrics import track_metrics
 from reversecore_mcp.core.config import get_config
 
 # Type variable for generic function wrapper
