@@ -13,6 +13,8 @@ from fastmcp import FastMCP, Context
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.result import ToolResult, success, failure
 from reversecore_mcp.core.decorators import log_execution
+from reversecore_mcp.core.error_handling import handle_tool_errors
+from reversecore_mcp.core.metrics import track_metrics
 from reversecore_mcp.core.security import validate_file_path
 from reversecore_mcp.core.ghidra_helper import (
     ensure_ghidra_available,
@@ -28,6 +30,8 @@ def register_neural_decompiler(mcp: FastMCP) -> None:
 
 
 @log_execution(tool_name="neural_decompile")
+@track_metrics("neural_decompile")
+@handle_tool_errors
 async def neural_decompile(
     file_path: str,
     function_address: str,

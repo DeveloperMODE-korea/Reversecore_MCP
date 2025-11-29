@@ -18,6 +18,8 @@ from fastmcp import FastMCP, Context
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.result import ToolResult, success, failure
 from reversecore_mcp.core.decorators import log_execution
+from reversecore_mcp.core.error_handling import handle_tool_errors
+from reversecore_mcp.core.metrics import track_metrics
 from reversecore_mcp.core.security import validate_file_path
 
 logger = get_logger(__name__)
@@ -122,6 +124,8 @@ def register_adaptive_vaccine(mcp: FastMCP) -> None:
 
 
 @log_execution(tool_name="adaptive_vaccine")
+@track_metrics("adaptive_vaccine")
+@handle_tool_errors
 async def adaptive_vaccine(
     threat_report: Dict[str, Any],
     action: str = "yara",

@@ -18,6 +18,8 @@ from reversecore_mcp.core.exceptions import ValidationError
 from reversecore_mcp.core.execution import execute_subprocess_async
 from reversecore_mcp.core.result import ToolResult, success, failure
 from reversecore_mcp.core.decorators import log_execution
+from reversecore_mcp.core.error_handling import handle_tool_errors
+from reversecore_mcp.core.metrics import track_metrics
 from reversecore_mcp.core.security import validate_file_path
 from reversecore_mcp.core import json_utils as json  # Use optimized JSON (3-5x faster)
 
@@ -138,6 +140,8 @@ async def _run_r2_cmd(file_path: str, cmd: str, timeout: int = 30, use_cache: bo
 
 
 @log_execution(tool_name="ghost_trace")
+@track_metrics("ghost_trace")
+@handle_tool_errors
 async def ghost_trace(
     file_path: str,
     focus_function: Optional[str] = None,

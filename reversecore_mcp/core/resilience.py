@@ -5,15 +5,19 @@ This module implements the Circuit Breaker pattern to prevent cascading failures
 when external tools (like Radare2 or Ghidra) become unstable.
 """
 
+import asyncio
+import inspect
 import time
 import functools
 from enum import Enum
-from typing import Dict
+from typing import Callable, Dict, TypeVar
 
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.exceptions import ToolExecutionError
 
 logger = get_logger(__name__)
+
+F = TypeVar("F", bound=Callable)
 
 
 class CircuitState(Enum):

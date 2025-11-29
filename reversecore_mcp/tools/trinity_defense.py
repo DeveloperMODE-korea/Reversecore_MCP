@@ -16,6 +16,8 @@ from fastmcp import FastMCP, Context
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.result import ToolResult, success, failure
 from reversecore_mcp.core.decorators import log_execution
+from reversecore_mcp.core.error_handling import handle_tool_errors
+from reversecore_mcp.core.metrics import track_metrics
 from reversecore_mcp.core.security import validate_file_path
 
 # Import the three signature tools
@@ -32,6 +34,8 @@ def register_trinity_defense(mcp: FastMCP) -> None:
 
 
 @log_execution(tool_name="trinity_defense")
+@track_metrics("trinity_defense")
+@handle_tool_errors
 async def trinity_defense(
     file_path: str,
     mode: str = "full",
