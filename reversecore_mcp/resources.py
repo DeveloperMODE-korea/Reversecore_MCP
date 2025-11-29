@@ -2,7 +2,8 @@ from fastmcp import FastMCP
 from pathlib import Path
 from collections import deque
 from functools import wraps
-from typing import Callable, TypeVar, Any
+from typing import Callable, TypeVar, Any, Union
+import asyncio
 
 # Import tools at module level for better performance
 # These imports are used by resource functions below
@@ -14,12 +15,21 @@ from reversecore_mcp.core.config import get_config
 # Type variable for generic function wrapper
 F = TypeVar("F", bound=Callable[..., Any])
 
+# Type alias for decorator return
+DecoratorType = Callable[[F], F]
 
-def resource_decorator(resource_name: str) -> Callable[[F], F]:
+
+def resource_decorator(resource_name: str) -> DecoratorType:
     """Combined decorator for resource functions with logging and metrics.
     
     Applies @log_execution and @track_metrics to resource functions
     for consistent monitoring and observability.
+    
+    Args:
+        resource_name: Name identifier for logging and metrics tracking
+        
+    Returns:
+        A decorator that wraps the function with logging and metrics
     """
     def decorator(func: F) -> F:
         # Apply decorators in reverse order (innermost first)
@@ -27,18 +37,17 @@ def resource_decorator(resource_name: str) -> Callable[[F], F]:
         wrapped = log_execution(tool_name=resource_name)(wrapped)
         
         @wraps(func)
-        async def async_wrapper(*args, **kwargs):
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             return await wrapped(*args, **kwargs)
         
         @wraps(func)
-        def sync_wrapper(*args, **kwargs):
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             return wrapped(*args, **kwargs)
         
         # Return appropriate wrapper based on function type
-        import asyncio
         if asyncio.iscoroutinefunction(func):
-            return async_wrapper  # type: ignore
-        return sync_wrapper  # type: ignore
+            return async_wrapper  # type: ignore[return-value]
+        return sync_wrapper  # type: ignore[return-value]
     
     return decorator
 

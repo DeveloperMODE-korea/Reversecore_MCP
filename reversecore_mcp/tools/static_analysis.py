@@ -1,6 +1,8 @@
 """Static analysis tools for extracting strings, scanning for versions, and detecting embedded content."""
 
+import os
 import re
+import tempfile
 
 from reversecore_mcp.core.config import get_config
 from reversecore_mcp.core.decorators import log_execution
@@ -13,6 +15,12 @@ from reversecore_mcp.core.validators import validate_tool_parameters
 
 # Load default timeout from configuration
 DEFAULT_TIMEOUT = get_config().default_tool_timeout
+
+# Output size limits
+MIN_OUTPUT_SIZE = 1024 * 1024  # 1MB - minimum output size for meaningful analysis
+LLM_SAFE_LIMIT = 50 * 1024  # 50KB - roughly 12-15k tokens, safe for most LLMs
+MAX_EXTRACTED_FILES = 200  # Maximum files to report in extraction results
+MAX_SIGNATURES = 50  # Maximum signatures to report
 
 # Pre-compile regex patterns for performance optimization
 _VERSION_PATTERNS = {
@@ -44,8 +52,8 @@ async def run_strings(
 
     # Enforce a reasonable minimum output size to prevent accidental truncation
     # 1KB is too small for meaningful string analysis
-    if max_output_size < 1024 * 1024:  # Enforce 1MB minimum
-        max_output_size = 1024 * 1024
+    if max_output_size < MIN_OUTPUT_SIZE:
+        max_output_size = MIN_OUTPUT_SIZE
 
     validated_path = validate_file_path(file_path)
     cmd = ["strings", "-n", str(min_length), str(validated_path)]
@@ -56,9 +64,6 @@ async def run_strings(
     )
 
     # Truncate output for LLM consumption if too large
-    # 50KB is roughly 12-15k tokens, which is a safe limit for most models
-    LLM_SAFE_LIMIT = 50 * 1024
-
     if len(output) > LLM_SAFE_LIMIT:
         truncated_output = output[:LLM_SAFE_LIMIT]
         warning_msg = (
@@ -140,8 +145,6 @@ async def run_binwalk_extract(
         >>> print(result.data["extracted_files"])
         [{"path": "squashfs-root/etc/passwd", "type": "ASCII text", "size": 1234}, ...]
     """
-    import os
-    import tempfile
     from pathlib import Path
 
     validated_path = validate_file_path(file_path)
@@ -214,10 +217,10 @@ async def run_binwalk_extract(
                 except (OSError, ValueError):
                     continue
     
-    # Sort by size (largest first) and limit to first 200 entries
+    # Sort by size (largest first) and limit entries
     extracted_files.sort(key=lambda x: x["size"], reverse=True)
-    truncated = len(extracted_files) > 200
-    extracted_files = extracted_files[:200]
+    truncated = len(extracted_files) > MAX_EXTRACTED_FILES
+    extracted_files = extracted_files[:MAX_EXTRACTED_FILES]
     
     # Parse binwalk output for additional info
     signatures_found = []
@@ -245,7 +248,7 @@ async def run_binwalk_extract(
             "total_size": total_size,
             "total_size_human": _format_size(total_size),
             "extraction_depth": max_depth_found,
-            "signatures_found": signatures_found[:50],  # Limit signatures
+            "signatures_found": signatures_found[:MAX_SIGNATURES],
             "binwalk_output": output[:5000] if len(output) > 5000 else output,
             "truncated": truncated,
         },

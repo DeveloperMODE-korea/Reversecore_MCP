@@ -270,8 +270,6 @@ def main():
             Returns:
                 JSON response with file path and status
             """
-            import shutil
-
             try:
                 # Ensure workspace exists
                 workspace = settings.workspace
