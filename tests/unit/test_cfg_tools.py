@@ -1,33 +1,31 @@
 """Unit tests for CFG visualization tools."""
 
 import json
-import subprocess
 
 import pytest
 
-from reversecore_mcp.core.exceptions import ValidationError
-from reversecore_mcp.tools import cli_tools
-from reversecore_mcp.tools import r2_analysis
+from reversecore_mcp.tools import cli_tools, r2_analysis
 
 
 def test_radare2_json_to_mermaid_basic():
     """Test basic JSON to Mermaid conversion."""
-    test_json = json.dumps([{
-        "blocks": [
+    test_json = json.dumps(
+        [
             {
-                "offset": 4194304,
-                "ops": [
-                    {"opcode": "push rbp"},
-                    {"opcode": "mov rbp, rsp"}
-                ],
-                "jump": 4194320,
-                "fail": 4194312
+                "blocks": [
+                    {
+                        "offset": 4194304,
+                        "ops": [{"opcode": "push rbp"}, {"opcode": "mov rbp, rsp"}],
+                        "jump": 4194320,
+                        "fail": 4194312,
+                    }
+                ]
             }
         ]
-    }])
-    
+    )
+
     result = r2_analysis._radare2_json_to_mermaid(test_json)
-    
+
     assert "graph TD" in result
     assert "N_0x400000" in result
     assert "push rbp" in result
@@ -38,16 +36,16 @@ def test_radare2_json_to_mermaid_basic():
 def test_radare2_json_to_mermaid_empty():
     """Test Mermaid conversion with empty data."""
     test_json = json.dumps([])
-    
+
     result = r2_analysis._radare2_json_to_mermaid(test_json)
-    
+
     assert "Error[No graph data found]" in result
 
 
 def test_radare2_json_to_mermaid_invalid_json():
     """Test Mermaid conversion with invalid JSON."""
     result = r2_analysis._radare2_json_to_mermaid("invalid json{]")
-    
+
     assert "Error[Parse Error:" in result
 
 
@@ -55,9 +53,9 @@ def test_radare2_json_to_mermaid_long_block():
     """Test that long blocks are truncated."""
     ops = [{"opcode": f"instruction_{i}"} for i in range(10)]
     test_json = json.dumps([{"blocks": [{"offset": 0x1000, "ops": ops}]}])
-    
+
     result = r2_analysis._radare2_json_to_mermaid(test_json)
-    
+
     # Should only show first 5 instructions + "..."
     assert "..." in result
     assert "instruction_0" in result
@@ -72,11 +70,9 @@ async def test_generate_function_graph_validation_error(
     """Test generate_function_graph with invalid parameters."""
     # Test invalid format
     result = await cli_tools.generate_function_graph(
-        file_path=str(workspace_dir / "test.bin"),
-        function_address="main",
-        format="invalid_format"
+        file_path=str(workspace_dir / "test.bin"), function_address="main", format="invalid_format"
     )
-    
+
     assert result.status == "error"
     assert "VALIDATION_ERROR" in result.error_code or "Invalid format" in result.message
 
@@ -86,33 +82,25 @@ async def test_generate_function_graph_json_format(
     monkeypatch, workspace_dir, patched_workspace_config
 ):
     """Test generate_function_graph with JSON output format."""
-    from pathlib import Path
-    
+
     # Create test binary
     test_file = workspace_dir / "test.bin"
     test_file.write_bytes(b"\x00" * 100)
-    
-    async def mock_exec(cmd, **kw):
+
+    async def mock_exec(*args, **kw):
         # Return mock radare2 JSON output
-        mock_output = json.dumps([{
-            "blocks": [
-                {
-                    "offset": 0x1000,
-                    "ops": [{"opcode": "nop"}],
-                    "jump": 0x1004
-                }
-            ]
-        }])
+        mock_output = json.dumps(
+            [{"blocks": [{"offset": 0x1000, "ops": [{"opcode": "nop"}], "jump": 0x1004}]}]
+        )
         return (mock_output, len(mock_output))
-    
-    monkeypatch.setattr(r2_analysis, "execute_subprocess_async", mock_exec)
-    
+
+    # Patch in the r2_analysis module where it's imported
+    monkeypatch.setattr(r2_analysis, "_execute_r2_command", mock_exec)
+
     result = await cli_tools.generate_function_graph(
-        file_path=str(test_file),
-        function_address="main",
-        format="json"
+        file_path=str(test_file), function_address="main", format="json"
     )
-    
+
     assert result.status == "success"
     assert "blocks" in result.data
 
@@ -124,27 +112,29 @@ async def test_generate_function_graph_mermaid_format(
     """Test generate_function_graph with Mermaid output format."""
     test_file = workspace_dir / "test.bin"
     test_file.write_bytes(b"\x00" * 100)
-    
-    async def mock_exec(cmd, **kw):
-        mock_output = json.dumps([{
-            "blocks": [
+
+    async def mock_exec(*args, **kw):
+        mock_output = json.dumps(
+            [
                 {
-                    "offset": 0x1000,
-                    "ops": [{"opcode": "push rbp"}, {"opcode": "mov rbp, rsp"}],
-                    "jump": 0x1010
+                    "blocks": [
+                        {
+                            "offset": 0x1000,
+                            "ops": [{"opcode": "push rbp"}, {"opcode": "mov rbp, rsp"}],
+                            "jump": 0x1010,
+                        }
+                    ]
                 }
             ]
-        }])
+        )
         return (mock_output, len(mock_output))
-    
-    monkeypatch.setattr(r2_analysis, "execute_subprocess_async", mock_exec)
-    
+
+    monkeypatch.setattr(r2_analysis, "_execute_r2_command", mock_exec)
+
     result = await cli_tools.generate_function_graph(
-        file_path=str(test_file),
-        function_address="0x1000",
-        format="mermaid"
+        file_path=str(test_file), function_address="0x1000", format="mermaid"
     )
-    
+
     assert result.status == "success"
     assert "graph TD" in result.data
     assert "push rbp" in result.data
@@ -158,14 +148,12 @@ async def test_generate_function_graph_invalid_address(
     """Test generate_function_graph with invalid function address."""
     test_file = workspace_dir / "test.bin"
     test_file.write_bytes(b"\x00" * 100)
-    
+
     # Test with shell injection attempt
     result = await cli_tools.generate_function_graph(
-        file_path=str(test_file),
-        function_address="main; rm -rf /",
-        format="json"
+        file_path=str(test_file), function_address="main; rm -rf /", format="json"
     )
-    
+
     assert result.status == "error"
     assert "VALIDATION_ERROR" in result.error_code
 
@@ -177,19 +165,17 @@ async def test_generate_function_graph_dot_format(
     """Test generate_function_graph with DOT output format."""
     test_file = workspace_dir / "test.bin"
     test_file.write_bytes(b"\x00" * 100)
-    
-    async def mock_exec(cmd, **kw):
+
+    async def mock_exec(*args, **kw):
         # Return mock DOT output
         mock_dot = "digraph G {\\n  node_1000 -> node_1010;\\n}"
         return (mock_dot, len(mock_dot))
-    
-    monkeypatch.setattr(r2_analysis, "execute_subprocess_async", mock_exec)
-    
+
+    monkeypatch.setattr(r2_analysis, "_execute_r2_command", mock_exec)
+
     result = await cli_tools.generate_function_graph(
-        file_path=str(test_file),
-        function_address="main",
-        format="dot"
+        file_path=str(test_file), function_address="main", format="dot"
     )
-    
+
     assert result.status == "success"
     assert "digraph" in result.data or result.metadata.get("format") == "dot"

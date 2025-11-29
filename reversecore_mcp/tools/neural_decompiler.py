@@ -9,17 +9,18 @@ Supports fallback to radare2 when Ghidra is not available.
 
 import re
 
-from fastmcp import FastMCP, Context
-from reversecore_mcp.core.logging_config import get_logger
-from reversecore_mcp.core.result import ToolResult, success, failure
+from fastmcp import Context, FastMCP
+
 from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_handling import handle_tool_errors
-from reversecore_mcp.core.metrics import track_metrics
-from reversecore_mcp.core.security import validate_file_path
-from reversecore_mcp.core.ghidra_helper import (
-    ensure_ghidra_available,
+from reversecore_mcp.core.ghidra import (
     decompile_function_with_ghidra,
+    ensure_ghidra_available,
 )
+from reversecore_mcp.core.logging_config import get_logger
+from reversecore_mcp.core.metrics import track_metrics
+from reversecore_mcp.core.result import ToolResult, failure, success
+from reversecore_mcp.core.security import validate_file_path
 
 logger = get_logger(__name__)
 
@@ -78,9 +79,7 @@ async def neural_decompile(
                 )
                 decompiler_used = "ghidra"
             except Exception as e:
-                logger.warning(
-                    f"Ghidra decompilation failed: {e}. Falling back to radare2"
-                )
+                logger.warning(f"Ghidra decompilation failed: {e}. Falling back to radare2")
                 fallback_note = f" (Ghidra failed: {str(e)[:50]}..., fell back to radare2)"
                 # Continue to radare2 fallback
         else:
@@ -93,7 +92,7 @@ async def neural_decompile(
             if ctx:
                 await ctx.info("🧠 Using radare2 decompiler (pdc)...")
 
-            from reversecore_mcp.tools.r2_analysis import _execute_r2_command
+            from reversecore_mcp.core.r2_helpers import execute_r2_command as _execute_r2_command
 
             r2_cmds = [f"pdc @ {function_address}"]
             output, bytes_read = await _execute_r2_command(
@@ -139,9 +138,7 @@ async def neural_decompile(
     return success(
         {
             "original_code": raw_code,
-            "original_code_snippet": (
-                raw_code[:200] + "..." if len(raw_code) > 200 else raw_code
-            ),
+            "original_code_snippet": (raw_code[:200] + "..." if len(raw_code) > 200 else raw_code),
             "neural_code": refined_code,
             "metadata": metadata,
             "decompiler": decompiler_used,
@@ -149,8 +146,7 @@ async def neural_decompile(
             "refinement_stats": {
                 "renamed_vars": refined_code.count("/* Renamed from"),
                 "inferred_structs": refined_code.count("->"),
-                "comments_added": refined_code.count("// Magic:")
-                + refined_code.count("/* Magic"),
+                "comments_added": refined_code.count("// Magic:") + refined_code.count("/* Magic"),
             },
         }
     )

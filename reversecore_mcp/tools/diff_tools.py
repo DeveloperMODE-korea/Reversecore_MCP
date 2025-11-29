@@ -4,6 +4,8 @@ import os
 import re
 from functools import lru_cache
 
+from fastmcp import Context
+
 # Use high-performance JSON implementation (3-5x faster)
 from reversecore_mcp.core import json_utils as json
 from reversecore_mcp.core.config import get_config
@@ -11,17 +13,20 @@ from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_handling import handle_tool_errors
 from reversecore_mcp.core.execution import execute_subprocess_async
 from reversecore_mcp.core.metrics import track_metrics
-from reversecore_mcp.core.result import ToolResult, success, failure
+from reversecore_mcp.core.r2_helpers import (
+    build_r2_cmd as _build_r2_cmd,
+)
+
+# Import shared R2 helper functions from core (avoids circular dependencies)
+from reversecore_mcp.core.r2_helpers import (
+    execute_r2_command as _execute_r2_command,
+)
+from reversecore_mcp.core.r2_helpers import (
+    parse_json_output as _parse_json_output,
+)
+from reversecore_mcp.core.result import ToolResult, failure, success
 from reversecore_mcp.core.security import validate_file_path
 from reversecore_mcp.core.validators import validate_tool_parameters
-from fastmcp import Context
-
-# Import helper functions from r2_analysis
-from reversecore_mcp.tools.r2_analysis import (
-    _execute_r2_command,
-    _build_r2_cmd,
-    _parse_json_output,
-)
 
 # Load default timeout from configuration
 DEFAULT_TIMEOUT = get_config().default_tool_timeout
@@ -204,11 +209,7 @@ async def diff_binaries(
                     change_type = "removed_block"
                 elif "modified" in line.lower() or "changed" in line.lower():
                     change_type = "code_change"
-                elif (
-                    "jmp" in line.lower()
-                    or "call" in line.lower()
-                    or "jnz" in line.lower()
-                ):
+                elif "jmp" in line.lower() or "call" in line.lower() or "jnz" in line.lower():
                     change_type = "control_flow_change"
 
                 changes.append(
@@ -234,9 +235,7 @@ async def diff_binaries(
             "function_specific": bool(function_name),
             "changes": changes,
             "total_changes": len(changes),
-            "raw_output": (
-                output if len(output) < 5000 else output[:5000] + "... (truncated)"
-            ),
+            "raw_output": (output if len(output) < 5000 else output[:5000] + "... (truncated)"),
         }
 
         return success(
@@ -356,22 +355,16 @@ async def analyze_variant_changes(
             pass
 
     # Sort by number of changes
-    sorted_funcs = sorted(changed_funcs.items(), key=lambda x: x[1], reverse=True)[
-        :top_n
-    ]
+    sorted_funcs = sorted(changed_funcs.items(), key=lambda x: x[1], reverse=True)[:top_n]
 
     detailed_analysis = []
 
     # 3. Generate CFG for top changed functions
     for func_name, count in sorted_funcs:
         # Get CFG for variant
-        cfg_result = await generate_function_graph(
-            file_path_b, func_name, format="mermaid"
-        )
+        cfg_result = await generate_function_graph(file_path_b, func_name, format="mermaid")
         cfg_mermaid = (
-            cfg_result.content[0].text
-            if not cfg_result.is_error
-            else "Error generating CFG"
+            cfg_result.content[0].text if not cfg_result.is_error else "Error generating CFG"
         )
 
         detailed_analysis.append(
@@ -493,7 +486,9 @@ async def match_libraries(
             if file_size_mb < 10:  # Full analysis for files under 10MB
                 analysis_level = "aaa"
             if ctx:
-                await ctx.info(f"File size: {file_size_mb:.1f}MB, using '{analysis_level}' analysis...")
+                await ctx.info(
+                    f"File size: {file_size_mb:.1f}MB, using '{analysis_level}' analysis..."
+                )
         except OSError:
             pass
 
@@ -508,9 +503,7 @@ async def match_libraries(
 
         if ctx:
             await ctx.report_progress(10, 100)
-            await ctx.info(
-                "Analyzing binary and matching signatures (this may take a while)..."
-            )
+            await ctx.info("Analyzing binary and matching signatures (this may take a while)...")
 
         # Step 3: Execute radare2 command
         output, bytes_read = await _execute_r2_command(
@@ -596,9 +589,7 @@ async def match_libraries(
         user_count = len(user_functions)
 
         # Calculate noise reduction percentage
-        noise_reduction = (
-            (library_count / total_functions * 100) if total_functions > 0 else 0.0
-        )
+        noise_reduction = (library_count / total_functions * 100) if total_functions > 0 else 0.0
 
         # Build result
         result_data = {
@@ -606,9 +597,7 @@ async def match_libraries(
             "library_functions": library_count,
             "user_functions": user_count,
             "noise_reduction_percentage": round(noise_reduction, 2),
-            "library_matches": library_functions[
-                :50
-            ],  # Limit to first 50 for readability
+            "library_matches": library_functions[:50],  # Limit to first 50 for readability
             "user_function_list": [
                 f["address"] for f in user_functions[:100]
             ],  # First 100 user functions

@@ -10,16 +10,20 @@ from reversecore_mcp.core.error_handling import handle_tool_errors
 from reversecore_mcp.core.execution import execute_subprocess_async
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.metrics import track_metrics
-from reversecore_mcp.core.result import ToolResult, success, failure
+from reversecore_mcp.core.r2_helpers import (
+    build_r2_cmd as _build_r2_cmd,
+)
+
+# Import shared R2 helper functions from core (avoids circular dependencies)
+from reversecore_mcp.core.r2_helpers import (
+    execute_r2_command as _execute_r2_command,
+)
+from reversecore_mcp.core.r2_helpers import (
+    parse_json_output as _parse_json_output,
+)
+from reversecore_mcp.core.result import ToolResult, failure, success
 from reversecore_mcp.core.security import validate_file_path
 from reversecore_mcp.core.validators import validate_tool_parameters
-
-# Import helper functions from r2_analysis
-from reversecore_mcp.tools.r2_analysis import (
-    _execute_r2_command,
-    _build_r2_cmd,
-    _parse_json_output,
-)
 
 # Load default timeout from configuration
 DEFAULT_TIMEOUT = get_config().default_tool_timeout
@@ -41,8 +45,8 @@ def _validate_address_or_fail(address: str, param_name: str = "address"):
     Returns:
         None if validation passes, or ToolResult failure if invalid
     """
-    from reversecore_mcp.core.validators import validate_address_format
     from reversecore_mcp.core.exceptions import ValidationError
+    from reversecore_mcp.core.validators import validate_address_format
 
     try:
         validate_address_format(address, param_name)
@@ -171,9 +175,7 @@ async def generate_signature(
         )
 
     # Check for all 0xFF or 0x00 (likely unmapped memory)
-    if re.match(r"^(ff)+$", hex_bytes, re.IGNORECASE) or re.match(
-        r"^(00)+$", hex_bytes
-    ):
+    if re.match(r"^(ff)+$", hex_bytes, re.IGNORECASE) or re.match(r"^(00)+$", hex_bytes):
         # If we used -n, try again without it to force mapping
         if analysis_level == "-n":
             from reversecore_mcp.tools.r2_analysis import _calculate_dynamic_timeout
@@ -188,9 +190,7 @@ async def generate_signature(
             hex_bytes = output.strip()
 
             # Re-check
-            if re.match(r"^(ff)+$", hex_bytes, re.IGNORECASE) or re.match(
-                r"^(00)+$", hex_bytes
-            ):
+            if re.match(r"^(ff)+$", hex_bytes, re.IGNORECASE) or re.match(r"^(00)+$", hex_bytes):
                 return failure(
                     "SIGNATURE_ERROR",
                     f"Extracted bytes are all 0xFF or 0x00 at {address}. The memory might be unmapped or empty.",
@@ -220,10 +220,10 @@ async def generate_signature(
         length = {length}
         author = "Reversecore_MCP"
         date = "auto-generated"
-        
+
     strings:
         $code = {{ {formatted_bytes} }}
-        
+
     condition:
         $code
 }}"""
@@ -318,17 +318,14 @@ async def generate_yara_rule(
 
     # Check for invalid patterns (all 00 or all FF)
     if len(hex_bytes) > 16 and (
-        re.match(r"^(00)+$", hex_bytes)
-        or re.match(r"^(ff)+$", hex_bytes, re.IGNORECASE)
+        re.match(r"^(00)+$", hex_bytes) or re.match(r"^(ff)+$", hex_bytes, re.IGNORECASE)
     ):
         # Smart Offset Search: Try to find a better address
         # 1. Try 'main' if we weren't already there
         # 2. Try entry point 'entry0'
         # 3. Find largest function
 
-        logger.info(
-            f"Invalid bytes at {function_address}, attempting smart offset search..."
-        )
+        logger.info(f"Invalid bytes at {function_address}, attempting smart offset search...")
 
         # Try to find a better function
         cmd = "aflj"
@@ -372,10 +369,10 @@ async def generate_yara_rule(
         length = {byte_length}
         author = "Reversecore_MCP"
         date = "auto-generated"
-        
+
     strings:
         $code = {{ {formatted_bytes} }}
-        
+
     condition:
         $code
 }}"""

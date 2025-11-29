@@ -2,29 +2,33 @@
 
 import os
 import re
+
 from async_lru import alru_cache
 from fastmcp import Context
 
+# Use high-performance JSON implementation (3-5x faster)
+from reversecore_mcp.core import json_utils as json
 from reversecore_mcp.core.config import get_config
 from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_handling import handle_tool_errors
 from reversecore_mcp.core.exceptions import ValidationError
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.metrics import track_metrics
+
+# Import shared R2 helper functions from core (avoids circular dependencies)
+from reversecore_mcp.core.r2_helpers import (
+    execute_r2_command as _execute_r2_command,
+)
+from reversecore_mcp.core.r2_helpers import (
+    parse_json_output as _parse_json_output,
+)
+from reversecore_mcp.core.r2_helpers import (
+    strip_address_prefixes as _strip_address_prefixes,
+)
 from reversecore_mcp.core.resilience import circuit_breaker
-from reversecore_mcp.core.result import ToolResult, success, failure
+from reversecore_mcp.core.result import ToolResult, failure, success
 from reversecore_mcp.core.security import validate_file_path
 from reversecore_mcp.core.validators import validate_tool_parameters
-
-# Import helper functions from r2_analysis
-from reversecore_mcp.tools.r2_analysis import (
-    _execute_r2_command,
-    _strip_address_prefixes,
-    _parse_json_output,
-)
-
-# Use high-performance JSON implementation (3-5x faster)
-from reversecore_mcp.core import json_utils as json
 
 # Load default timeout from configuration
 DEFAULT_TIMEOUT = get_config().default_tool_timeout
@@ -293,9 +297,9 @@ async def _smart_decompile_impl(
     # 3. Try Ghidra first if requested and available
     if use_ghidra:
         try:
-            from reversecore_mcp.core.ghidra_helper import (
-                ensure_ghidra_available,
+            from reversecore_mcp.core.ghidra import (
                 decompile_function_with_ghidra,
+                ensure_ghidra_available,
             )
 
             if ensure_ghidra_available():
@@ -317,8 +321,7 @@ async def _smart_decompile_impl(
 
                 except Exception as ghidra_error:
                     logger.warning(
-                        f"Ghidra decompilation failed: {ghidra_error}. "
-                        "Falling back to radare2"
+                        f"Ghidra decompilation failed: {ghidra_error}. Falling back to radare2"
                     )
                     # Fall through to radare2
             else:
@@ -396,9 +399,7 @@ async def smart_decompile(
     """
     import time
 
-    result = await _smart_decompile_impl(
-        file_path, function_address, timeout, use_ghidra
-    )
+    result = await _smart_decompile_impl(file_path, function_address, timeout, use_ghidra)
 
     # Check for cache hit
     if result.status == "success" and result.metadata:
@@ -487,7 +488,7 @@ async def recover_structures(
         # Use radare2 for quick analysis
         recover_structures("/app/workspace/binary", "0x401000", use_ghidra=False)
     """
-    from reversecore_mcp.core.ghidra_helper import ensure_ghidra_available
+    from reversecore_mcp.core.ghidra import ensure_ghidra_available
 
     # 1. Validate parameters
     validated_path = validate_file_path(file_path)
@@ -517,7 +518,7 @@ async def recover_structures(
             fallback_note = ""
             # 4a. Use Ghidra for advanced structure recovery
             try:
-                from reversecore_mcp.core.ghidra_helper import (
+                from reversecore_mcp.core.ghidra import (
                     recover_structures_with_ghidra,
                 )
 
@@ -573,11 +574,7 @@ async def recover_structures(
                     offset = var.get("delta", 0)
 
                     # Simple heuristic: group by base register
-                    base = (
-                        var.get("ref", {}).get("base", "unknown")
-                        if "ref" in var
-                        else "stack"
-                    )
+                    base = var.get("ref", {}).get("base", "unknown") if "ref" in var else "stack"
 
                     if base not in structures:
                         structures[base] = {"name": f"struct_{base}", "fields": []}
@@ -593,7 +590,7 @@ async def recover_structures(
             # 6. Generate C structure definitions
             # OPTIMIZATION: Build strings more efficiently using join
             c_definitions = []
-            for struct_name, struct_data in structures.items():
+            for _struct_name, struct_data in structures.items():
                 # Pre-format fields more efficiently
                 field_strs = [
                     f"{field['type']} {field['name']}; // offset {field['offset']}"

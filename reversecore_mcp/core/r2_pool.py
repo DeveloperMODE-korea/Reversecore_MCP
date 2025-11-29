@@ -9,8 +9,9 @@ import asyncio
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager, contextmanager
-from typing import Dict, Any, Optional, AsyncGenerator, Generator
+from typing import Any
 
 try:
     import r2pipe
@@ -36,13 +37,13 @@ class R2ConnectionPool:
         self.max_connections = max_connections
         self._pool: OrderedDict[str, Any] = OrderedDict()
         self._lock = threading.RLock()
-        self._async_lock: Optional[asyncio.Lock] = None  # Lazy-initialized async lock
-        self._last_access: Dict[str, float] = {}
+        self._async_lock: asyncio.Lock | None = None  # Lazy-initialized async lock
+        self._last_access: dict[str, float] = {}
         self._analyzed_files = set()  # Track files that have been analyzed (aaa)
 
     def _get_async_lock(self) -> asyncio.Lock:
         """Get or create an async lock for thread-safe async operations.
-        
+
         The lock is lazily initialized to ensure it's created in the correct
         event loop context.
         """
@@ -174,7 +175,7 @@ class R2ConnectionPool:
     @asynccontextmanager
     async def async_session(self, file_path: str) -> AsyncGenerator[Any, None]:
         """Async context manager for r2 connection.
-        
+
         Usage:
             async with r2_pool.async_session(path) as r2:
                 result = r2.cmd('aaa')
@@ -193,7 +194,7 @@ class R2ConnectionPool:
     @contextmanager
     def sync_session(self, file_path: str) -> Generator[Any, None, None]:
         """Sync context manager for r2 connection.
-        
+
         Usage:
             with r2_pool.sync_session(path) as r2:
                 result = r2.cmd('aaa')
@@ -212,7 +213,7 @@ class R2ConnectionPool:
     def close_all(self):
         """Close all connections in the pool."""
         with self._lock:
-            for file_path, r2 in self._pool.items():
+            for _file_path, r2 in self._pool.items():
                 try:
                     r2.quit()
                 except Exception:
@@ -234,5 +235,6 @@ class R2ConnectionPool:
                 self._analyzed_files.add(file_path)
 
 
-# Global instance
+# Global instance (for backward compatibility)
+# New code should use: from reversecore_mcp.core.container import get_r2_pool
 r2_pool = R2ConnectionPool()

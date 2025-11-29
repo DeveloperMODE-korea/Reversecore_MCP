@@ -7,10 +7,9 @@ to prevent resource exhaustion over time.
 
 import asyncio
 import time
-from typing import Optional
 
-from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core import config
+from reversecore_mcp.core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -22,7 +21,7 @@ class ResourceManager:
 
     def __init__(self, cleanup_interval: int = 3600):  # Default: 1 hour
         self.cleanup_interval = cleanup_interval
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._running = False
 
     async def start(self):
@@ -106,5 +105,6 @@ class ResourceManager:
         logger.info("Resource cleanup complete")
 
 
-# Global instance
+# Global instance (for backward compatibility)
+# New code should use: from reversecore_mcp.core.container import get_resource_manager
 resource_manager = ResourceManager()
