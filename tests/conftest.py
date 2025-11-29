@@ -1,12 +1,30 @@
 """Pytest configuration and shared fixtures with explicit dependency injection."""
 
-from pathlib import Path
+import os
+import tempfile
 
-import pytest
+# Set up test environment variables BEFORE importing reversecore_mcp modules
+# This is required because some modules initialize config at import time
+_test_workspace = tempfile.mkdtemp(prefix="reversecore_test_workspace_")
+_test_r2_workspace = tempfile.mkdtemp(prefix="reversecore_test_r2_")
+_test_ghidra = tempfile.mkdtemp(prefix="reversecore_test_ghidra_")
+_test_ghidra_project = tempfile.mkdtemp(prefix="reversecore_test_ghidra_project_")
+_test_read_dirs = tempfile.mkdtemp(prefix="reversecore_test_rules_")
 
-from reversecore_mcp.core import security
-from reversecore_mcp.core.config import Config
-from reversecore_mcp.core.security import WorkspaceConfig
+# Force override environment variables for testing
+# Note: The config module expects REVERSECORE_WORKSPACE, not WORKSPACE
+os.environ["REVERSECORE_WORKSPACE"] = _test_workspace
+os.environ["REVERSECORE_READ_DIRS"] = _test_read_dirs
+os.environ["R2_WORKSPACE"] = _test_r2_workspace
+os.environ["GHIDRA_PATH"] = _test_ghidra
+os.environ["GHIDRA_PROJECT_PATH"] = _test_ghidra_project
+
+# These imports must come after env vars are set due to module-level config loading
+import pytest  # noqa: E402
+
+from reversecore_mcp.core import security  # noqa: E402
+from reversecore_mcp.core.config import Config  # noqa: E402
+from reversecore_mcp.core.security import WorkspaceConfig  # noqa: E402
 
 
 @pytest.fixture
@@ -82,4 +100,3 @@ def patched_config(config, monkeypatch):
     # Note: lib_tools no longer imports get_config at module level
     # Individual tool modules import it directly from core.config
     return config
-

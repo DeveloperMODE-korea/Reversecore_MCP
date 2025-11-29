@@ -394,7 +394,7 @@ async def _verify_hypothesis_with_emulation(
     try:
         validated_func = _validate_r2_identifier(function_name)
     except ValidationError as e:
-        return failure(str(e))
+        return failure("VALIDATION_ERROR", str(e))
 
     # Construct ESIL script
     # 1. Initialize ESIL (aei)
@@ -445,8 +445,9 @@ async def _verify_hypothesis_with_emulation(
     if final_regs is None:
         logger.error(f"Failed to parse emulation results. Output: {output[:500]}")
         return failure(
+            "EMULATION_ERROR",
             "Emulation completed but failed to parse register state. "
-            "The function may have crashed or radare2 output was corrupted."
+            "The function may have crashed or radare2 output was corrupted.",
         )
 
     return success(
