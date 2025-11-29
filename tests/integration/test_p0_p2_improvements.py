@@ -108,9 +108,9 @@ class TestYaraInputValidation:
         from reversecore_mcp.tools.adaptive_vaccine import adaptive_vaccine
         
         result = await adaptive_vaccine(
-            str(sample_binary_path),
             threat_report={"malware_name": "Test"},
-            action="invalid_action"  # Invalid action
+            action="invalid_action",  # Invalid action
+            file_path=str(sample_binary_path)
         )
         
         assert result.status == "error"
@@ -125,13 +125,13 @@ class TestYaraInputValidation:
         
         # Test with strings containing special characters
         result = await adaptive_vaccine(
-            str(sample_binary_path),
             threat_report={
                 "malware_name": "TestMalware",
                 "strings": ['test"string', "test\\path", "test\nline"],
                 "patch_addresses": []
             },
-            action="yara"
+            action="yara",
+            file_path=str(sample_binary_path)
         )
         
         # Should handle special characters without crashing
@@ -243,7 +243,7 @@ class TestErrorHandlerDeduplication:
         
         # Test ToolNotFoundError
         result = _handle_exception(
-            ToolNotFoundError("test_tool", "Test tool not found"),
+            ToolNotFoundError("test_tool"),
             "test_func"
         )
         assert result.error_code == "TOOL_NOT_FOUND"

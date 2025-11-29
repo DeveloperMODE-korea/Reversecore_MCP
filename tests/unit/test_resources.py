@@ -24,14 +24,17 @@ class TestStaticResources:
         # Should register at least the static resources
         assert mock_mcp.resource.call_count >= 3
 
-    @patch('reversecore_mcp.resources.Path')
-    def test_get_guide_exists(self, mock_path_cls, mock_mcp):
+    @patch('reversecore_mcp.resources._get_resources_path')
+    def test_get_guide_exists(self, mock_get_resources_path, mock_mcp):
         """Test guide resource when file exists."""
         # Setup
-        mock_path = Mock()
-        mock_path.exists.return_value = True
-        mock_path.read_text.return_value = "# Test Guide Content"
-        mock_path_cls.return_value = mock_path
+        mock_guide_path = Mock()
+        mock_guide_path.exists.return_value = True
+        mock_guide_path.read_text.return_value = "# Test Guide Content"
+        
+        mock_resources_path = Mock()
+        mock_resources_path.__truediv__ = Mock(return_value=mock_guide_path)
+        mock_get_resources_path.return_value = mock_resources_path
         
         # Capture the registered function
         registered_funcs = {}
@@ -48,19 +51,17 @@ class TestStaticResources:
         guide_func = registered_funcs.get("reversecore://guide")
         assert guide_func is not None
         
-        # Mock the path for actual call
-        with patch.object(Path, 'exists', return_value=True), \
-             patch.object(Path, 'read_text', return_value="# Test Guide"):
-            result = guide_func()
-            assert "# Test Guide" in result
+        result = guide_func()
+        assert "# Test Guide Content" in result
 
-    @patch('reversecore_mcp.resources.Path')
-    def test_get_guide_not_found(self, mock_path_cls, mock_mcp):
+    @patch('reversecore_mcp.resources._get_resources_path')
+    def test_get_guide_not_found(self, mock_get_resources_path, mock_mcp):
         """Test guide resource when file doesn't exist."""
         # Setup
         mock_path = Mock()
+        mock_path.__truediv__ = Mock(return_value=mock_path)
         mock_path.exists.return_value = False
-        mock_path_cls.return_value = mock_path
+        mock_get_resources_path.return_value = mock_path
         
         # Capture the registered function
         registered_funcs = {}
@@ -77,10 +78,8 @@ class TestStaticResources:
         guide_func = registered_funcs.get("reversecore://guide")
         assert guide_func is not None
         
-        # Mock the path for actual call
-        with patch.object(Path, 'exists', return_value=False):
-            result = guide_func()
-            assert result == "Guide not found."
+        result = guide_func()
+        assert result == "Guide not found."
 
     def test_get_structure_guide(self, mock_mcp):
         """Test structure guide resource."""

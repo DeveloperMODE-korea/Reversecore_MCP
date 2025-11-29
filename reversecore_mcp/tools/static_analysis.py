@@ -155,8 +155,10 @@ async def run_binwalk_extract(
         temp_dir = tempfile.mkdtemp(prefix="binwalk_extract_")
         extraction_dir = temp_dir
     else:
-        # Validate output directory path
-        extraction_dir = validate_file_path(output_dir, must_exist=False)
+        # Resolve output directory path (may not exist yet)
+        from pathlib import Path
+        output_path = Path(output_dir).resolve()
+        extraction_dir = str(output_path)
         os.makedirs(extraction_dir, exist_ok=True)
     
     # Build binwalk extraction command
