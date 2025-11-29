@@ -327,15 +327,25 @@ async def run_radare2(
     validated_path = validate_file_path(file_path)
     validated_command = validate_r2_command(r2_command)
 
-    # Adaptive analysis logic
-    # Use 'aa' (basic analysis) instead of 'aaa' (advanced analysis) for better performance
-    # 'aaa' is often overkill for automated tasks and causes timeouts on large binaries
+    # Adaptive analysis logic based on command type and file size
+    # Use 'aa' for basic commands, 'aaa' for analysis-heavy commands on small files
     analysis_level = "aa"
 
     # Simple information commands don't need analysis
-    simple_commands = ["i", "iI", "iz", "il", "is", "ie", "it"]
+    simple_commands = ["i", "iI", "iz", "izj", "il", "is", "isj", "ie", "it", "iS", "iSj"]
     if validated_command in simple_commands or validated_command.startswith("i "):
         analysis_level = "-n"
+
+    # Function listing commands (afl, aflj) benefit from deeper analysis
+    # but only if file is small enough
+    function_commands = ["afl", "aflj", "afll", "afllj", "pdf", "pdr"]
+    if any(cmd in validated_command for cmd in function_commands):
+        try:
+            file_size_mb = os.path.getsize(validated_path) / (1024 * 1024)
+            if file_size_mb < 10:  # For files under 10MB, use deeper analysis
+                analysis_level = "aaa"
+        except OSError:
+            pass
 
     # If user explicitly requested analysis, handle it via caching
     if "aaa" in validated_command or "aa" in validated_command:
@@ -352,7 +362,7 @@ async def run_radare2(
             max_output_size=max_output_size,
             base_timeout=timeout,
         )
-        return success(output, bytes_read=bytes_read)
+        return success(output, bytes_read=bytes_read, analysis_level=analysis_level)
     except Exception as e:
         # Log error to client if context is available
         if ctx:
@@ -873,19 +883,16 @@ async def analyze_xrefs(
         await ctx.info(f"Analyzing xrefs for {address}...")
 
     # 4. Execute analysis using helper
-    # Use 'aa' instead of 'aaa' for speed if possible, but 'axt' needs good analysis.
-    # We'll stick to 'aaa' but rely on the increased timeout (120s -> 300s in config/default).
-    # Wait, I set default to 120s in the signature.
-    # If the user wants faster, they can use 'aa'.
-    # Let's try to be smart: if file size is large (>5MB), use 'aa'.
+    # Use 'aa' (basic analysis) as default to prevent timeouts on large/obfuscated binaries
+    # 'aaa' is much slower but more accurate - only use for small files
 
-    # Use 'aa' (basic analysis) as default to prevent timeouts on obfuscated binaries
     analysis_level = "aa"
     try:
-        if os.path.getsize(validated_path) > 5 * 1024 * 1024:
-            analysis_level = "aa"
-            if ctx:
-                await ctx.info("Large file detected, using lighter analysis ('aa')...")
+        file_size_mb = os.path.getsize(validated_path) / (1024 * 1024)
+        if file_size_mb < 5:
+            analysis_level = "aaa"  # Full analysis for small files (<5MB)
+        if ctx and file_size_mb > 5:
+            await ctx.info(f"Large file ({file_size_mb:.1f}MB) detected, using basic analysis...")
     except OSError:
         pass
 

@@ -1,5 +1,6 @@
 """Decompilation and code recovery tools for binary analysis."""
 
+import os
 import re
 from async_lru import alru_cache
 from fastmcp import Context
@@ -228,16 +229,26 @@ async def get_pseudo_code(
     # 3. Build radare2 command to decompilation
     r2_cmd = f"pdc @ {address}"
 
-    # 4. Execute decompilation using helper
+    # 4. Determine analysis level based on file size
+    # Use 'aa' (basic) for large files to prevent timeouts
+    analysis_level = "aa"
+    try:
+        file_size_mb = os.path.getsize(validated_path) / (1024 * 1024)
+        if file_size_mb < 5:
+            analysis_level = "aaa"  # Full analysis for small files
+    except OSError:
+        pass
+
+    # 5. Execute decompilation using helper
     output, bytes_read = await _execute_r2_command(
         validated_path,
         [r2_cmd],
-        analysis_level="aaa",
+        analysis_level=analysis_level,
         max_output_size=10_000_000,
         base_timeout=timeout,
     )
 
-    # 5. Check if output is valid
+    # 6. Check if output is valid
     if not output or output.strip() == "":
         return failure(
             "DECOMPILATION_ERROR",
@@ -245,13 +256,14 @@ async def get_pseudo_code(
             hint="Verify the address exists and points to a valid function. Try analyzing with 'afl' first.",
         )
 
-    # 6. Return pseudo C code
+    # 7. Return pseudo C code
     return success(
         output,
         bytes_read=bytes_read,
         address=address,
         format="pseudo_c",
-        description=f"Pseudo C code decompiled from address {address}",
+        analysis_level=analysis_level,
+        description=f"Pseudo C code decompiled from address {address} (analysis: {analysis_level})",
     )
 
 

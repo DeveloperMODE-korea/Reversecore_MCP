@@ -359,24 +359,47 @@ async def extract_rtti_info(
         timeout=timeout,
     )
 
-    # Extract potential RTTI strings
-    rtti_pattern = re.compile(r"(_ZTS|_ZTI|class\s+\w+|struct\s+\w+)")
-    class_pattern = re.compile(r"(?:class|struct)\s+(\w+(?:::\w+)*)")
+    # Enhanced patterns for RTTI extraction
+    # 1. GNU/Linux style: _ZTS (typeinfo string), _ZTI (typeinfo), _ZTV (vtable)
+    # 2. MSVC style: .?AV (class), .?AU (struct), .?AW (enum)
+    # 3. Explicit class/struct keywords
+    rtti_pattern = re.compile(r"(_ZTS|_ZTI|_ZTV|\.?\?A[VUW]|class\s+\w+|struct\s+\w+)")
+    
+    # Pattern for extracting class names from various formats
+    class_patterns = [
+        re.compile(r"(?:class|struct)\s+(\w+(?:::\w+)*)"),  # class Foo, struct Bar::Baz
+        re.compile(r"\.?\?AV(\w+)@@"),  # MSVC class: .?AVClassName@@
+        re.compile(r"\.?\?AU(\w+)@@"),  # MSVC struct: .?AUStructName@@
+        re.compile(r"_ZTS(\d+)(\w+)"),  # GCC typeinfo: _ZTS4Foo -> Foo (length prefixed)
+        re.compile(r"(\w{2,}(?:Actor|Component|Manager|Controller|Handler|Service|Factory|Provider|Interface))"),  # Common OOP patterns
+        re.compile(r"(C[a-z][A-Z]\w{3,})"),  # Hungarian notation: CzCharacter, CxMonster
+    ]
 
     rtti_strings = []
     class_names = set()
 
     for line in output.split("\n"):
-        if rtti_pattern.search(line):
-            rtti_strings.append(line.strip())
-            # Try to extract class names
-            class_match = class_pattern.search(line)
-            if class_match:
-                class_names.add(class_match.group(1))
+        line_stripped = line.strip()
+        if rtti_pattern.search(line_stripped):
+            rtti_strings.append(line_stripped)
+            
+            # Try all patterns to extract class names
+            for pattern in class_patterns:
+                matches = pattern.findall(line_stripped)
+                for match in matches:
+                    # Handle tuple results from patterns with groups
+                    if isinstance(match, tuple):
+                        class_name = match[-1]  # Take the last group (usually the name)
+                    else:
+                        class_name = match
+                    
+                    # Filter out noise (too short, all caps, numbers only)
+                    if len(class_name) > 2 and not class_name.isupper() and not class_name.isdigit():
+                        class_names.add(class_name)
 
     return success(
         {
-            "rtti_strings": rtti_strings[:100],  # Limit to first 100
+            "rtti_strings": rtti_strings[:200],  # Limit to first 200
             "class_names": sorted(list(class_names)),
             "total_rtti_entries": len(rtti_strings),
             "total_classes": len(class_names),

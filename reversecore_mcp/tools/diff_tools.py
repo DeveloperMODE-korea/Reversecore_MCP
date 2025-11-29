@@ -1,5 +1,6 @@
 """Binary diffing and library matching tools for comparing binaries and identifying library code."""
 
+import os
 import re
 from functools import lru_cache
 
@@ -485,10 +486,19 @@ async def match_libraries(
     )
 
     try:
-        # Step 1: Load binary and analyze
-        # Use radare2 to get function list with signature matching
+        # Step 1: Determine analysis level based on file size
+        analysis_level = "aa"  # Default to basic analysis
+        try:
+            file_size_mb = os.path.getsize(validated_path) / (1024 * 1024)
+            if file_size_mb < 10:  # Full analysis for files under 10MB
+                analysis_level = "aaa"
+            if ctx:
+                await ctx.info(f"File size: {file_size_mb:.1f}MB, using '{analysis_level}' analysis...")
+        except OSError:
+            pass
 
-        # Build command to apply signatures and get function list
+        # Step 2: Build commands for signature matching
+        # Use radare2 to get function list with signature matching
         if signature_db:
             # Load custom signature database
             r2_commands = [f"zg {validated_sig_path}", "aflj"]
@@ -502,10 +512,7 @@ async def match_libraries(
                 "Analyzing binary and matching signatures (this may take a while)..."
             )
 
-        # Execute using helper
-        # Use 'aa' (basic analysis) instead of 'aaa' to prevent hangs
-        analysis_level = "aa"
-
+        # Step 3: Execute radare2 command
         output, bytes_read = await _execute_r2_command(
             validated_path,
             r2_commands,
@@ -513,6 +520,10 @@ async def match_libraries(
             max_output_size=max_output_size,
             base_timeout=timeout,
         )
+
+        if ctx:
+            await ctx.report_progress(60, 100)
+            await ctx.info("Parsing function list...")
 
         # Parse JSON output from aflj (function list JSON)
         try:
