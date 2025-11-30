@@ -549,14 +549,28 @@ async def recover_structures(
         # radare2's 'afvt' command shows variable types and offsets
         r2_cmds = [
             f"s {function_address}",  # Seek to function
+            "af",  # Analyze this function only
             "afvj",  # Get function variables in JSON
         ]
+
+        # OPTIMIZATION: Use adaptive analysis based on file size
+        # For large binaries, skip full analysis - just analyze the target function
+        import os
+        file_size_mb = os.path.getsize(validated_path) / (1024 * 1024)
+        
+        if file_size_mb > 10:
+            # Large binary: minimal analysis, rely on function-specific analysis
+            analysis_level = "aa"  # Basic analysis only
+        elif file_size_mb > 5:
+            analysis_level = "aa"
+        else:
+            analysis_level = "aaa"  # Full analysis for small files
 
         # Execute using helper
         output, bytes_read = await _execute_r2_command(
             validated_path,
             r2_cmds,
-            analysis_level="aaa",
+            analysis_level=analysis_level,
             max_output_size=10_000_000,
             base_timeout=timeout,
         )
