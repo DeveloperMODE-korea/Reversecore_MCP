@@ -1,0 +1,165 @@
+# Reversecore_MCP Dockerfile for macOS ARM64 (Apple Silicon)
+#
+# This Dockerfile is optimized for Apple Silicon Macs (M1/M2/M3/M4).
+# Uses ARM64-native images and binaries for better performance.
+#
+# Usage:
+#   docker build -f Dockerfile.arm64 -t reversecore-mcp:arm64 .
+#   docker run --rm -it -p 8000:8000 -v $(pwd)/workspace:/app/workspace reversecore-mcp:arm64
+#
+# Framework: FastMCP v2.13.1+ (Latest MCP server framework)
+
+# ============================================================================
+# Build Stage: Install dependencies that require compilation
+# ============================================================================
+FROM --platform=linux/arm64 python:3.12-slim-bookworm AS builder
+ARG YARA_VERSION=4.3.1
+ARG RADARE2_VERSION=6.0.4
+ARG GHIDRA_VERSION=11.4.2
+ARG GHIDRA_DATE=20250826
+
+# Set working directory
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    make \
+    automake \
+    autoconf \
+    libtool \
+    pkg-config \
+    flex \
+    bison \
+    libssl-dev \
+    libffi-dev \
+    git \
+    patch \
+    xz-utils \
+    curl \
+    ca-certificates \
+    unzip \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build and install native YARA for ARM64
+RUN curl -sSL "https://github.com/VirusTotal/yara/archive/refs/tags/v${YARA_VERSION}.tar.gz" -o /tmp/yara.tar.gz \
+    && tar -xzf /tmp/yara.tar.gz -C /tmp \
+    && cd /tmp/yara-${YARA_VERSION} \
+    && ./bootstrap.sh \
+    && ./configure --disable-cuckoo --disable-magic --disable-dotnet \
+    && make -j"$(nproc)" \
+    && make install \
+    && ldconfig \
+    && rm -rf /tmp/yara*
+
+# Build radare2 from source for ARM64
+RUN curl -sSL "https://github.com/radareorg/radare2/releases/download/${RADARE2_VERSION}/radare2-${RADARE2_VERSION}.tar.xz" -o /tmp/radare2.tar.xz \
+    && tar -xJf /tmp/radare2.tar.xz -C /tmp \
+    && cd /tmp/radare2-${RADARE2_VERSION} \
+    && ./configure --prefix=/opt/radare2 \
+    && make -j"$(nproc)" \
+    && make install \
+    && rm -rf /tmp/radare2*
+
+# Download Ghidra (Java-based, architecture independent)
+RUN wget -q "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_${GHIDRA_VERSION}_build/ghidra_${GHIDRA_VERSION}_PUBLIC_${GHIDRA_DATE}.zip" -O /tmp/ghidra.zip \
+    && unzip -q /tmp/ghidra.zip -d /opt \
+    && mv /opt/ghidra_${GHIDRA_VERSION}_PUBLIC /opt/ghidra \
+    && rm /tmp/ghidra.zip \
+    && rm -rf /opt/ghidra/docs \
+    && rm -rf /opt/ghidra/Extensions/Eclipse \
+    && rm -rf /opt/ghidra/Extensions/sample
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Install Python dependencies into a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install packages (skip angr on ARM64 - known compatibility issues)
+# Create a modified requirements without angr for ARM64
+RUN grep -v "^angr" requirements.txt > requirements-arm64.txt \
+    && pip install --no-cache-dir -r requirements-arm64.txt \
+    || pip install --no-cache-dir -r requirements.txt
+
+# ============================================================================
+# Runtime Stage: Create minimal production image for ARM64
+# ============================================================================
+FROM --platform=linux/arm64 python:3.12-slim-bookworm
+
+# Set working directory
+WORKDIR /app
+
+# Create workspace and rules directories
+RUN mkdir -p /app/workspace /app/rules
+
+# Install runtime dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        file \
+        binutils \
+        binwalk \
+        graphviz \
+        wget \
+        gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Eclipse Temurin OpenJDK 21 for ARM64
+RUN wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /usr/share/keyrings/adoptium.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main" > /etc/apt/sources.list.d/adoptium.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends temurin-21-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set JAVA_HOME for ARM64
+ENV JAVA_HOME="/usr/lib/jvm/temurin-21-jdk-arm64"
+
+# Copy built artifacts from builder stage
+RUN mkdir -p /usr/local/include /usr/local/lib/pkgconfig
+COPY --from=builder /usr/local/bin/yara /usr/local/bin/yara
+COPY --from=builder /usr/local/bin/yarac /usr/local/bin/yarac
+COPY --from=builder /usr/local/lib/libyara* /usr/local/lib/
+COPY --from=builder /usr/local/include/yara /usr/local/include/yara
+COPY --from=builder /usr/local/lib/pkgconfig/yara.pc /usr/local/lib/pkgconfig/yara.pc
+COPY --from=builder /opt/radare2 /opt/radare2
+COPY --from=builder /opt/ghidra /opt/ghidra
+RUN echo "/opt/radare2/lib" > /etc/ld.so.conf.d/radare2.conf && ldconfig
+
+# Copy Python virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy application code
+COPY reversecore_mcp/ ./reversecore_mcp/
+COPY server.py ./
+COPY resources/ /app/resources/
+
+# Set environment variables
+ENV PATH="/opt/radare2/bin:/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app \
+    REVERSECORE_WORKSPACE=/app/workspace \
+    GHIDRA_INSTALL_DIR=/opt/ghidra \
+    MCP_TRANSPORT=http \
+    LOG_LEVEL=INFO \
+    LOG_FILE=/var/log/reversecore/app.log \
+    RATE_LIMIT=60
+
+# Create log directory
+RUN mkdir -p /var/log/reversecore
+
+# Create a non-root user
+RUN useradd -m -u 1000 appuser \
+    && chown -R appuser:appuser /app /var/log/reversecore
+USER appuser
+
+# Expose port for HTTP transport
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()" || exit 1
+
+# Run the MCP server
+CMD ["python", "server.py"]

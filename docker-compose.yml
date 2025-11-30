@@ -1,0 +1,54 @@
+# Docker Compose for Reversecore MCP
+#
+# Usage:
+#   # For x86_64 (Intel/AMD) - Default
+#   docker compose up
+#
+#   # For ARM64 (Apple Silicon)
+#   docker compose --profile arm64 up
+#
+#   # Or use the convenience script
+#   ./scripts/run-docker.sh        # Auto-detect architecture
+#   ./scripts/run-docker.sh x86    # Force x86
+#   ./scripts/run-docker.sh arm64  # Force ARM64
+
+services:
+  # Default service for x86_64 (Intel/AMD/Linux)
+  reversecore-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: reversecore-mcp:latest
+    container_name: reversecore-mcp
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./workspace:/app/workspace
+      - ./rules:/app/rules
+    environment:
+      - MCP_TRANSPORT=http
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    profiles:
+      - default
+      - x86
+
+  # ARM64 service for Apple Silicon Macs
+  reversecore-mcp-arm64:
+    build:
+      context: .
+      dockerfile: Dockerfile.arm64
+    image: reversecore-mcp:arm64
+    container_name: reversecore-mcp-arm64
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./workspace:/app/workspace
+      - ./rules:/app/rules
+    environment:
+      - MCP_TRANSPORT=http
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    profiles:
+      - arm64
+      - macos
