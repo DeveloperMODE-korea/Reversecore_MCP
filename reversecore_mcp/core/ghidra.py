@@ -165,9 +165,16 @@ class GhidraService:
                 del self._projects[file_path]
 
     def _resolve_function(
-        self, flat_api: "FlatProgramAPI", address_str: str
+        self, flat_api: "FlatProgramAPI", address_str: str, create_if_missing: bool = True
     ) -> Optional["Function"]:
-        """Resolve a function from address string or symbol name."""
+        """
+        Resolve a function from address string or symbol name.
+        
+        Args:
+            flat_api: Ghidra FlatProgramAPI instance
+            address_str: Function address (hex) or symbol name
+            create_if_missing: If True, create a function at the address if none exists
+        """
         program = flat_api.getCurrentProgram()
         function_manager = program.getFunctionManager()
 
@@ -178,10 +185,13 @@ class GhidraService:
         if symbols.hasNext():
             symbol = symbols.next()
             address = symbol.getAddress()
-            return function_manager.getFunctionAt(address)
+            func = function_manager.getFunctionAt(address)
+            if func is not None:
+                return func
 
         # Try as hex address
         addr_str = _HEX_PREFIX_PATTERN.sub("", address_str)
+        address = None
 
         try:
             address = flat_api.toAddr(int(addr_str, 16))
@@ -192,11 +202,24 @@ class GhidraService:
             pass
 
         # Try to find function containing this address
-        try:
-            address = flat_api.toAddr(int(addr_str, 16))
-            return function_manager.getFunctionContaining(address)
-        except (ValueError, Exception):
-            pass
+        if address is not None:
+            try:
+                func = function_manager.getFunctionContaining(address)
+                if func is not None:
+                    return func
+            except Exception:
+                pass
+
+        # If no function found and create_if_missing, create one at the address
+        # This is needed when analyze=False (no auto function detection)
+        if create_if_missing and address is not None:
+            try:
+                logger.info(f"Creating function at address: {address}")
+                func = flat_api.createFunction(address, None)  # Auto-generate name
+                if func is not None:
+                    return func
+            except Exception as e:
+                logger.debug(f"Failed to create function: {e}")
 
         return None
 
