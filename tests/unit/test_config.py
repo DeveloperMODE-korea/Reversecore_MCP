@@ -130,6 +130,7 @@ class TestConfigValidation:
         config.validate_paths()  # Should not raise
 
     def test_validate_paths_workspace_missing(self, monkeypatch, tmp_path):
+        """When workspace is missing, it should fall back to cwd."""
         workspace = tmp_path / "missing"
         read_dir = tmp_path / "rules"
         read_dir.mkdir()
@@ -137,10 +138,13 @@ class TestConfigValidation:
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
 
-        with pytest.raises(ValueError, match="Workspace directory does not exist"):
-            reset_config()
+        # With non-strict validation (default), it should fall back to cwd
+        config = reset_config()
+        # Workspace falls back to cwd when configured path doesn't exist
+        assert config.workspace.exists()
 
     def test_validate_paths_workspace_not_directory(self, monkeypatch, tmp_path):
+        """When workspace is a file, it should fall back to cwd."""
         workspace = tmp_path / "file.txt"
         workspace.write_text("not a dir")
         read_dir = tmp_path / "rules"
@@ -149,10 +153,14 @@ class TestConfigValidation:
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
 
-        with pytest.raises(ValueError, match="Workspace path is not a directory"):
-            reset_config()
+        # With non-strict validation (default), it should not raise
+        # but the workspace path won't exist as a directory
+        config = reset_config()
+        # The config is created, workspace falls back to cwd
+        assert config.workspace.exists()
 
     def test_validate_paths_read_dir_missing(self, monkeypatch, tmp_path):
+        """When read dir is missing, it should be filtered out."""
         workspace = tmp_path / "workspace"
         workspace.mkdir()
         read_dir = tmp_path / "missing"
@@ -160,10 +168,13 @@ class TestConfigValidation:
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
 
-        with pytest.raises(ValueError, match="Read directory does not exist"):
-            reset_config()
+        # With non-strict validation (default), missing read dirs are filtered out
+        config = reset_config()
+        # Missing read dir should be filtered out
+        assert len(config.read_only_dirs) == 0
 
     def test_validate_paths_read_dir_not_directory(self, monkeypatch, tmp_path):
+        """When read dir is a file, it should be filtered out."""
         workspace = tmp_path / "workspace"
         workspace.mkdir()
         read_dir = tmp_path / "file.txt"
@@ -172,6 +183,21 @@ class TestConfigValidation:
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
 
-        with pytest.raises(ValueError, match="Read directory path is not a directory"):
+        # With non-strict validation (default), non-directory read paths are filtered
+        config = reset_config()
+        # File paths are filtered out from read_only_dirs
+        assert len(config.read_only_dirs) == 0
+
+    def test_validate_paths_strict_mode(self, monkeypatch, tmp_path):
+        """When strict mode is enabled, missing paths should raise."""
+        workspace = tmp_path / "missing"
+        read_dir = tmp_path / "rules"
+        read_dir.mkdir()
+
+        monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
+        monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
+        monkeypatch.setenv("REVERSECORE_STRICT_PATHS", "true")
+
+        with pytest.raises(ValueError, match="Workspace directory does not exist"):
             reset_config()
 

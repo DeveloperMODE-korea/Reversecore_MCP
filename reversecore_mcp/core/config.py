@@ -56,12 +56,35 @@ class Config:
     @classmethod
     def from_env(cls) -> "Config":
         """Build a configuration object from environment variables."""
-        workspace = (
-            Path(os.getenv("REVERSECORE_WORKSPACE", "/app/workspace"))
-            .expanduser()
-            .resolve()
-        )
-        read_dirs = _split_paths(os.getenv("REVERSECORE_READ_DIRS", "/app/rules"))
+        strict_validation = _parse_bool(os.getenv("REVERSECORE_STRICT_PATHS"), default=False)
+        
+        # Determine workspace: use env var, fallback to current directory if path doesn't exist
+        workspace_env = os.getenv("REVERSECORE_WORKSPACE", "")
+        if workspace_env:
+            workspace = Path(workspace_env).expanduser().resolve()
+        else:
+            # No env var set: use current working directory as default
+            workspace = Path.cwd()
+        
+        # If configured workspace doesn't exist or isn't a directory, handle based on strict mode
+        if not workspace.exists() or not workspace.is_dir():
+            if strict_validation:
+                if not workspace.exists():
+                    raise ValueError(f"Workspace directory does not exist: {workspace}")
+                else:
+                    raise ValueError(f"Workspace path is not a directory: {workspace}")
+            # Non-strict: fall back to cwd
+            workspace = Path.cwd()
+        
+        # Parse read directories, filtering out non-existent/non-directory paths
+        read_dirs_env = os.getenv("REVERSECORE_READ_DIRS", "")
+        if read_dirs_env:
+            all_read_dirs = _split_paths(read_dirs_env)
+            # Filter to only existing directories (graceful degradation)
+            read_dirs = tuple(d for d in all_read_dirs if d.exists() and d.is_dir())
+        else:
+            read_dirs = tuple()
+        
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         log_file = Path(os.getenv("LOG_FILE", "/tmp/reversecore/app.log")).expanduser()
         log_format = os.getenv("LOG_FORMAT", "human").lower()
@@ -90,21 +113,42 @@ class Config:
             default_tool_timeout=default_tool_timeout,
         )
 
-        config.validate_paths()
+        # Validation is handled above during path resolution
+        # validate_paths() can still be called manually for additional checks
         return config
 
-    def validate_paths(self) -> None:
-        """Validate that configured directories exist and are directories."""
+    def validate_paths(self, strict: bool = True) -> None:
+        """Validate that configured directories exist and are directories.
+        
+        Args:
+            strict: If True, raise ValueError for missing directories.
+                   If False, only log warnings (useful for test environments).
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         if not self.workspace.exists():
-            raise ValueError(f"Workspace directory does not exist: {self.workspace}")
-        if not self.workspace.is_dir():
-            raise ValueError(f"Workspace path is not a directory: {self.workspace}")
+            msg = f"Workspace directory does not exist: {self.workspace}"
+            if strict:
+                raise ValueError(msg)
+            logger.warning(msg)
+        elif not self.workspace.is_dir():
+            msg = f"Workspace path is not a directory: {self.workspace}"
+            if strict:
+                raise ValueError(msg)
+            logger.warning(msg)
 
         for read_dir in self.read_only_dirs:
             if not read_dir.exists():
-                raise ValueError(f"Read directory does not exist: {read_dir}")
-            if not read_dir.is_dir():
-                raise ValueError(f"Read directory path is not a directory: {read_dir}")
+                msg = f"Read directory does not exist: {read_dir}"
+                if strict:
+                    raise ValueError(msg)
+                logger.warning(msg)
+            elif not read_dir.is_dir():
+                msg = f"Read directory path is not a directory: {read_dir}"
+                if strict:
+                    raise ValueError(msg)
+                logger.warning(msg)
 
 
 _CONFIG: Config | None = None

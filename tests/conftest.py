@@ -86,8 +86,11 @@ def sample_binary_path(workspace_dir):
 
 @pytest.fixture
 def patched_workspace_config(workspace_config, monkeypatch):
-    """Patch the global WORKSPACE_CONFIG for modules that read it directly."""
-    monkeypatch.setattr(security, "WORKSPACE_CONFIG", workspace_config)
+    """Patch the workspace config for modules that use get_workspace_config()."""
+    # Patch the lazy-initialized config variable
+    monkeypatch.setattr(security, "_WORKSPACE_CONFIG", workspace_config)
+    # Also patch the getter function to return our config
+    monkeypatch.setattr(security, "get_workspace_config", lambda: workspace_config)
     return workspace_config
 
 

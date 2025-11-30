@@ -36,20 +36,47 @@ class WorkspaceConfig:
         return cls(workspace=config.workspace, read_only_dirs=config.read_only_dirs)
 
 
-def _build_workspace_config() -> WorkspaceConfig:
-    return WorkspaceConfig.from_env()
+# Lazy-initialized workspace configuration
+# This avoids initialization errors when the module is imported before
+# environment variables are set (common in test fixtures)
+_WORKSPACE_CONFIG: Optional[WorkspaceConfig] = None
 
 
-WORKSPACE_CONFIG = _build_workspace_config()
+def get_workspace_config() -> WorkspaceConfig:
+    """
+    Get the workspace configuration, initializing it lazily on first access.
+    
+    This lazy initialization pattern allows tests to set up environment
+    variables or mock configurations before the first access.
+    
+    Returns:
+        WorkspaceConfig instance
+    """
+    global _WORKSPACE_CONFIG
+    if _WORKSPACE_CONFIG is None:
+        _WORKSPACE_CONFIG = WorkspaceConfig.from_env()
+    return _WORKSPACE_CONFIG
 
 
 def refresh_workspace_config() -> WorkspaceConfig:
     """Recompute the default workspace configuration (mainly for tests)."""
-    global WORKSPACE_CONFIG
-    WORKSPACE_CONFIG = _build_workspace_config()
+    global _WORKSPACE_CONFIG
+    _WORKSPACE_CONFIG = WorkspaceConfig.from_env()
     # Clear the path resolution cache when config changes
     _resolve_path_cached.cache_clear()
-    return WORKSPACE_CONFIG
+    return _WORKSPACE_CONFIG
+
+
+def reset_workspace_config() -> None:
+    """
+    Reset the workspace configuration to uninitialized state.
+    
+    This is useful for tests that need to change environment variables
+    and have the configuration re-read on next access.
+    """
+    global _WORKSPACE_CONFIG
+    _WORKSPACE_CONFIG = None
+    _resolve_path_cached.cache_clear()
 
 
 @lru_cache(maxsize=PATH_VALIDATION_CACHE_SIZE)
@@ -103,7 +130,7 @@ def validate_file_path(
         ValueError: If the path is invalid, doesn't exist, or is outside
                    the allowed directories
     """
-    active_config = config or WORKSPACE_CONFIG
+    active_config = config or get_workspace_config()
 
     # Use cached path resolution to avoid repeated filesystem calls
     abs_path, is_file, error = _resolve_path_cached(path)
