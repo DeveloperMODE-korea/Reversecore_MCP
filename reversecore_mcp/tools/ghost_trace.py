@@ -197,8 +197,9 @@ async def ghost_trace(
     if not functions or not isinstance(functions, list):
         logger.error(f"Invalid function list format. Output preview: {output[:200]}...")
         return failure(
+            "PARSE_ERROR",
             "Failed to parse function list from radare2. "
-            "Output may be corrupted or analysis failed."
+            "Output may be corrupted or analysis failed.",
         )
 
     # Find orphans and suspicious logic

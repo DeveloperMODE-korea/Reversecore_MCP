@@ -168,13 +168,9 @@ def list_workspace() -> ToolResult:
     files = []
     for item in workspace.iterdir():
         if item.is_file():
-            files.append(
-                {"name": item.name, "size": item.stat().st_size, "path": str(item)}
-            )
+            files.append({"name": item.name, "size": item.stat().st_size, "path": str(item)})
 
-    return success(
-        {"files": files}, file_count=len(files), workspace_path=str(workspace)
-    )
+    return success({"files": files}, file_count=len(files), workspace_path=str(workspace))
 
 
 @log_execution(tool_name="scan_workspace")
@@ -209,6 +205,7 @@ async def scan_workspace(
         ToolResult with aggregated scan results for all files.
     """
     import asyncio
+
     from reversecore_mcp.core import json_utils as json
     from reversecore_mcp.tools.lib_tools import parse_binary_with_lief
 
@@ -229,9 +226,7 @@ async def scan_workspace(
     files_to_scan = list(files_to_scan_set)
 
     if not files_to_scan:
-        return success(
-            {"files": [], "summary": "No files found matching patterns"}, file_count=0
-        )
+        return success({"files": [], "summary": "No files found matching patterns"}, file_count=0)
 
     total_files = len(files_to_scan)
 
@@ -250,9 +245,7 @@ async def scan_workspace(
         try:
             file_cmd_result = await run_file(path_str)
             file_result["file_type"] = (
-                file_cmd_result.content[0].text
-                if file_cmd_result.content
-                else "unknown"
+                file_cmd_result.data if file_cmd_result.status == "success" else "unknown"
             )
         except Exception as e:
             file_result["file_type_error"] = str(e)
@@ -272,9 +265,9 @@ async def scan_workspace(
             try:
                 # Run sync function in thread pool
                 lief_result = await asyncio.to_thread(parse_binary_with_lief, path_str)
-                if not lief_result.is_error:
+                if lief_result.status == "success":
                     # Parse JSON content if available
-                    content = lief_result.content[0].text
+                    content = lief_result.data
                     try:
                         file_result["lief_metadata"] = (
                             json.loads(content) if isinstance(content, str) else content
