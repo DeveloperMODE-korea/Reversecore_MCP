@@ -112,15 +112,15 @@ class GhidraService:
 
                 self._configure_environment()
                 
-                # OPTIMIZATION: Limit JVM heap to prevent excessive memory usage
-                # Default Ghidra can use 50%+ of system RAM
+                # OPTIMIZATION: Use G1GC for better performance with large heaps
+                # No memory limit - let Ghidra use what it needs for faster analysis
                 jvm_args = [
-                    "-Xmx4g",  # Max heap 4GB (adjust based on system)
-                    "-XX:+UseG1GC",  # Use G1 garbage collector for large heaps
+                    "-XX:+UseG1GC",  # G1 garbage collector (better for large heaps)
                     "-XX:MaxGCPauseMillis=200",  # Limit GC pause time
+                    "-XX:+ParallelRefProcEnabled",  # Parallel reference processing
                 ]
 
-                logger.info("Starting Ghidra JVM with optimized settings...")
+                logger.info("Starting Ghidra JVM...")
                 try:
                     pyghidra.start(jvm_args=jvm_args)
                 except Exception as e:
