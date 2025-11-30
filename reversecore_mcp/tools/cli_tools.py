@@ -358,26 +358,18 @@ async def analyze_with_ai(
     """
     validated_path = validate_file_path(file_path)
 
-    if not ctx:
-        return failure(
-            "NO_CONTEXT",
-            "AI sampling requires Context parameter",
-            hint="This tool needs to be called from an MCP client that supports sampling",
-        )
+    # 1. Get basic info about the file
+    file_info_result = await run_file(str(validated_path))
+    file_info = file_info_result.data if file_info_result.status == "success" else "Unknown"
 
-    try:
-        # 1. Get basic info about the file
-        file_info_result = await run_file(str(validated_path))
-        file_info = file_info_result.data if file_info_result.status == "success" else "Unknown"
+    # 2. Get strings sample
+    strings_result = await run_strings(str(validated_path), max_output_size=100_000)
+    strings_sample = (strings_result.data if strings_result.status == "success" else "")[:5000]
 
-        # 2. Get strings sample
-        strings_result = await run_strings(str(validated_path), max_output_size=100_000)
-        strings_sample = (strings_result.data if strings_result.status == "success" else "")[
-            :5000
-        ]  # First 5KB
-
-        # 3. Ask AI via sampling
-        prompt = f"""You are a reverse engineering expert analyzing a binary file.
+    # 3. Try AI sampling if context available
+    if ctx:
+        try:
+            prompt = f"""You are a reverse engineering expert analyzing a binary file.
 
 File: {validated_path.name}
 Type: {file_info}
@@ -392,25 +384,114 @@ Question: {question}
 Please provide a concise, technical analysis based on the available information.
 """
 
-        response = await ctx.sample(messages=[{"role": "user", "content": prompt}], max_tokens=500)
+            response = await ctx.sample(
+                messages=[{"role": "user", "content": prompt}], max_tokens=500
+            )
 
-        ai_analysis = (
-            response.content.text if hasattr(response.content, "text") else str(response.content)
-        )
+            ai_analysis = (
+                response.content.text
+                if hasattr(response.content, "text")
+                else str(response.content)
+            )
 
-        return success(
-            ai_analysis,
-            question=question,
-            file=validated_path.name,
-            description=f"AI analysis completed for: {question}",
-        )
+            return success(
+                ai_analysis,
+                question=question,
+                file=validated_path.name,
+                description=f"AI analysis completed for: {question}",
+            )
 
-    except Exception as e:
-        return failure(
-            "AI_SAMPLING_ERROR",
-            f"AI sampling failed: {str(e)}",
-            hint="Ensure the MCP client supports sampling feature",
-        )
+        except Exception:
+            # Fallback to static analysis if sampling fails
+            pass
+
+    # 4. Fallback: Static rule-based analysis when AI sampling unavailable
+    analysis_result = _perform_static_analysis(
+        validated_path.name, file_info, strings_sample, question
+    )
+
+    return success(
+        analysis_result,
+        question=question,
+        file=validated_path.name,
+        analysis_type="static_fallback",
+        description="Static analysis (AI sampling unavailable)",
+    )
+
+
+def _perform_static_analysis(
+    filename: str, file_info: str, strings_sample: str, question: str
+) -> str:
+    """Perform static rule-based analysis as fallback when AI sampling is unavailable."""
+    import re
+
+    findings = []
+    question_lower = question.lower()
+
+    # File type analysis
+    file_type_info = []
+    if "PE32" in file_info or ".exe" in filename.lower() or ".dll" in filename.lower():
+        file_type_info.append("Windows PE executable")
+    if "ELF" in file_info or ".so" in filename.lower():
+        file_type_info.append("Linux ELF binary")
+    if "Mach-O" in file_info or ".dylib" in filename.lower():
+        file_type_info.append("macOS Mach-O binary")
+
+    findings.append(f"**File Type**: {', '.join(file_type_info) if file_type_info else file_info}")
+
+    # String-based pattern detection
+    patterns = {
+        "network": (r"(http[s]?://|socket|connect|recv|send|WSA|inet_)", "Network/Communication"),
+        "crypto": (r"(AES|RSA|SHA|MD5|crypt|encrypt|decrypt|hash)", "Cryptographic"),
+        "file_ops": (r"(CreateFile|ReadFile|WriteFile|fopen|fread|fwrite)", "File I/O"),
+        "registry": (r"(RegOpenKey|RegSetValue|RegQueryValue|HKEY_)", "Windows Registry"),
+        "process": (r"(CreateProcess|ShellExecute|WinExec|system\(|exec)", "Process Execution"),
+        "debug": (r"(IsDebuggerPresent|CheckRemoteDebugger|NtQueryInformation)", "Anti-Debug"),
+        "injection": (r"(VirtualAlloc|WriteProcessMemory|CreateRemoteThread)", "Code Injection"),
+        "game": (r"(player|inventory|skill|quest|guild|npc|monster|item)", "Game Logic"),
+        "ui": (r"(button|dialog|window|menu|click|render)", "UI/Graphics"),
+    }
+
+    detected_categories = []
+    for _category, (pattern, label) in patterns.items():
+        if re.search(pattern, strings_sample, re.IGNORECASE):
+            detected_categories.append(label)
+
+    if detected_categories:
+        findings.append(f"**Detected Functionality**: {', '.join(detected_categories)}")
+
+    # Answer question-specific queries
+    if any(word in question_lower for word in ["malware", "malicious", "threat", "suspicious"]):
+        suspicious_indicators = []
+        if "Anti-Debug" in detected_categories:
+            suspicious_indicators.append("Anti-debugging techniques detected")
+        if "Code Injection" in detected_categories:
+            suspicious_indicators.append("Process injection capabilities")
+        if re.search(r"(cmd\.exe|powershell|/bin/sh)", strings_sample, re.IGNORECASE):
+            suspicious_indicators.append("Shell command execution")
+
+        if suspicious_indicators:
+            findings.append(f"**Potential Concerns**: {'; '.join(suspicious_indicators)}")
+        else:
+            findings.append(
+                "**Assessment**: No obvious malicious indicators found in string analysis"
+            )
+
+    elif any(word in question_lower for word in ["purpose", "what does", "functionality"]):
+        if "Game Logic" in detected_categories:
+            findings.append("**Purpose**: Likely a game client (game-related strings detected)")
+        elif "Network/Communication" in detected_categories:
+            findings.append("**Purpose**: Network-enabled application")
+        else:
+            findings.append("**Purpose**: Unable to determine specific purpose from strings alone")
+
+    # Summary
+    findings.append(
+        "\n*Note: This is a static rule-based analysis. "
+        "For deeper insights, use specialized tools like `ghost_trace` or `trinity_defense`.*"
+    )
+
+    return "\n".join(findings)
 
 
 @log_execution(tool_name="suggest_function_name")
