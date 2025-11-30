@@ -417,7 +417,8 @@ async def recover_structures(
     file_path: str,
     function_address: str,
     use_ghidra: bool = True,
-    timeout: int = DEFAULT_TIMEOUT * 10,
+    fast_mode: bool = True,
+    timeout: int = DEFAULT_TIMEOUT * 5,
     ctx: Context = None,
 ) -> ToolResult:
     """
@@ -433,6 +434,11 @@ async def recover_structures(
     - **AI Comprehension**: AI can't understand raw offsets, but understands named fields
     - **Scale**: One structure definition can clarify thousands of lines of code
 
+    **Performance Tips (for large binaries like game clients):**
+    - Use `fast_mode=True` (default) to skip full binary analysis
+    - Use `use_ghidra=False` for quick radare2-based analysis
+    - For best results on first run, set `fast_mode=False` but expect longer wait
+
     **How It Works:**
     1. Analyze memory access patterns in the function
     2. Identify structure layouts from offset usage
@@ -445,11 +451,6 @@ async def recover_structures(
     - Vulnerability research: Find buffer overflow candidates in structs
     - Software auditing: Document undocumented data structures
 
-    **AI Collaboration:**
-    - AI: "This offset pattern looks like Vector3 (x, y, z)"
-    - You: Apply structure definition in Ghidra
-    - Result: All "this + 0x0/0x4/0x8" become "vec.x/vec.y/vec.z"
-
     **Ghidra vs Radare2:**
     - Ghidra (default): Superior type recovery, structure propagation, C++ support
     - Radare2 (fallback): Basic structure definition, faster but less intelligent
@@ -458,7 +459,8 @@ async def recover_structures(
         file_path: Path to the binary file (must be in workspace)
         function_address: Function to analyze for structure usage (e.g., 'main', '0x401000')
         use_ghidra: Use Ghidra for advanced recovery (default True), or radare2 for basic
-        timeout: Execution timeout in seconds (default 600 for Ghidra analysis)
+        fast_mode: Skip full binary analysis for faster startup (default True)
+        timeout: Execution timeout in seconds (default 300 seconds)
         ctx: FastMCP Context (auto-injected)
 
     Returns:
@@ -479,11 +481,11 @@ async def recover_structures(
         }
 
     Example:
-        # Recover structures used in main function
+        # Fast structure recovery (recommended for large binaries)
         recover_structures("/app/workspace/game.exe", "main")
 
-        # Analyze specific class method
-        recover_structures("/app/workspace/game.exe", "Player::update")
+        # More thorough analysis (slower but more accurate)
+        recover_structures("/app/workspace/game.exe", "main", fast_mode=False)
 
         # Use radare2 for quick analysis
         recover_structures("/app/workspace/binary", "0x401000", use_ghidra=False)
@@ -522,16 +524,19 @@ async def recover_structures(
                     recover_structures_with_ghidra,
                 )
 
+                # Pass fast_mode to skip full binary analysis
                 structures, metadata = recover_structures_with_ghidra(
-                    validated_path, function_address, timeout
+                    validated_path, function_address, timeout, skip_full_analysis=fast_mode
                 )
 
+                mode_note = " (fast mode)" if fast_mode else " (full analysis)"
                 return success(
                     {"structures": structures},
                     **metadata,
                     function_address=function_address,
                     method="ghidra",
-                    description=f"Structures recovered from {function_address} using Ghidra",
+                    fast_mode=fast_mode,
+                    description=f"Structures recovered from {function_address} using Ghidra{mode_note}",
                 )
 
             except Exception as e:
