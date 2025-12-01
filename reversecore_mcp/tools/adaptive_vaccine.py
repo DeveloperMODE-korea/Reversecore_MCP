@@ -9,17 +9,18 @@ This tool generates defensive measures against detected threats:
 
 import re
 import shutil
-import lief
-from typing import Dict, Any, Optional, Tuple
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from fastmcp import FastMCP, Context
-from reversecore_mcp.core.logging_config import get_logger
-from reversecore_mcp.core.result import ToolResult, success, failure
+import lief
+from fastmcp import Context, FastMCP
+
 from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_handling import handle_tool_errors
+from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.metrics import track_metrics
+from reversecore_mcp.core.result import ToolResult, failure, success
 from reversecore_mcp.core.security import validate_file_path
 
 logger = get_logger(__name__)
@@ -31,7 +32,7 @@ YARA_MAX_PATTERNS = 10
 YARA_MAX_STRING_LITERAL_LENGTH = 200
 
 
-def _validate_threat_report(threat_report: Any) -> Dict[str, Any]:
+def _validate_threat_report(threat_report: Any) -> dict[str, Any]:
     """
     Validate and sanitize threat_report input for YARA rule generation.
 
@@ -46,9 +47,7 @@ def _validate_threat_report(threat_report: Any) -> Dict[str, Any]:
     """
     # Type check
     if not isinstance(threat_report, dict):
-        raise ValueError(
-            f"threat_report must be a dictionary, got {type(threat_report).__name__}"
-        )
+        raise ValueError(f"threat_report must be a dictionary, got {type(threat_report).__name__}")
 
     # Extract and validate fields with defaults
     validated = {}
@@ -97,9 +96,7 @@ def _validate_threat_report(threat_report: Any) -> Dict[str, Any]:
     return validated
 
 
-def _sanitize_yara_string(
-    s: str, max_length: int = YARA_MAX_STRING_LITERAL_LENGTH
-) -> str:
+def _sanitize_yara_string(s: str, max_length: int = YARA_MAX_STRING_LITERAL_LENGTH) -> str:
     """
     Sanitize a string for safe use in YARA rules.
 
@@ -127,9 +124,9 @@ def register_adaptive_vaccine(mcp: FastMCP) -> None:
 @track_metrics("adaptive_vaccine")
 @handle_tool_errors
 async def adaptive_vaccine(
-    threat_report: Dict[str, Any],
+    threat_report: dict[str, Any],
     action: str = "yara",
-    file_path: Optional[str] = None,
+    file_path: str | None = None,
     dry_run: bool = True,
     ctx: Context = None,
 ) -> ToolResult:
@@ -201,16 +198,12 @@ async def adaptive_vaccine(
     # Generate binary patch
     if action in ["patch", "both"]:
         if not file_path:
-            return failure(
-                "MISSING_FILE_PATH", "file_path is required for patch action"
-            )
+            return failure("MISSING_FILE_PATH", "file_path is required for patch action")
 
         validated_path = validate_file_path(file_path)
 
         try:
-            patch_info = _create_binary_patch(
-                validated_path, threat_report, dry_run=dry_run
-            )
+            patch_info = _create_binary_patch(validated_path, threat_report, dry_run=dry_run)
             result["patch"] = patch_info
 
             if ctx:
@@ -275,7 +268,7 @@ def _hex_to_yara_bytes(hex_val: str, arch: str = "x86") -> str:
         return hex_val
 
 
-def _generate_yara_rule(threat_report: Dict[str, Any], arch: str = "x86") -> str:
+def _generate_yara_rule(threat_report: dict[str, Any], arch: str = "x86") -> str:
     """
     Generate YARA rule from threat information.
 
@@ -338,7 +331,7 @@ def _generate_yara_rule(threat_report: Dict[str, Any], arch: str = "x86") -> str
         source = "Reversecore TDS - Adaptive Vaccine"
 
     strings:
-{chr(10).join(strings_section) if strings_section else '        // No patterns extracted - manual analysis required'}
+{chr(10).join(strings_section) if strings_section else "        // No patterns extracted - manual analysis required"}
 
     condition:
         {condition}
@@ -347,7 +340,7 @@ def _generate_yara_rule(threat_report: Dict[str, Any], arch: str = "x86") -> str
     return yara_rule
 
 
-def _va_to_file_offset(file_path: Path, va: int) -> Tuple[int, str]:
+def _va_to_file_offset(file_path: Path, va: int) -> tuple[int, str]:
     """Convert virtual address to file offset using LIEF.
 
     Args:
@@ -381,11 +374,7 @@ def _va_to_file_offset(file_path: Path, va: int) -> Tuple[int, str]:
                     # Find section name
                     section_name = "unknown"
                     for section in binary.sections:
-                        if (
-                            section.virtual_address
-                            <= va
-                            < section.virtual_address + section.size
-                        ):
+                        if section.virtual_address <= va < section.virtual_address + section.size:
                             section_name = section.name
                             break
                     return offset, section_name
@@ -398,8 +387,8 @@ def _va_to_file_offset(file_path: Path, va: int) -> Tuple[int, str]:
 
 
 def _create_binary_patch(
-    file_path: Path, threat_report: Dict[str, Any], dry_run: bool = True
-) -> Dict[str, Any]:
+    file_path: Path, threat_report: dict[str, Any], dry_run: bool = True
+) -> dict[str, Any]:
     """
     Create binary patch to neutralize threat.
 
@@ -475,12 +464,31 @@ def _create_binary_patch(
 
             patch_info["applied"] = True
             patch_info["backup"] = str(backup_path)
-            logger.info(
-                f"Applied patch at file offset {hex(file_offset)} (VA: {address_str})"
-            )
+            logger.info(f"Applied patch at file offset {hex(file_offset)} (VA: {address_str})")
         except Exception as e:
             # Restore from backup
             shutil.copy2(backup_path, file_path)
             raise RuntimeError(f"Patch failed, restored from backup: {e}")
 
     return patch_info
+
+
+from typing import Any
+
+from reversecore_mcp.core.plugin import Plugin
+
+
+class AdaptiveVaccinePlugin(Plugin):
+    """Plugin for Adaptive Vaccine tool."""
+
+    @property
+    def name(self) -> str:
+        return "adaptive_vaccine"
+
+    @property
+    def description(self) -> str:
+        return "Automated defense generation tool (YARA rules, binary patching)."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register Adaptive Vaccine tool."""
+        mcp_server.tool(adaptive_vaccine)

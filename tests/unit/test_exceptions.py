@@ -2,8 +2,6 @@
 Unit tests for core.exceptions module.
 """
 
-import pytest
-
 from reversecore_mcp.core.exceptions import (
     ExecutionTimeoutError,
     OutputLimitExceededError,
@@ -43,4 +41,3 @@ class TestExceptions:
         assert issubclass(ToolNotFoundError, ReversecoreError)
         assert issubclass(ExecutionTimeoutError, ReversecoreError)
         assert issubclass(OutputLimitExceededError, ReversecoreError)
-

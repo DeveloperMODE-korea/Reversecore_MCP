@@ -2,9 +2,7 @@
 Unit tests for server main() transport selection.
 """
 
-import types
 import sys
-import importlib
 
 import pytest
 
@@ -13,7 +11,7 @@ def test_server_main_stdio(monkeypatch, tmp_path):
     # Set LOG_FILE to writable temp path BEFORE import to avoid /var/log permission issues
     monkeypatch.setenv("LOG_FILE", str(tmp_path / "app.log"))
     monkeypatch.setenv("MCP_TRANSPORT", "stdio")
-    
+
     # Set up workspace and read dirs for path validation
     workspace = tmp_path / "workspace"
     workspace.mkdir(exist_ok=True)
@@ -21,9 +19,10 @@ def test_server_main_stdio(monkeypatch, tmp_path):
     read_dir.mkdir(exist_ok=True)
     monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
     monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-    
+
     # Reload settings to pick up new environment variables
     from reversecore_mcp.core.config import reload_settings
+
     reload_settings()
 
     # Ensure fresh import
@@ -54,7 +53,7 @@ def test_server_main_http(monkeypatch, tmp_path):
     # Set LOG_FILE to writable temp path BEFORE import
     monkeypatch.setenv("LOG_FILE", str(tmp_path / "app.log"))
     monkeypatch.setenv("MCP_TRANSPORT", "http")
-    
+
     # Set up workspace and read dirs for path validation
     workspace = tmp_path / "workspace"
     workspace.mkdir(exist_ok=True)
@@ -62,9 +61,10 @@ def test_server_main_http(monkeypatch, tmp_path):
     read_dir.mkdir(exist_ok=True)
     monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
     monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
-    
+
     # Reload settings to pick up new environment variables
     from reversecore_mcp.core.config import reload_settings
+
     reload_settings()
 
     # Mock uvicorn module before import

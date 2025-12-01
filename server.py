@@ -5,12 +5,13 @@ This module initializes the FastMCP server and registers all available tools.
 It includes health and metrics endpoints for monitoring in HTTP mode.
 """
 
-from fastmcp import FastMCP
-from contextlib import asynccontextmanager
 import shutil
+from contextlib import asynccontextmanager
 
-from reversecore_mcp.core.logging_config import setup_logging, get_logger
+from fastmcp import FastMCP
+
 from reversecore_mcp.core.config import get_config
+from reversecore_mcp.core.logging_config import get_logger, setup_logging
 from reversecore_mcp.core.resource_manager import resource_manager
 
 # Setup logging
@@ -113,22 +114,30 @@ async def server_lifespan(server: FastMCP):
 # Initialize the FastMCP server with lifespan management
 mcp = FastMCP(name="Reversecore_MCP", lifespan=server_lifespan)
 
-# Register all tool modules
-from reversecore_mcp.tools import (  # noqa: E402
-    cli_tools,
-    lib_tools,
-    ghost_trace,
-    neural_decompiler,
-    adaptive_vaccine,
-    trinity_defense,
-)
+# Register plugins dynamically
+import os
 
-cli_tools.register_cli_tools(mcp)
-lib_tools.register_lib_tools(mcp)
-ghost_trace.register_ghost_trace(mcp)
-neural_decompiler.register_neural_decompiler(mcp)
-adaptive_vaccine.register_adaptive_vaccine(mcp)
-trinity_defense.register_trinity_defense(mcp)
+from reversecore_mcp.core.loader import PluginLoader
+
+# Initialize plugin loader
+loader = PluginLoader()
+
+# Discover and load plugins from the tools directory
+# We assume tools are in the 'reversecore_mcp/tools' package
+tools_dir = os.path.join(os.path.dirname(__file__), "reversecore_mcp", "tools")
+if not os.path.exists(tools_dir):
+    # Fallback for development environment where running from root
+    tools_dir = os.path.join(os.getcwd(), "reversecore_mcp", "tools")
+
+plugins = loader.discover_plugins(tools_dir, "reversecore_mcp.tools")
+
+# Register each plugin with the MCP server
+for plugin in plugins:
+    try:
+        plugin.register(mcp)
+        logger.info(f"Registered plugin: {plugin.name}")
+    except Exception as e:
+        logger.error(f"Failed to register plugin {plugin.name}: {e}")
 
 # Register prompts
 from reversecore_mcp import prompts  # noqa: E402
@@ -169,7 +178,8 @@ def setup_authentication():
         X-API-Key: your-secret-key
     """
     import os
-    from fastapi import Depends, HTTPException, status, Request
+
+    from fastapi import Depends, HTTPException, Request, status
     from fastapi.security import APIKeyHeader
 
     api_key = os.getenv("MCP_API_KEY")
@@ -216,8 +226,9 @@ def main():
     if transport == "http":
         # HTTP transport mode for network-based AI agents
         import uvicorn
-        from fastapi import FastAPI, UploadFile, File
+        from fastapi import FastAPI, File, UploadFile
         from fastapi.responses import JSONResponse
+
         from reversecore_mcp.core.metrics import metrics_collector
 
         # Setup authentication (if MCP_API_KEY is set)
@@ -306,19 +317,15 @@ def main():
         # Optional: apply rate limiting if slowapi is available
         try:
             from slowapi import Limiter, _rate_limit_exceeded_handler  # type: ignore
-            from slowapi.util import get_remote_address  # type: ignore
             from slowapi.errors import RateLimitExceeded  # type: ignore
+            from slowapi.util import get_remote_address  # type: ignore
 
             rate_limit = settings.rate_limit
-            limiter = Limiter(
-                key_func=get_remote_address, default_limits=[f"{rate_limit}/minute"]
-            )
+            limiter = Limiter(key_func=get_remote_address, default_limits=[f"{rate_limit}/minute"])
 
             # Attach middleware and exception handler
             @app.middleware("http")
-            async def rate_limit_middleware(
-                request, call_next
-            ):  # pragma: no cover - integration
+            async def rate_limit_middleware(request, call_next):  # pragma: no cover - integration
                 return await limiter.middleware(request, call_next)
 
             app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

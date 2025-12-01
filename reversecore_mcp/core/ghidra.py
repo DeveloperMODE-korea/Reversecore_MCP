@@ -111,7 +111,7 @@ class GhidraService:
                 import pyghidra
 
                 self._configure_environment()
-                
+
                 # OPTIMIZATION: Use G1GC for better performance with large heaps
                 # No memory limit - let Ghidra use what it needs for faster analysis
                 jvm_args = [
@@ -169,7 +169,7 @@ class GhidraService:
     ) -> Optional["Function"]:
         """
         Resolve a function from address string or symbol name.
-        
+
         Args:
             flat_api: Ghidra FlatProgramAPI instance
             address_str: Function address (hex) or symbol name
@@ -370,7 +370,7 @@ class GhidraService:
 
         Returns:
             Tuple of (structures_dict, metadata_dict)
-        
+
         Performance Notes:
             - skip_full_analysis=True (default): ~30-60 seconds for large binaries
             - skip_full_analysis=False: Can take 10+ minutes, uses more memory
@@ -383,8 +383,10 @@ class GhidraService:
             project_name = "struct_analysis"
 
             try:
-                logger.info(f"Analyzing structures in: {file_path} (skip_full_analysis={skip_full_analysis})")
-                
+                logger.info(
+                    f"Analyzing structures in: {file_path} (skip_full_analysis={skip_full_analysis})"
+                )
+
                 # OPTIMIZATION: Always skip full analysis for structure recovery
                 # The decompiler performs targeted analysis on the specific function
                 # Full analysis is rarely needed and extremely slow on large binaries
@@ -575,16 +577,18 @@ def recover_structures_with_ghidra(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     Recover structures using Ghidra.
-    
+
     Args:
         file_path: Path to the binary file
         function_address: Function address or name
         timeout: Timeout in seconds
         skip_full_analysis: Skip full binary analysis for faster startup (default True)
-    
+
     (Deprecated: use ghidra_service.recover_structures())
     """
-    return ghidra_service.recover_structures(str(file_path), function_address, timeout, skip_full_analysis)
+    return ghidra_service.recover_structures(
+        str(file_path), function_address, timeout, skip_full_analysis
+    )
 
 
 def get_ghidra_version() -> str | None:

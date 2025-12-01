@@ -320,3 +320,27 @@ async def scan_workspace(
         status="completed",
         description=f"Batch scan completed for {len(files_to_scan)} files",
     )
+
+
+from typing import Any
+
+from reversecore_mcp.core.plugin import Plugin
+
+
+class FileOperationsPlugin(Plugin):
+    """Plugin for file operation tools."""
+
+    @property
+    def name(self) -> str:
+        return "file_operations"
+
+    @property
+    def description(self) -> str:
+        return "File management tools for workspace operations."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register file operation tools."""
+        mcp_server.tool(run_file)
+        mcp_server.tool(copy_to_workspace)
+        mcp_server.tool(list_workspace)
+        mcp_server.tool(scan_workspace)

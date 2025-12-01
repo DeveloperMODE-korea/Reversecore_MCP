@@ -2,15 +2,15 @@
 Error formatting utilities for structured error responses.
 """
 
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from reversecore_mcp.core.config import get_config
 from reversecore_mcp.core.exceptions import ReversecoreError
 
 
 def format_error(
-    error: Exception, tool_name: Optional[str] = None, hint: Optional[str] = None
-) -> Union[str, Dict[str, Any]]:
+    error: Exception, tool_name: str | None = None, hint: str | None = None
+) -> str | dict[str, Any]:
     """
     Format an error as string or structured JSON based on settings.
 
@@ -54,7 +54,7 @@ def format_error(
 
     if structured:
         # Return structured JSON format
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "error_code": error_code,
             "error_type": error_type,
             "message": message,

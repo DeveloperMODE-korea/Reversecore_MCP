@@ -10,53 +10,13 @@ Targets remaining low-coverage areas:
 """
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 # ============================================================================
 # CLI Tools Additional Tests (45% -> higher)
 # ============================================================================
-
-
-class TestCliToolsAdditional:
-    """Additional tests for cli_tools module."""
-
-    def test_resolve_address_integer(self):
-        """Test _resolve_address with integer string."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        mock_proj.loader.main_object.get_symbol.return_value = None
-
-        result = _resolve_address(mock_proj, "4198400")
-        assert result == 4198400
-
-    def test_resolve_address_none(self):
-        """Test _resolve_address with None."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        result = _resolve_address(mock_proj, None)
-        assert result is None
-
-    def test_resolve_address_empty(self):
-        """Test _resolve_address with empty string."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        result = _resolve_address(mock_proj, "")
-        assert result is None
-
-    def test_resolve_address_invalid_hex(self):
-        """Test _resolve_address with invalid hex."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        mock_proj.loader.main_object.get_symbol.return_value = None
-
-        result = _resolve_address(mock_proj, "0xZZZZ")
-        assert result is None
 
 
 # ============================================================================
@@ -187,7 +147,7 @@ class TestR2AnalysisAdditional:
 
     def test_strip_address_prefixes(self):
         """Test _strip_address_prefixes helper."""
-        from reversecore_mcp.tools.r2_analysis import _strip_address_prefixes
+        from reversecore_mcp.core.r2_helpers import _strip_address_prefixes
 
         assert _strip_address_prefixes("0x401000") == "401000"
         assert _strip_address_prefixes("401000") == "401000"
@@ -195,21 +155,21 @@ class TestR2AnalysisAdditional:
 
     def test_escape_mermaid_chars(self):
         """Test _escape_mermaid_chars helper."""
-        from reversecore_mcp.tools.r2_analysis import _escape_mermaid_chars
+        from reversecore_mcp.core.r2_helpers import _escape_mermaid_chars
 
         result = _escape_mermaid_chars("test")
         assert isinstance(result, str)
 
     def test_get_r2_project_name(self):
         """Test _get_r2_project_name helper."""
-        from reversecore_mcp.tools.r2_analysis import _get_r2_project_name
+        from reversecore_mcp.core.r2_helpers import _get_r2_project_name
 
         result = _get_r2_project_name("/path/to/file.bin")
         assert isinstance(result, str)
 
     def test_calculate_dynamic_timeout(self):
         """Test _calculate_dynamic_timeout helper."""
-        from reversecore_mcp.tools.r2_analysis import _calculate_dynamic_timeout
+        from reversecore_mcp.core.r2_helpers import _calculate_dynamic_timeout
 
         # Small file should use base timeout
         result = _calculate_dynamic_timeout("/nonexistent/file.bin", base_timeout=100)

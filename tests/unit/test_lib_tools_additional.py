@@ -3,8 +3,6 @@
 import sys
 import types
 
-import pytest
-
 from reversecore_mcp.tools import lib_tools
 
 
@@ -168,6 +166,7 @@ def test_run_yara_formatter_fallback_tuple_api(
                     self.meta = {"author": "test"}
                     # Old strings API that raises AttributeError when accessing .instances
                     self.strings = [(20, "$b", b"xyz")]
+
             return [OldMatch()]
 
     class _Error(Exception):
@@ -251,7 +250,7 @@ def test_disassemble_no_data_at_offset(
     """Test disassemble when no data is read from offset."""
     # Create a very small file
     test_file = _create_workspace_binary(workspace_dir, "tiny.bin", b"\x90")
-    
+
     # Mock capstone
     fake_capstone = types.ModuleType("capstone")
     fake_capstone.CS_ARCH_X86 = 0
@@ -267,7 +266,9 @@ def test_disassemble_no_data_at_offset(
     monkeypatch.setitem(sys.modules, "capstone", fake_capstone)
 
     # Try to read from an offset beyond the file
-    out = lib_tools.disassemble_with_capstone(str(test_file), arch="x86", mode="64", offset=100, size=1024)
+    out = lib_tools.disassemble_with_capstone(
+        str(test_file), arch="x86", mode="64", offset=100, size=1024
+    )
     assert out.status == "error"
     assert out.error_code == "NO_DATA"
 
@@ -279,8 +280,10 @@ def test_disassemble_no_instructions(
     """Test disassemble when no instructions are disassembled."""
     # Create file with invalid opcodes that won't disassemble
     test_file = _create_workspace_binary(workspace_dir, "invalid.bin", b"\xff" * 10)
-    
-    out = lib_tools.disassemble_with_capstone(str(test_file), arch="x86", mode="64", offset=0, size=10)
+
+    out = lib_tools.disassemble_with_capstone(
+        str(test_file), arch="x86", mode="64", offset=0, size=10
+    )
     # Should succeed but with no instructions
     if out.status == "success":
         assert "No instructions" in out.data or out.metadata.get("instruction_count") == 0
@@ -368,6 +371,7 @@ def test_parse_binary_with_lief_with_symbols(
     class _Function:
         def __init__(self, name):
             self.name = name
+
         def __str__(self):
             return self.name
 

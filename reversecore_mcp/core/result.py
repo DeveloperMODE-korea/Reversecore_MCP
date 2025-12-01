@@ -2,29 +2,31 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Literal, Union
 
 from pydantic import BaseModel
 
 try:
-    from typing import TypedDict, NotRequired
+    from typing import NotRequired, TypedDict
 except ImportError:
-    from typing_extensions import TypedDict, NotRequired
+    from typing_extensions import NotRequired, TypedDict
 
 
 # TypedDict definitions for common tool result structures
 class FunctionInfo(TypedDict):
     """Information about a function in a binary."""
+
     name: str
     address: str
     size: NotRequired[int]
     signature: NotRequired[str]
-    callees: NotRequired[List[str]]
-    callers: NotRequired[List[str]]
+    callees: NotRequired[list[str]]
+    callers: NotRequired[list[str]]
 
 
 class DisassemblyResult(TypedDict):
     """Result of disassembly operation."""
+
     address: str
     mnemonic: str
     operands: str
@@ -34,6 +36,7 @@ class DisassemblyResult(TypedDict):
 
 class DecompilationResult(TypedDict):
     """Result of decompilation operation."""
+
     function_name: str
     source_code: str
     decompiler: NotRequired[str]
@@ -42,41 +45,46 @@ class DecompilationResult(TypedDict):
 
 class BinaryMetadata(TypedDict):
     """Metadata about a binary file."""
+
     file_path: str
     file_size: int
     file_type: str
     architecture: NotRequired[str]
     endianness: NotRequired[str]
     entry_point: NotRequired[str]
-    sections: NotRequired[List[Dict[str, Any]]]
+    sections: NotRequired[list[dict[str, Any]]]
 
 
 class YaraRuleResult(TypedDict):
     """Result of YARA rule generation."""
+
     rule_name: str
     rule_content: str
     patterns_count: NotRequired[int]
-    meta: NotRequired[Dict[str, str]]
+    meta: NotRequired[dict[str, str]]
 
 
 class ScanResult(TypedDict):
     """Result of a security scan."""
-    findings: List[Dict[str, Any]]
+
+    findings: list[dict[str, Any]]
     severity: NotRequired[str]
-    recommendations: NotRequired[List[str]]
+    recommendations: NotRequired[list[str]]
 
 
 class EmulationResult(TypedDict):
     """Result of code emulation."""
-    final_registers: Dict[str, Any]
+
+    final_registers: dict[str, Any]
     steps_executed: int
     status: str
-    memory_writes: NotRequired[List[Dict[str, Any]]]
-    syscalls: NotRequired[List[str]]
+    memory_writes: NotRequired[list[dict[str, Any]]]
+    syscalls: NotRequired[list[str]]
 
 
 class ErrorDetails(TypedDict, total=False):
     """Details for error responses."""
+
     max_size: int
     actual_size: int
     exception_type: str
@@ -87,8 +95,8 @@ class ToolSuccess(BaseModel):
     """Represents a successful tool invocation."""
 
     status: Literal["success"] = "success"
-    data: Union[str, Dict[str, Any]]
-    metadata: Optional[Dict[str, Any]] = None
+    data: str | dict[str, Any]
+    metadata: dict[str, Any] | None = None
 
 
 class ToolError(BaseModel):
@@ -97,14 +105,14 @@ class ToolError(BaseModel):
     status: Literal["error"] = "error"
     error_code: str
     message: str
-    hint: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    hint: str | None = None
+    details: dict[str, Any] | None = None
 
 
 ToolResult = Union[ToolSuccess, ToolError]
 
 
-def success(data: Union[str, Dict[str, Any]], **metadata: Any) -> ToolSuccess:
+def success(data: str | dict[str, Any], **metadata: Any) -> ToolSuccess:
     """Create a ToolSuccess instance with optional metadata."""
     return ToolSuccess(data=data, metadata=metadata or None)
 
@@ -112,7 +120,7 @@ def success(data: Union[str, Dict[str, Any]], **metadata: Any) -> ToolSuccess:
 def failure(
     error_code: str,
     message: str,
-    hint: Optional[str] = None,
+    hint: str | None = None,
     **details: Any,
 ) -> ToolError:
     """Create a ToolError instance with optional hint/details."""

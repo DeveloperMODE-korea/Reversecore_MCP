@@ -71,9 +71,7 @@ async def run_strings(
             f"Showing first {LLM_SAFE_LIMIT} bytes.\n"
             "To analyze the full content, consider using 'grep' or processing the file directly."
         )
-        return success(
-            truncated_output + warning_msg, bytes_read=bytes_read, truncated=True
-        )
+        return success(truncated_output + warning_msg, bytes_read=bytes_read, truncated=True)
 
     return success(output, bytes_read=bytes_read)
 
@@ -148,7 +146,7 @@ async def run_binwalk_extract(
     from pathlib import Path
 
     validated_path = validate_file_path(file_path)
-    
+
     # Create output directory if not specified
     if output_dir is None:
         # Create temp directory for extraction
@@ -157,32 +155,33 @@ async def run_binwalk_extract(
     else:
         # Resolve output directory path (may not exist yet)
         from pathlib import Path
+
         output_path = Path(output_dir).resolve()
         extraction_dir = str(output_path)
         os.makedirs(extraction_dir, exist_ok=True)
-    
+
     # Build binwalk extraction command
     cmd = ["binwalk", "-e"]  # -e for extraction
-    
+
     if matryoshka:
         cmd.append("-M")  # Matryoshka/recursive extraction
-    
+
     cmd.extend(["-d", str(depth)])  # Extraction depth
     cmd.extend(["-C", str(extraction_dir)])  # Output directory
     cmd.append(str(validated_path))
-    
+
     # Run extraction
     output, bytes_read = await execute_subprocess_async(
         cmd,
         max_output_size=max_output_size,
         timeout=timeout,
     )
-    
+
     # Gather extraction results
     extracted_files = []
     total_size = 0
     max_depth_found = 0
-    
+
     # Walk the extraction directory to catalog results
     extraction_path = Path(extraction_dir)
     if extraction_path.exists():
@@ -191,13 +190,13 @@ async def run_binwalk_extract(
             rel_path = Path(root).relative_to(extraction_path)
             current_depth = len(rel_path.parts)
             max_depth_found = max(max_depth_found, current_depth)
-            
+
             for filename in files:
                 file_full_path = Path(root) / filename
                 try:
                     file_size = file_full_path.stat().st_size
                     total_size += file_size
-                    
+
                     # Try to determine file type
                     file_type = "unknown"
                     try:
@@ -210,20 +209,22 @@ async def run_binwalk_extract(
                     except (OSError, TimeoutError):
                         # file command failed or timed out, use default "unknown"
                         file_type = "unknown"
-                    
-                    extracted_files.append({
-                        "path": str(file_full_path.relative_to(extraction_path)),
-                        "type": file_type,
-                        "size": file_size,
-                    })
+
+                    extracted_files.append(
+                        {
+                            "path": str(file_full_path.relative_to(extraction_path)),
+                            "type": file_type,
+                            "size": file_size,
+                        }
+                    )
                 except (OSError, ValueError):
                     continue
-    
+
     # Sort by size (largest first) and limit entries
     extracted_files.sort(key=lambda x: x["size"], reverse=True)
     truncated = len(extracted_files) > MAX_EXTRACTED_FILES
     extracted_files = extracted_files[:MAX_EXTRACTED_FILES]
-    
+
     # Parse binwalk output for additional info
     signatures_found = []
     for line in output.split("\n"):
@@ -235,18 +236,16 @@ async def run_binwalk_extract(
                 try:
                     offset = int(parts[0])
                     sig_type = " ".join(parts[2:])
-                    signatures_found.append({
-                        "offset": offset,
-                        "type": sig_type[:100]
-                    })
+                    signatures_found.append({"offset": offset, "type": sig_type[:100]})
                 except (ValueError, IndexError):
                     continue
-    
+
     return success(
         {
             "output_directory": str(extraction_dir),
             "extracted_files": extracted_files,
-            "total_files": len(extracted_files) + (100 if truncated else 0),  # Estimate if truncated
+            "total_files": len(extracted_files)
+            + (100 if truncated else 0),  # Estimate if truncated
             "total_size": total_size,
             "total_size_human": _format_size(total_size),
             "extraction_depth": max_depth_found,
@@ -364,14 +363,16 @@ async def extract_rtti_info(
     # 2. MSVC style: .?AV (class), .?AU (struct), .?AW (enum)
     # 3. Explicit class/struct keywords
     rtti_pattern = re.compile(r"(_ZTS|_ZTI|_ZTV|\.?\?A[VUW]|class\s+\w+|struct\s+\w+)")
-    
+
     # Pattern for extracting class names from various formats
     class_patterns = [
         re.compile(r"(?:class|struct)\s+(\w+(?:::\w+)*)"),  # class Foo, struct Bar::Baz
         re.compile(r"\.?\?AV(\w+)@@"),  # MSVC class: .?AVClassName@@
         re.compile(r"\.?\?AU(\w+)@@"),  # MSVC struct: .?AUStructName@@
         re.compile(r"_ZTS(\d+)(\w+)"),  # GCC typeinfo: _ZTS4Foo -> Foo (length prefixed)
-        re.compile(r"(\w{2,}(?:Actor|Component|Manager|Controller|Handler|Service|Factory|Provider|Interface))"),  # Common OOP patterns
+        re.compile(
+            r"(\w{2,}(?:Actor|Component|Manager|Controller|Handler|Service|Factory|Provider|Interface))"
+        ),  # Common OOP patterns
         re.compile(r"(C[a-z][A-Z]\w{3,})"),  # Hungarian notation: CzCharacter, CxMonster
     ]
 
@@ -382,7 +383,7 @@ async def extract_rtti_info(
         line_stripped = line.strip()
         if rtti_pattern.search(line_stripped):
             rtti_strings.append(line_stripped)
-            
+
             # Try all patterns to extract class names
             for pattern in class_patterns:
                 matches = pattern.findall(line_stripped)
@@ -392,9 +393,13 @@ async def extract_rtti_info(
                         class_name = match[-1]  # Take the last group (usually the name)
                     else:
                         class_name = match
-                    
+
                     # Filter out noise (too short, all caps, numbers only)
-                    if len(class_name) > 2 and not class_name.isupper() and not class_name.isdigit():
+                    if (
+                        len(class_name) > 2
+                        and not class_name.isupper()
+                        and not class_name.isdigit()
+                    ):
                         class_names.add(class_name)
 
     return success(
@@ -407,3 +412,28 @@ async def extract_rtti_info(
         bytes_read=bytes_read,
         description=f"Extracted {len(class_names)} C++ class names from RTTI",
     )
+
+
+from typing import Any
+
+from reversecore_mcp.core.plugin import Plugin
+
+
+class StaticAnalysisPlugin(Plugin):
+    """Plugin for static analysis tools."""
+
+    @property
+    def name(self) -> str:
+        return "static_analysis"
+
+    @property
+    def description(self) -> str:
+        return "Static analysis tools for string extraction, version scanning, and RTTI analysis."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register static analysis tools."""
+        mcp_server.tool(run_strings)
+        mcp_server.tool(run_binwalk)
+        mcp_server.tool(run_binwalk_extract)
+        mcp_server.tool(scan_for_versions)
+        mcp_server.tool(extract_rtti_info)

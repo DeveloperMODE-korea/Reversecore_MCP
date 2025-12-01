@@ -61,17 +61,11 @@ def extract_iocs(
                     if isinstance(data["data"], str):
                         text = data["data"]
                     elif isinstance(data["data"], dict):
-                        text = json.dumps(
-                            data["data"]
-                        )  # Convert back to string for regex
+                        text = json.dumps(data["data"])  # Convert back to string for regex
                 elif "content" in data:  # Legacy or other format
                     if isinstance(data["content"], list):
                         text = "\n".join(
-                            [
-                                c.get("text", "")
-                                for c in data["content"]
-                                if isinstance(c, dict)
-                            ]
+                            [c.get("text", "") for c in data["content"] if isinstance(c, dict)]
                         )
                     else:
                         text = str(data["content"])
@@ -90,7 +84,7 @@ def extract_iocs(
                     f"File {text} is too large for regex analysis (>10MB).",
                     hint="Use 'run_strings' or 'grep' to filter content first.",
                 )
-            with open(text, "r", encoding="utf-8", errors="ignore") as f:
+            with open(text, encoding="utf-8", errors="ignore") as f:
                 text = f.read()
         except Exception as e:
             return failure("FILE_READ_ERROR", f"Failed to read file: {str(e)}")

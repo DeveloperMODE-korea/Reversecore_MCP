@@ -92,30 +92,6 @@ class TestStaticAnalysisFinal:
 # ============================================================================
 
 
-class TestCliToolsFinal:
-    """Final tests for cli_tools."""
-
-    def test_resolve_address_with_symbol_exception(self):
-        """Test _resolve_address when symbol lookup raises exception."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        mock_proj.loader.main_object.get_symbol.side_effect = Exception("fail")
-
-        result = _resolve_address(mock_proj, "test_symbol")
-        assert result is None
-
-    def test_resolve_address_integer_fallback(self):
-        """Test _resolve_address with integer fallback."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        mock_proj.loader.main_object.get_symbol.return_value = None
-
-        result = _resolve_address(mock_proj, "12345")
-        assert result == 12345
-
-
 # ============================================================================
 # JSON Utils additional tests
 # ============================================================================

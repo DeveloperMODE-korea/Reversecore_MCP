@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from reversecore_mcp.core.exceptions import ValidationError
-from reversecore_mcp.tools import cli_tools
+from reversecore_mcp.tools import decompilation, signature_tools
 
 
 @pytest.mark.asyncio
@@ -31,7 +31,7 @@ class TestSmartDecompile:
             new_callable=AsyncMock,
             return_value=(mock_output, len(mock_output)),
         ):
-            result = await cli_tools.smart_decompile(str(test_file), "main")
+            result = await decompilation.smart_decompile(str(test_file), "main", use_ghidra=False)
 
             assert result.status == "success"
             assert "void main" in result.data
@@ -42,7 +42,7 @@ class TestSmartDecompile:
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE_BINARY")
 
-        result = await cli_tools.smart_decompile(str(test_file), "main; rm -rf /")
+        result = await decompilation.smart_decompile(str(test_file), "main; rm -rf /")
 
         assert result.status == "error"
         # Updated to match the new error message from validate_address_format
@@ -61,7 +61,7 @@ class TestSmartDecompile:
             new_callable=AsyncMock,
             return_value=(mock_output, len(mock_output)),
         ):
-            result = await cli_tools.smart_decompile(str(test_file), "nonexistent_func")
+            result = await decompilation.smart_decompile(str(test_file), "nonexistent_func")
 
             assert result.status == "success"
             assert "Cannot find function" in result.data
@@ -79,7 +79,7 @@ class TestSmartDecompile:
             new_callable=AsyncMock,
             return_value=(mock_output, len(mock_output)),
         ):
-            result = await cli_tools.smart_decompile(str(test_file), "0x401000")
+            result = await decompilation.smart_decompile(str(test_file), "0x401000")
 
             assert result.status == "success"
             assert "fcn_401000" in result.data
@@ -102,7 +102,7 @@ class TestGenerateYaraRule:
             new_callable=AsyncMock,
             return_value=(mock_output, len(mock_output)),
         ):
-            result = await cli_tools.generate_yara_rule(
+            result = await signature_tools.generate_yara_rule(
                 str(test_file), "main", rule_name="test_rule"
             )
 
@@ -117,7 +117,9 @@ class TestGenerateYaraRule:
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE_BINARY")
 
-        result = await cli_tools.generate_yara_rule(str(test_file), "main", rule_name="123-invalid")
+        result = await signature_tools.generate_yara_rule(
+            str(test_file), "main", rule_name="123-invalid"
+        )
 
         assert result.status == "error"
         assert "rule_name must start with a letter" in result.message
@@ -129,7 +131,7 @@ class TestGenerateYaraRule:
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE_BINARY")
 
-        result = await cli_tools.generate_yara_rule(str(test_file), "main", byte_length=2000)
+        result = await signature_tools.generate_yara_rule(str(test_file), "main", byte_length=2000)
 
         assert result.status == "error"
         assert "cannot exceed 1024" in result.message
@@ -141,7 +143,7 @@ class TestGenerateYaraRule:
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE_BINARY")
 
-        result = await cli_tools.generate_yara_rule(str(test_file), "main; echo hacked")
+        result = await signature_tools.generate_yara_rule(str(test_file), "main; echo hacked")
 
         assert result.status == "error"
         # Updated to match the new error message from validate_address_format
@@ -162,7 +164,7 @@ class TestGenerateYaraRule:
             new_callable=AsyncMock,
             return_value=(mock_output, len(mock_output)),
         ):
-            result = await cli_tools.generate_yara_rule(
+            result = await signature_tools.generate_yara_rule(
                 str(test_file), "main", byte_length=32, rule_name="custom_rule"
             )
 
@@ -182,7 +184,7 @@ class TestGenerateYaraRule:
             new_callable=AsyncMock,
             return_value=(mock_output, len(mock_output)),
         ):
-            result = await cli_tools.generate_yara_rule(str(test_file), "0x401000")
+            result = await signature_tools.generate_yara_rule(str(test_file), "0x401000")
 
             assert result.status == "success"
             assert "rule auto_generated_rule" in result.data

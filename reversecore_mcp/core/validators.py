@@ -3,7 +3,8 @@ Input validators for tool-specific parameters.
 """
 
 import re
-from typing import Dict, Any
+from typing import Any
+
 from reversecore_mcp.core.exceptions import ValidationError
 
 # Pre-compile address validation pattern for performance
@@ -37,7 +38,7 @@ def validate_address_format(address: str, param_name: str = "address") -> None:
         )
 
 
-def validate_tool_parameters(tool_name: str, params: Dict[str, Any]) -> None:
+def validate_tool_parameters(tool_name: str, params: dict[str, Any]) -> None:
     """
     Validate tool-specific parameters.
 
@@ -68,7 +69,7 @@ def validate_tool_parameters(tool_name: str, params: Dict[str, Any]) -> None:
         validators[tool_name](params)
 
 
-def _validate_strings_params(params: Dict[str, Any]) -> None:
+def _validate_strings_params(params: dict[str, Any]) -> None:
     """Validate run_strings parameters."""
     min_length = params.get("min_length", 4)
     if not isinstance(min_length, int) or min_length < 1:
@@ -79,7 +80,7 @@ def _validate_strings_params(params: Dict[str, Any]) -> None:
         raise ValidationError("max_output_size must be a positive integer")
 
 
-def _validate_radare2_params(params: Dict[str, Any]) -> None:
+def _validate_radare2_params(params: dict[str, Any]) -> None:
     """Validate run_radare2 parameters."""
     if "r2_command" not in params:
         raise ValidationError("r2_command is required")
@@ -88,7 +89,7 @@ def _validate_radare2_params(params: Dict[str, Any]) -> None:
         raise ValidationError("r2_command must be a string")
 
 
-def _validate_capstone_params(params: Dict[str, Any]) -> None:
+def _validate_capstone_params(params: dict[str, Any]) -> None:
     """Validate disassemble_with_capstone parameters."""
     offset = params.get("offset", 0)
     if not isinstance(offset, int) or offset < 0:
@@ -102,7 +103,7 @@ def _validate_capstone_params(params: Dict[str, Any]) -> None:
     # to provide more detailed error messages
 
 
-def _validate_yara_params(params: Dict[str, Any]) -> None:
+def _validate_yara_params(params: dict[str, Any]) -> None:
     """Validate run_yara parameters."""
     if "rule_file" not in params:
         raise ValidationError("rule_file is required")
@@ -112,7 +113,7 @@ def _validate_yara_params(params: Dict[str, Any]) -> None:
         raise ValidationError("timeout must be a positive integer")
 
 
-def _validate_cfg_params(params: Dict[str, Any]) -> None:
+def _validate_cfg_params(params: dict[str, Any]) -> None:
     """Validate generate_function_graph parameters."""
     if "function_address" in params:
         if not isinstance(params["function_address"], str):
@@ -126,7 +127,7 @@ def _validate_cfg_params(params: Dict[str, Any]) -> None:
         )
 
 
-def _validate_emulation_params(params: Dict[str, Any]) -> None:
+def _validate_emulation_params(params: dict[str, Any]) -> None:
     """Validate emulate_machine_code parameters."""
     if "start_address" in params:
         if not isinstance(params["start_address"], str):
@@ -146,7 +147,7 @@ def _validate_emulation_params(params: Dict[str, Any]) -> None:
         )
 
 
-def _validate_pseudo_code_params(params: Dict[str, Any]) -> None:
+def _validate_pseudo_code_params(params: dict[str, Any]) -> None:
     """Validate get_pseudo_code parameters."""
     if "address" in params:
         if not isinstance(params["address"], str):
@@ -157,7 +158,7 @@ def _validate_pseudo_code_params(params: Dict[str, Any]) -> None:
         raise ValidationError("timeout must be a positive integer")
 
 
-def _validate_signature_params(params: Dict[str, Any]) -> None:
+def _validate_signature_params(params: dict[str, Any]) -> None:
     """Validate generate_signature parameters."""
     if "address" not in params:
         raise ValidationError("address is required")
@@ -174,21 +175,21 @@ def _validate_signature_params(params: Dict[str, Any]) -> None:
         raise ValidationError("timeout must be a positive integer")
 
 
-def _validate_rtti_params(params: Dict[str, Any]) -> None:
+def _validate_rtti_params(params: dict[str, Any]) -> None:
     """Validate extract_rtti_info parameters."""
     timeout = params.get("timeout", 300)
     if not isinstance(timeout, int) or timeout < 1:
         raise ValidationError("timeout must be a positive integer")
 
 
-def _validate_decompile_params(params: Dict[str, Any]) -> None:
+def _validate_decompile_params(params: dict[str, Any]) -> None:
     """Validate smart_decompile parameters."""
     if "function_address" in params:
         if not isinstance(params["function_address"], str):
             raise ValidationError("function_address must be a string")
 
 
-def _validate_yara_generation_params(params: Dict[str, Any]) -> None:
+def _validate_yara_generation_params(params: dict[str, Any]) -> None:
     """Validate generate_yara_rule parameters."""
     if "function_address" in params:
         if not isinstance(params["function_address"], str):
@@ -208,7 +209,7 @@ def _validate_yara_generation_params(params: Dict[str, Any]) -> None:
             raise ValidationError("rule_name must be a string")
 
 
-def _validate_diff_binaries_params(params: Dict[str, Any]) -> None:
+def _validate_diff_binaries_params(params: dict[str, Any]) -> None:
     """Validate diff_binaries parameters."""
     if "function_name" in params and params["function_name"] is not None:
         if not isinstance(params["function_name"], str):
@@ -223,7 +224,7 @@ def _validate_diff_binaries_params(params: Dict[str, Any]) -> None:
         raise ValidationError("timeout must be a positive integer")
 
 
-def _validate_match_libraries_params(params: Dict[str, Any]) -> None:
+def _validate_match_libraries_params(params: dict[str, Any]) -> None:
     """Validate match_libraries parameters."""
     max_output_size = params.get("max_output_size", 10_000_000)
     if not isinstance(max_output_size, int) or max_output_size < 1:

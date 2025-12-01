@@ -1,9 +1,6 @@
 """Unit tests for BinaryMetadataCache."""
 
 import time
-from pathlib import Path
-
-import pytest
 
 from reversecore_mcp.core.binary_cache import BinaryMetadataCache, binary_cache
 
@@ -16,10 +13,10 @@ class TestBinaryMetadataCache:
         cache = BinaryMetadataCache()
         test_file = tmp_path / "test.bin"
         test_file.write_text("test")
-        
+
         key1 = cache._get_cache_key(str(test_file))
         key2 = cache._get_cache_key(str(test_file.absolute()))
-        
+
         assert key1 == key2
         assert str(test_file.absolute()) in key1
 
@@ -28,11 +25,11 @@ class TestBinaryMetadataCache:
         cache = BinaryMetadataCache()
         test_file = tmp_path / "test.bin"
         test_file.write_text("test")
-        
+
         # Set metadata
         cache.set(str(test_file), "format", "PE")
         cache.set(str(test_file), "arch", "x86-64")
-        
+
         # Get metadata
         assert cache.get(str(test_file), "format") == "PE"
         assert cache.get(str(test_file), "arch") == "x86-64"
@@ -42,7 +39,7 @@ class TestBinaryMetadataCache:
         cache = BinaryMetadataCache()
         test_file = tmp_path / "test.bin"
         test_file.write_text("test")
-        
+
         result = cache.get(str(test_file), "nonexistent")
         assert result is None
 
@@ -52,15 +49,15 @@ class TestBinaryMetadataCache:
         cache = BinaryMetadataCache(ttl_seconds=0)
         test_file = tmp_path / "test.bin"
         test_file.write_text("original")
-        
+
         # Set initial metadata
         cache.set(str(test_file), "format", "PE")
         assert cache.get(str(test_file), "format") == "PE"
-        
+
         # Modify file
         time.sleep(0.01)  # Ensure mtime changes
         test_file.write_text("modified")
-        
+
         # Cache should be invalid now
         result = cache.get(str(test_file), "format")
         assert result is None
@@ -69,11 +66,11 @@ class TestBinaryMetadataCache:
         """Test that cache handles nonexistent files gracefully."""
         cache = BinaryMetadataCache()
         nonexistent = tmp_path / "nonexistent.bin"
-        
+
         # Should return None for nonexistent file
         result = cache.get(str(nonexistent), "format")
         assert result is None
-        
+
         # Setting on nonexistent file should not crash
         cache.set(str(nonexistent), "format", "PE")
 
@@ -84,14 +81,14 @@ class TestBinaryMetadataCache:
         test_file2 = tmp_path / "test2.bin"
         test_file1.write_text("test1")
         test_file2.write_text("test2")
-        
+
         # Set metadata for both files
         cache.set(str(test_file1), "format", "PE")
         cache.set(str(test_file2), "format", "ELF")
-        
+
         # Clear first file
         cache.clear(str(test_file1))
-        
+
         # First file should be cleared
         assert cache.get(str(test_file1), "format") is None
         # Second file should still be cached
@@ -104,14 +101,14 @@ class TestBinaryMetadataCache:
         test_file2 = tmp_path / "test2.bin"
         test_file1.write_text("test1")
         test_file2.write_text("test2")
-        
+
         # Set metadata for both files
         cache.set(str(test_file1), "format", "PE")
         cache.set(str(test_file2), "format", "ELF")
-        
+
         # Clear all
         cache.clear()
-        
+
         # Both should be cleared
         assert cache.get(str(test_file1), "format") is None
         assert cache.get(str(test_file2), "format") is None
@@ -121,12 +118,12 @@ class TestBinaryMetadataCache:
         cache = BinaryMetadataCache()
         test_file = tmp_path / "test.bin"
         test_file.write_text("test")
-        
+
         # Set multiple keys
         cache.set(str(test_file), "format", "PE")
         cache.set(str(test_file), "arch", "x86-64")
         cache.set(str(test_file), "size", 1024)
-        
+
         # All keys should be retrievable
         assert cache.get(str(test_file), "format") == "PE"
         assert cache.get(str(test_file), "arch") == "x86-64"
@@ -137,11 +134,11 @@ class TestBinaryMetadataCache:
         cache = BinaryMetadataCache()
         test_file = tmp_path / "test.bin"
         test_file.write_text("test")
-        
+
         # Set initial value
         cache.set(str(test_file), "format", "PE")
         assert cache.get(str(test_file), "format") == "PE"
-        
+
         # Overwrite
         cache.set(str(test_file), "format", "ELF")
         assert cache.get(str(test_file), "format") == "ELF"
@@ -152,20 +149,20 @@ class TestBinaryMetadataCache:
         cache = BinaryMetadataCache(ttl_seconds=0)
         test_file = tmp_path / "test.bin"
         test_file.write_text("test")
-        
+
         # Not valid initially (not in cache)
         assert cache._is_valid(str(test_file)) is False
-        
+
         # Set metadata
         cache.set(str(test_file), "format", "PE")
-        
+
         # Now valid
         assert cache._is_valid(str(test_file)) is True
-        
+
         # Modify file
         time.sleep(0.01)
         test_file.write_text("modified")
-        
+
         # No longer valid
         assert cache._is_valid(str(test_file)) is False
 

@@ -11,7 +11,8 @@ This module provides functions to execute subprocess commands safely with:
 import asyncio
 import subprocess
 import threading
-from typing import Any, Coroutine, Tuple
+from collections.abc import Coroutine
+from typing import Any
 
 from reversecore_mcp.core.exceptions import (
     ExecutionTimeoutError,
@@ -35,7 +36,7 @@ class _BackgroundLoopRunner:
         asyncio.set_event_loop(self._loop)
         self._loop.run_forever()
 
-    def run(self, coro: Coroutine[Any, Any, Tuple[str, int]]) -> Tuple[str, int]:
+    def run(self, coro: Coroutine[Any, Any, tuple[str, int]]) -> tuple[str, int]:
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         return future.result()
 
@@ -58,7 +59,7 @@ async def execute_subprocess_async(
     timeout: int = 300,  # 5 minutes default
     encoding: str = "utf-8",
     errors: str = "replace",
-) -> Tuple[str, int]:
+) -> tuple[str, int]:
     """
     Execute a subprocess command asynchronously with streaming output and size limits.
 
@@ -175,7 +176,7 @@ def execute_subprocess_streaming(
     timeout: int = 300,  # 5 minutes default
     encoding: str = "utf-8",
     errors: str = "replace",
-) -> Tuple[str, int]:
+) -> tuple[str, int]:
     """
     Execute a subprocess command with streaming output and size limits.
 

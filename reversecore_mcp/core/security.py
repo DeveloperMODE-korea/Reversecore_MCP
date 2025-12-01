@@ -12,11 +12,9 @@ in command_spec.py which provides stronger security guarantees.
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional, Tuple
 
 from reversecore_mcp.core.config import get_config
 from reversecore_mcp.core.exceptions import ValidationError
-
 
 # Configuration constants
 PATH_VALIDATION_CACHE_SIZE = 256  # Number of path resolutions to cache
@@ -27,7 +25,7 @@ class WorkspaceConfig:
     """Immutable configuration for workspace-aware file validation."""
 
     workspace: Path
-    read_only_dirs: Tuple[Path, ...]
+    read_only_dirs: tuple[Path, ...]
 
     @classmethod
     def from_env(cls) -> "WorkspaceConfig":
@@ -39,16 +37,16 @@ class WorkspaceConfig:
 # Lazy-initialized workspace configuration
 # This avoids initialization errors when the module is imported before
 # environment variables are set (common in test fixtures)
-_WORKSPACE_CONFIG: Optional[WorkspaceConfig] = None
+_WORKSPACE_CONFIG: WorkspaceConfig | None = None
 
 
 def get_workspace_config() -> WorkspaceConfig:
     """
     Get the workspace configuration, initializing it lazily on first access.
-    
+
     This lazy initialization pattern allows tests to set up environment
     variables or mock configurations before the first access.
-    
+
     Returns:
         WorkspaceConfig instance
     """
@@ -70,7 +68,7 @@ def refresh_workspace_config() -> WorkspaceConfig:
 def reset_workspace_config() -> None:
     """
     Reset the workspace configuration to uninitialized state.
-    
+
     This is useful for tests that need to change environment variables
     and have the configuration re-read on next access.
     """
@@ -80,7 +78,7 @@ def reset_workspace_config() -> None:
 
 
 @lru_cache(maxsize=PATH_VALIDATION_CACHE_SIZE)
-def _resolve_path_cached(path_str: str) -> Tuple[Path, bool, str]:
+def _resolve_path_cached(path_str: str) -> tuple[Path, bool, str]:
     """
     Cached path resolution to avoid repeated filesystem calls.
 
@@ -100,7 +98,7 @@ def _resolve_path_cached(path_str: str) -> Tuple[Path, bool, str]:
 def validate_file_path(
     path: str,
     read_only: bool = False,
-    config: Optional[WorkspaceConfig] = None,
+    config: WorkspaceConfig | None = None,
 ) -> Path:
     """
     Validate and normalize a file path.

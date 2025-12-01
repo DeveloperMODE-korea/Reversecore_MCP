@@ -173,38 +173,6 @@ class TestStaticAnalysisMain:
 # ============================================================================
 
 
-class TestCliToolsMain:
-    """Test CLI tool functions."""
-
-    @pytest.mark.asyncio
-    async def test_solve_path_constraints(self, sample_binary_path, patched_config):
-        """Test solve_path_constraints function."""
-        from reversecore_mcp.tools.cli_tools import solve_path_constraints
-
-        result = await solve_path_constraints(str(sample_binary_path), "0x1000", "0x2000")
-
-        # May fail if angr not installed
-        assert result.status in ("success", "error")
-
-    @pytest.mark.asyncio
-    async def test_analyze_with_ai(self, sample_binary_path, patched_config):
-        """Test analyze_with_ai function."""
-        from reversecore_mcp.tools.cli_tools import analyze_with_ai
-
-        result = await analyze_with_ai(str(sample_binary_path), "What does this binary do?")
-
-        assert result.status in ("success", "error")
-
-    @pytest.mark.asyncio
-    async def test_suggest_function_name(self, sample_binary_path, patched_config):
-        """Test suggest_function_name function."""
-        from reversecore_mcp.tools.cli_tools import suggest_function_name
-
-        result = await suggest_function_name(str(sample_binary_path), "0x1000")
-
-        assert result.status in ("success", "error")
-
-
 # ============================================================================
 # diff_tools.py - Test diff functions
 # ============================================================================

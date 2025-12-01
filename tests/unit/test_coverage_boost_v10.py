@@ -84,7 +84,7 @@ class TestR2AnalysisFinalPush:
 
     def test_extract_first_json_nested(self):
         """Test _extract_first_json with nested JSON."""
-        from reversecore_mcp.tools.r2_analysis import _extract_first_json
+        from reversecore_mcp.core.r2_helpers import _extract_first_json
 
         text = 'Some output {"nested": {"key": "value"}}'
         result = _extract_first_json(text)

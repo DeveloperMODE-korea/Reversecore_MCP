@@ -1,7 +1,9 @@
 """Tests for high-performance JSON utilities."""
 
 import time
+
 import pytest
+
 from reversecore_mcp.core import json_utils
 
 # Test configuration constants
@@ -37,7 +39,7 @@ class TestJSONUtils:
         result = json_utils.dumps(obj, indent=2)
         assert isinstance(result, str)
         # Should contain newlines for formatting
-        assert '\n' in result
+        assert "\n" in result
         # Parse back to verify
         parsed = json_utils.loads(result)
         assert parsed == obj
@@ -51,7 +53,7 @@ class TestJSONUtils:
 
     def test_loads_complex(self):
         """Test loads() with complex nested structure."""
-        json_str = '''
+        json_str = """
         {
             "string": "value",
             "number": 123,
@@ -63,7 +65,7 @@ class TestJSONUtils:
                 "key": "nested_value"
             }
         }
-        '''
+        """
         result = json_utils.loads(json_str)
         assert result["string"] == "value"
         assert result["number"] == 123
@@ -78,11 +80,7 @@ class TestJSONUtils:
         original = {
             "text": "Hello, World!",
             "numbers": [1, 2, 3, 4, 5],
-            "nested": {
-                "a": 1,
-                "b": 2,
-                "c": [{"x": 10}, {"y": 20}]
-            }
+            "nested": {"a": 1, "b": 2, "c": [{"x": 10}, {"y": 20}]},
         }
         json_str = json_utils.dumps(original)
         parsed = json_utils.loads(json_str)
@@ -113,23 +111,24 @@ class TestJSONUtils:
         # This test documents the expected performance benefit
         # When orjson is available: 3-5x faster than stdlib json
         # When not available: fallback to stdlib json (same performance)
-        
+
         obj = {"data": list(range(1000)), "nested": [{"key": i} for i in range(100)]}
-        
+
         # Warm up
         for _ in range(10):
             json_utils.dumps(obj)
-        
+
         # Time the operation
         start = time.time()
         for _ in range(100):
             json_utils.dumps(obj)
         duration = time.time() - start
-        
+
         # Should complete in reasonable time (sanity check)
-        assert duration < MAX_EXPECTED_SERIALIZATION_TIME, \
+        assert duration < MAX_EXPECTED_SERIALIZATION_TIME, (
             f"JSON serialization too slow: {duration}s (max: {MAX_EXPECTED_SERIALIZATION_TIME}s)"
-        
+        )
+
         # Log whether we're using orjson or fallback
         print(f"\nUsing orjson: {json_utils.is_orjson_available()}")
         print(f"Serialization time for 100 iterations: {duration:.3f}s")
@@ -137,25 +136,25 @@ class TestJSONUtils:
     def test_json_decode_error_import(self):
         """Test that JSONDecodeError is properly exposed."""
         # Verify JSONDecodeError is accessible
-        assert hasattr(json_utils, 'JSONDecodeError')
+        assert hasattr(json_utils, "JSONDecodeError")
         assert json_utils.JSONDecodeError is not None
-        
+
     def test_invalid_json_raises_error(self):
         """Test that invalid JSON raises JSONDecodeError."""
         with pytest.raises(json_utils.JSONDecodeError):
             json_utils.loads("invalid json {]")
-    
+
     def test_dumps_none(self):
         """Test dumps() with None value."""
         result = json_utils.dumps(None)
         assert result == "null"
         assert json_utils.loads(result) is None
-    
+
     def test_dumps_boolean_values(self):
         """Test dumps() with boolean values."""
         assert json_utils.loads(json_utils.dumps(True)) is True
         assert json_utils.loads(json_utils.dumps(False)) is False
-    
+
     def test_dumps_numeric_types(self):
         """Test dumps() with various numeric types."""
         result = json_utils.dumps({"int": 42, "float": 3.14, "negative": -10})
@@ -163,7 +162,7 @@ class TestJSONUtils:
         assert parsed["int"] == 42
         assert abs(parsed["float"] - 3.14) < 0.001
         assert parsed["negative"] == -10
-    
+
     def test_large_nested_structure(self):
         """Test with large nested data structure."""
         large_obj = {
@@ -171,7 +170,7 @@ class TestJSONUtils:
                 "level2": {
                     "level3": {
                         "data": list(range(100)),
-                        "strings": [f"item_{i}" for i in range(50)]
+                        "strings": [f"item_{i}" for i in range(50)],
                     }
                 }
             }
@@ -179,14 +178,14 @@ class TestJSONUtils:
         json_str = json_utils.dumps(large_obj)
         parsed = json_utils.loads(json_str)
         assert parsed == large_obj
-    
+
     def test_special_characters_in_strings(self):
         """Test handling of special characters."""
         obj = {
             "newline": "line1\nline2",
             "tab": "col1\tcol2",
             "quote": 'He said "hello"',
-            "backslash": "path\\to\\file"
+            "backslash": "path\\to\\file",
         }
         json_str = json_utils.dumps(obj)
         parsed = json_utils.loads(json_str)

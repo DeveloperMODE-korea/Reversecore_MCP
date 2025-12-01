@@ -17,21 +17,21 @@ class TestJsonUtilsDeep:
 
     def test_extract_first_json_valid(self):
         """Test _extract_first_json with valid JSON."""
-        from reversecore_mcp.tools.r2_analysis import _extract_first_json
+        from reversecore_mcp.core.r2_helpers import _extract_first_json
 
         result = _extract_first_json('{"key": "value"}')
         assert result == '{"key": "value"}'
 
     def test_extract_first_json_mixed(self):
         """Test _extract_first_json with text before JSON."""
-        from reversecore_mcp.tools.r2_analysis import _extract_first_json
+        from reversecore_mcp.core.r2_helpers import _extract_first_json
 
         result = _extract_first_json('Some text before {"key": "value"} some after')
         assert '{"key"' in result or result is None
 
     def test_parse_json_output(self):
         """Test _parse_json_output function."""
-        from reversecore_mcp.tools.r2_analysis import _parse_json_output
+        from reversecore_mcp.core.r2_helpers import _parse_json_output
 
         result = _parse_json_output('{"functions": []}')
         assert result is not None
@@ -40,21 +40,6 @@ class TestJsonUtilsDeep:
 # ============================================================================
 # CLI Tools deep coverage
 # ============================================================================
-
-
-class TestCliToolsDeep:
-    """Deep tests for cli_tools module."""
-
-    def test_resolve_address_symbol_exception(self):
-        """Test _resolve_address when symbol lookup throws exception."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        mock_proj.loader.main_object.get_symbol.side_effect = Exception("lookup error")
-
-        # Should not raise, returns None
-        result = _resolve_address(mock_proj, "some_symbol")
-        assert result is None
 
 
 # ============================================================================
@@ -67,7 +52,7 @@ class TestR2AnalysisDeep:
 
     def test_build_r2_cmd(self):
         """Test _build_r2_cmd helper function."""
-        from reversecore_mcp.tools.r2_analysis import _build_r2_cmd
+        from reversecore_mcp.core.r2_helpers import _build_r2_cmd
 
         cmd = _build_r2_cmd("/path/to/file.bin", ["iij"])
         assert isinstance(cmd, list)

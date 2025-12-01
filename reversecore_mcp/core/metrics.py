@@ -7,7 +7,7 @@ import threading
 import time
 from collections import defaultdict
 from functools import wraps
-from typing import Any, Dict
+from typing import Any
 
 from reversecore_mcp.core.result import ToolError
 
@@ -22,7 +22,7 @@ class MetricsCollector:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self.tool_metrics: Dict[str, Dict[str, Any]] = defaultdict(
+        self.tool_metrics: dict[str, dict[str, Any]] = defaultdict(
             lambda: {
                 "calls": 0,
                 "errors": 0,
@@ -32,17 +32,15 @@ class MetricsCollector:
                 "min_time": float("inf"),
             }
         )
-        self.cache_metrics: Dict[str, Dict[str, int]] = defaultdict(
+        self.cache_metrics: dict[str, dict[str, int]] = defaultdict(
             lambda: {
                 "hits": 0,
                 "misses": 0,
             }
         )
-        self.circuit_breaker_states: Dict[str, str] = {}
+        self.circuit_breaker_states: dict[str, str] = {}
 
-    def record_tool_execution(
-        self, tool_name: str, execution_time: float, success: bool = True
-    ):
+    def record_tool_execution(self, tool_name: str, execution_time: float, success: bool = True):
         """
         Record metrics for a tool execution (thread-safe).
 
@@ -78,7 +76,7 @@ class MetricsCollector:
         with self._lock:
             self.circuit_breaker_states[tool_name] = state
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get all collected metrics (thread-safe)."""
         with self._lock:
             return {
@@ -122,7 +120,7 @@ def track_metrics(tool_name: str):
                     if isinstance(result, ToolError):
                         success = False
                     elif hasattr(result, "status"):
-                        success = getattr(result, "status") == "success"
+                        success = result.status == "success"
                     elif isinstance(result, dict) and "status" in result:
                         success = result["status"] == "success"
                     else:
@@ -134,9 +132,7 @@ def track_metrics(tool_name: str):
                     raise
                 finally:
                     execution_time = time.time() - start_time
-                    metrics_collector.record_tool_execution(
-                        tool_name, execution_time, success
-                    )
+                    metrics_collector.record_tool_execution(tool_name, execution_time, success)
 
             return async_wrapper
         else:
@@ -152,7 +148,7 @@ def track_metrics(tool_name: str):
                     if isinstance(result, ToolError):
                         success = False
                     elif hasattr(result, "status"):
-                        success = getattr(result, "status") == "success"
+                        success = result.status == "success"
                     elif isinstance(result, dict) and "status" in result:
                         success = result["status"] == "success"
                     else:
@@ -164,9 +160,7 @@ def track_metrics(tool_name: str):
                     raise
                 finally:
                     execution_time = time.time() - start_time
-                    metrics_collector.record_tool_execution(
-                        tool_name, execution_time, success
-                    )
+                    metrics_collector.record_tool_execution(tool_name, execution_time, success)
 
             return sync_wrapper
 

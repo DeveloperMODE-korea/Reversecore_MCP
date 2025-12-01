@@ -6,7 +6,9 @@ double parsing and provides cleaner error handling.
 """
 
 import json
+
 import pytest
+
 from reversecore_mcp.core.r2_helpers import _extract_first_json, _parse_json_output
 
 
@@ -53,7 +55,7 @@ class TestExtractFirstJson:
     def test_returns_none_for_unclosed_json(self):
         """Should return None for unclosed JSON structures."""
         assert _extract_first_json('{"key": "value"') is None
-        assert _extract_first_json('[1, 2, 3') is None
+        assert _extract_first_json("[1, 2, 3") is None
 
     def test_ignores_unmatched_closing_brackets(self):
         """Should ignore unmatched closing brackets before valid JSON."""
@@ -98,11 +100,11 @@ class TestParseJsonOutput:
     def test_handles_radare2_like_output(self):
         """Should handle realistic radare2 command output."""
         # Simulate aflj output with some prefixes
-        output = '''e scr.color=0
+        output = """e scr.color=0
 aaa
 [x] Analyze all flags starting with sym. and entry0 (aa)
 [x] Analyze function calls (aac)
-[{"name": "sym.main", "offset": 4096}, {"name": "sym.foo", "offset": 4200}]'''
+[{"name": "sym.main", "offset": 4096}, {"name": "sym.foo", "offset": 4200}]"""
         result = _parse_json_output(output)
         assert isinstance(result, list)
         assert len(result) == 2
@@ -125,7 +127,7 @@ class TestPerformanceImprovement:
         # The key improvement is that we don't have the pattern:
         # if json_str: parse(json_str) else: parse(output)
         # Instead we use a single try-except flow
-        
+
         # Test with noisy output (triggers extraction path)
         output = 'prefix {"key": "value"} suffix'
         result = _parse_json_output(output)
@@ -137,7 +139,7 @@ class TestPerformanceImprovement:
         output = '{"key": "value"}'
         result = _parse_json_output(output)
         assert result == {"key": "value"}
-        
+
     def test_eliminates_redundant_fallback_pattern(self):
         """Should not use the old redundant if/else pattern."""
         # The old pattern was:
@@ -149,7 +151,7 @@ class TestPerformanceImprovement:
         #
         # This could parse the same invalid JSON twice.
         # New pattern uses try-except, avoiding redundant attempts.
-        
+
         # Test that invalid JSON raises error cleanly, not after multiple attempts
         try:
             _parse_json_output("not json")
@@ -168,8 +170,9 @@ class TestPerformanceImprovement:
             # stdlib: "Expecting value: line 1 column 1 (char 0)"
             # Both are clear, so we accept either
             error_msg = str(e)
-            assert ("unexpected character" in error_msg or "Expecting value" in error_msg), \
+            assert "unexpected character" in error_msg or "Expecting value" in error_msg, (
                 f"Error message should be clear: {error_msg}"
+            )
 
 
 class TestEdgeCases:
@@ -185,15 +188,7 @@ class TestEdgeCases:
 
     def test_deeply_nested_json(self):
         """Should handle deeply nested JSON structures."""
-        nested = {
-            "level1": {
-                "level2": {
-                    "level3": {
-                        "level4": {"data": [1, 2, 3]}
-                    }
-                }
-            }
-        }
+        nested = {"level1": {"level2": {"level3": {"level4": {"data": [1, 2, 3]}}}}}
         text = f"prefix {json.dumps(nested)} suffix"
         result = _extract_first_json(text)
         assert result is not None

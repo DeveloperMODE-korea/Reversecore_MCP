@@ -6,11 +6,11 @@ Uses high-performance JSON serialization when available.
 """
 
 # Use high-performance JSON implementation for log serialization
-from reversecore_mcp.core import json_utils as json
 import logging
 from logging.handlers import RotatingFileHandler
-from typing import Any, Dict
+from typing import Any
 
+from reversecore_mcp.core import json_utils as json
 from reversecore_mcp.core.config import get_config
 
 
@@ -19,7 +19,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON."""
-        log_data: Dict[str, Any] = {
+        log_data: dict[str, Any] = {
             "timestamp": self.formatTime(record, self.datefmt),
             "level": record.levelname,
             "logger": record.name,
@@ -106,12 +106,11 @@ def setup_logging() -> None:
 
         file_handler.setFormatter(file_formatter)
         logger.addHandler(file_handler)
-    except (PermissionError, OSError, IOError) as e:
+    except (PermissionError, OSError) as e:
         # If we can't create or write to the log file, log to console only
         # This is acceptable in restricted environments (e.g., AWS Lambda, read-only filesystems)
         logger.warning(
-            f"Could not create log file handler for {log_file}: {e}. "
-            "Logging to console only."
+            f"Could not create log file handler for {log_file}: {e}. Logging to console only."
         )
 
     # Prevent propagation to root logger

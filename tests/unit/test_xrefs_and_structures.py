@@ -5,7 +5,7 @@ import json
 import pytest
 
 from reversecore_mcp.core import r2_helpers
-from reversecore_mcp.tools import cli_tools
+from reversecore_mcp.tools import decompilation, r2_analysis
 
 
 def _create_workspace_file(workspace_dir, name: str, data: str | bytes = "stub"):
@@ -41,7 +41,7 @@ class TestAnalyzeXrefs:
             mock_exec,
         )
 
-        result = await cli_tools.analyze_xrefs(str(mocked_path), "main", "all")
+        result = await r2_analysis.analyze_xrefs(str(mocked_path), "main", "all")
 
         assert result.status == "success"
         assert isinstance(result.data, dict)
@@ -69,7 +69,7 @@ class TestAnalyzeXrefs:
             mock_exec,
         )
 
-        result = await cli_tools.analyze_xrefs(str(mocked_path), "0x401000", "to")
+        result = await r2_analysis.analyze_xrefs(str(mocked_path), "0x401000", "to")
 
         assert result.status == "success"
         assert result.data["xref_type"] == "to"
@@ -93,7 +93,7 @@ class TestAnalyzeXrefs:
             mock_exec,
         )
 
-        result = await cli_tools.analyze_xrefs(str(mocked_path), "main", "from")
+        result = await r2_analysis.analyze_xrefs(str(mocked_path), "main", "from")
 
         assert result.status == "success"
         assert result.data["xref_type"] == "from"
@@ -115,7 +115,7 @@ class TestAnalyzeXrefs:
             mock_exec,
         )
 
-        result = await cli_tools.analyze_xrefs(str(mocked_path), "0x401000", "all")
+        result = await r2_analysis.analyze_xrefs(str(mocked_path), "0x401000", "all")
 
         assert result.status == "success"
         assert result.data["total_refs_to"] == 0
@@ -129,7 +129,7 @@ class TestAnalyzeXrefs:
         """Test with invalid xref_type parameter."""
         mocked_path = _create_workspace_file(workspace_dir, "test_binary")
 
-        result = await cli_tools.analyze_xrefs(str(mocked_path), "main", "invalid_type")
+        result = await r2_analysis.analyze_xrefs(str(mocked_path), "main", "invalid_type")
 
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"
@@ -141,7 +141,7 @@ class TestAnalyzeXrefs:
         """Test with invalid address format."""
         mocked_path = _create_workspace_file(workspace_dir, "test_binary")
 
-        result = await cli_tools.analyze_xrefs(
+        result = await r2_analysis.analyze_xrefs(
             str(mocked_path),
             "main; rm -rf /",  # Shell injection attempt
             "all",
@@ -166,7 +166,7 @@ class TestAnalyzeXrefs:
             mock_exec,
         )
 
-        result = await cli_tools.analyze_xrefs(str(mocked_path), "main", "all")
+        result = await r2_analysis.analyze_xrefs(str(mocked_path), "main", "all")
 
         # Should return success but with empty refs since it gracefully handles parse errors
         assert result.status == "success"
@@ -200,7 +200,7 @@ class TestRecoverStructures:
             mock_exec,
         )
 
-        result = await cli_tools.recover_structures(str(mocked_path), "main", use_ghidra=False)
+        result = await decompilation.recover_structures(str(mocked_path), "main", use_ghidra=False)
 
         assert result.status == "success"
         assert isinstance(result.data, dict)
@@ -224,7 +224,7 @@ class TestRecoverStructures:
             mock_exec,
         )
 
-        result = await cli_tools.recover_structures(str(mocked_path), "main", use_ghidra=False)
+        result = await decompilation.recover_structures(str(mocked_path), "main", use_ghidra=False)
 
         assert result.status == "success"
         assert result.data["count"] == 0
@@ -236,7 +236,7 @@ class TestRecoverStructures:
         """Test with invalid function address."""
         mocked_path = _create_workspace_file(workspace_dir, "test_binary")
 
-        result = await cli_tools.recover_structures(
+        result = await decompilation.recover_structures(
             str(mocked_path),
             "main; echo hack",  # Shell injection attempt
             use_ghidra=False,
@@ -275,7 +275,7 @@ class TestRecoverStructures:
             mock_exec,
         )
 
-        result = await cli_tools.recover_structures(str(mocked_path), "main", use_ghidra=True)
+        result = await decompilation.recover_structures(str(mocked_path), "main", use_ghidra=True)
 
         assert result.status == "success"
         assert result.metadata["method"] == "radare2"
@@ -297,7 +297,7 @@ class TestRecoverStructures:
             mock_exec,
         )
 
-        result = await cli_tools.recover_structures(str(mocked_path), "main", use_ghidra=False)
+        result = await decompilation.recover_structures(str(mocked_path), "main", use_ghidra=False)
 
         assert result.status == "error"
         assert result.error_code == "STRUCTURE_RECOVERY_ERROR"
@@ -322,7 +322,7 @@ class TestRecoverStructures:
             mock_exec,
         )
 
-        result = await cli_tools.recover_structures(
+        result = await decompilation.recover_structures(
             str(mocked_path), "Player::update", use_ghidra=False
         )
 

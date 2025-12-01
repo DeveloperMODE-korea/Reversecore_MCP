@@ -1,6 +1,6 @@
 """YARA scanning tools for binary analysis with rule matching."""
 
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Protocol
 
 from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_handling import handle_tool_errors
@@ -10,21 +10,21 @@ from reversecore_mcp.core.security import validate_file_path
 from reversecore_mcp.core.validators import validate_tool_parameters
 
 # Global cache for compiled YARA rules: {file_path: (timestamp, compiled_rules)}
-_YARA_RULES_CACHE: Dict[str, Tuple[float, Any]] = {}
+_YARA_RULES_CACHE: dict[str, tuple[float, Any]] = {}
 
 
 class YaraStringMatchInstance(Protocol):
     """Subset of yara.StringMatchInstance used by our formatter."""
 
-    offset: Optional[int]
-    matched_data: Optional[bytes]
+    offset: int | None
+    matched_data: bytes | None
 
 
 class YaraStringMatch(Protocol):
     """Subset of yara.StringMatch used by our formatter."""
 
-    identifier: Optional[str]
-    instances: Optional[List[YaraStringMatchInstance]]
+    identifier: str | None
+    instances: list[YaraStringMatchInstance] | None
 
 
 class YaraMatch(Protocol):
@@ -32,12 +32,12 @@ class YaraMatch(Protocol):
 
     rule: str
     namespace: str
-    tags: List[str]
-    meta: Dict[str, Any]
-    strings: Optional[List[YaraStringMatch]]
+    tags: list[str]
+    meta: dict[str, Any]
+    strings: list[YaraStringMatch] | None
 
 
-def _format_yara_match(match: YaraMatch) -> Dict[str, Any]:
+def _format_yara_match(match: YaraMatch) -> dict[str, Any]:
     """
     Format a YARA match result as a dictionary.
 

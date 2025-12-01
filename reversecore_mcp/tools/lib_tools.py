@@ -7,13 +7,12 @@ This module acts as a facade that imports and exposes tools from specialized mod
 - lief_tools: LIEF binary parsing
 """
 
-from fastmcp import FastMCP
+from reversecore_mcp.tools.capstone_tools import disassemble_with_capstone
 
 # Import all tools from specialized modules
-from reversecore_mcp.tools.ioc_tools import extract_iocs, _IOC_IPV4_PATTERN
-from reversecore_mcp.tools.yara_tools import run_yara, _format_yara_match
-from reversecore_mcp.tools.capstone_tools import disassemble_with_capstone
-from reversecore_mcp.tools.lief_tools import parse_binary_with_lief, _format_lief_output
+from reversecore_mcp.tools.ioc_tools import _IOC_IPV4_PATTERN, extract_iocs
+from reversecore_mcp.tools.lief_tools import _format_lief_output, parse_binary_with_lief
+from reversecore_mcp.tools.yara_tools import _format_yara_match, run_yara
 
 # Re-export all tools so existing imports continue to work
 __all__ = [
@@ -29,14 +28,25 @@ __all__ = [
 ]
 
 
-def register_lib_tools(mcp: FastMCP) -> None:
-    """
-    Register all library tool wrappers with the FastMCP server.
+from typing import Any
 
-    Args:
-        mcp: The FastMCP server instance to register tools with
-    """
-    mcp.tool(run_yara)
-    mcp.tool(disassemble_with_capstone)
-    mcp.tool(parse_binary_with_lief)
-    mcp.tool(extract_iocs)
+from reversecore_mcp.core.plugin import Plugin
+
+
+class LibToolsPlugin(Plugin):
+    """Plugin for library-backed tools (YARA, Capstone, LIEF, IOCs)."""
+
+    @property
+    def name(self) -> str:
+        return "lib_tools"
+
+    @property
+    def description(self) -> str:
+        return "Library-backed tools for YARA scanning, disassembly, binary parsing, and IOC extraction."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register library tools."""
+        mcp_server.tool(run_yara)
+        mcp_server.tool(disassemble_with_capstone)
+        mcp_server.tool(parse_binary_with_lief)
+        mcp_server.tool(extract_iocs)

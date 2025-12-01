@@ -2,6 +2,7 @@
 
 import os
 import re
+from typing import Any
 
 from async_lru import alru_cache
 from fastmcp import Context
@@ -18,19 +19,10 @@ from reversecore_mcp.core.r2_helpers import (
     build_r2_cmd as _build_r2_cmd,
 )
 from reversecore_mcp.core.r2_helpers import (
-    calculate_dynamic_timeout as _calculate_dynamic_timeout,
-)
-from reversecore_mcp.core.r2_helpers import (
     escape_mermaid_chars as _escape_mermaid_chars,
 )
 from reversecore_mcp.core.r2_helpers import (
     execute_r2_command as _execute_r2_command,
-)
-from reversecore_mcp.core.r2_helpers import (
-    extract_first_json as _extract_first_json,
-)
-from reversecore_mcp.core.r2_helpers import (
-    get_r2_project_name as _get_r2_project_name,
 )
 from reversecore_mcp.core.r2_helpers import (
     parse_json_output as _parse_json_output,
@@ -109,6 +101,28 @@ async def run_radare2(
         if ctx:
             await ctx.error(f"radare2 command '{validated_command}' failed: {str(e)}")
         raise
+
+
+from reversecore_mcp.core.plugin import Plugin
+
+
+class R2AnalysisPlugin(Plugin):
+    """Plugin for Radare2 analysis tools."""
+
+    @property
+    def name(self) -> str:
+        return "r2_analysis"
+
+    @property
+    def description(self) -> str:
+        return "Radare2-based analysis tools for binary analysis, cross-references, and execution tracing."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register R2 analysis tools."""
+        mcp_server.tool(run_radare2)
+        mcp_server.tool(trace_execution_path)
+        mcp_server.tool(generate_function_graph)
+        mcp_server.tool(analyze_xrefs)
 
 
 @log_execution(tool_name="trace_execution_path")

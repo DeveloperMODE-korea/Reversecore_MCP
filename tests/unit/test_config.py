@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from reversecore_mcp.core.config import Config, get_config, reset_config
+from reversecore_mcp.core.config import get_config, reset_config
 
 
 def _provision_env(monkeypatch, tmp_path):
@@ -200,4 +200,3 @@ class TestConfigValidation:
 
         with pytest.raises(ValueError, match="Workspace directory does not exist"):
             reset_config()
-

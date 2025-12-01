@@ -8,9 +8,9 @@ commands like "pdf @ main; w hello" could bypass simple prefix matching.
 
 import re
 from dataclasses import dataclass
-from typing import Literal, List, NewType
-from reversecore_mcp.core.exceptions import ValidationError
+from typing import Literal, NewType
 
+from reversecore_mcp.core.exceptions import ValidationError
 
 CommandType = Literal["read", "write", "analyze", "system"]
 ValidatedR2Command = NewType("ValidatedR2Command", str)
@@ -47,7 +47,7 @@ class CommandSpec:
 
 
 # Radare2 command specifications with strict regex patterns
-R2_COMMAND_SPECS: List[CommandSpec] = [
+R2_COMMAND_SPECS: list[CommandSpec] = [
     # Disassembly commands
     CommandSpec(
         name="pdf",
@@ -304,9 +304,7 @@ def validate_r2_command(cmd: str, allow_write: bool = False) -> ValidatedR2Comma
         ValidationError: Dangerous command pattern detected
     """
     if not cmd or not cmd.strip():
-        raise ValidationError(
-            "Command string cannot be empty", details={"command": cmd}
-        )
+        raise ValidationError("Command string cannot be empty", details={"command": cmd})
 
     cmd_stripped = cmd.strip()
 

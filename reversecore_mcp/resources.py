@@ -14,7 +14,7 @@ from reversecore_mcp.core.metrics import track_metrics
 
 # Import tools at module level for better performance
 # These imports are used by resource functions below
-from reversecore_mcp.tools import cli_tools, lib_tools
+from reversecore_mcp.tools import decompilation, lib_tools, r2_analysis, static_analysis
 
 # Type variable for generic function wrapper
 F = TypeVar("F", bound=Callable[..., Any])
@@ -124,7 +124,7 @@ def register_resources(mcp: FastMCP):
     async def get_file_strings(filename: str) -> str:
         """Extract all strings from a binary file"""
         try:
-            result = await cli_tools.run_strings(_get_workspace_path(filename))
+            result = await static_analysis.run_strings(_get_workspace_path(filename))
             if result.status == "success":
                 # Get content from ToolResult
                 content = result.data if isinstance(result.data, str) else str(result.data)
@@ -139,7 +139,7 @@ def register_resources(mcp: FastMCP):
         """Extract IOCs (IPs, URLs, Emails) from a binary file"""
         try:
             # 1. Extract strings
-            strings_res = await cli_tools.run_strings(_get_workspace_path(filename))
+            strings_res = await static_analysis.run_strings(_get_workspace_path(filename))
             if strings_res.status != "success":
                 return f"Failed to extract strings from {filename}"
 
@@ -176,7 +176,7 @@ def register_resources(mcp: FastMCP):
     async def get_decompiled_code(filename: str, address: str) -> str:
         """Get decompiled pseudo-C code for a specific function"""
         try:
-            result = await cli_tools.smart_decompile(
+            result = await decompilation.smart_decompile(
                 _get_workspace_path(filename), address, use_ghidra=True
             )
 
@@ -197,7 +197,9 @@ def register_resources(mcp: FastMCP):
     async def get_disassembly(filename: str, address: str) -> str:
         """Get disassembly for a specific function"""
         try:
-            result = await cli_tools.run_radare2(_get_workspace_path(filename), f"pdf @ {address}")
+            result = await r2_analysis.run_radare2(
+                _get_workspace_path(filename), f"pdf @ {address}"
+            )
 
             if result.status == "success":
                 content = result.data if isinstance(result.data, str) else str(result.data)
@@ -216,7 +218,7 @@ def register_resources(mcp: FastMCP):
     async def get_function_cfg(filename: str, address: str) -> str:
         """Get Control Flow Graph (Mermaid) for a specific function"""
         try:
-            result = await cli_tools.generate_function_graph(
+            result = await r2_analysis.generate_function_graph(
                 _get_workspace_path(filename), address, format="mermaid"
             )
 
@@ -235,7 +237,7 @@ def register_resources(mcp: FastMCP):
     async def get_function_list(filename: str) -> str:
         """Get list of all functions in the binary"""
         try:
-            result = await cli_tools.run_radare2(
+            result = await r2_analysis.run_radare2(
                 _get_workspace_path(filename), "aflj"
             )  # List functions in JSON format
 

@@ -12,32 +12,6 @@ import pytest
 # ============================================================================
 
 
-class TestCliToolsLastPush:
-    """Tests for remaining cli_tools coverage."""
-
-    def test_resolve_address_invalid_decimal(self):
-        """Test _resolve_address with invalid non-decimal string."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        mock_proj.loader.main_object.get_symbol.return_value = None
-
-        result = _resolve_address(mock_proj, "invalid_string")
-        assert result is None
-
-    def test_resolve_address_symbol_with_underscore(self):
-        """Test _resolve_address with symbol containing underscore."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        mock_symbol = MagicMock()
-        mock_symbol.rebased_addr = 0x401100
-        mock_proj.loader.main_object.get_symbol.return_value = mock_symbol
-
-        result = _resolve_address(mock_proj, "_start")
-        assert result == 0x401100
-
-
 # ============================================================================
 # JSON Utils - is_orjson_available
 # ============================================================================

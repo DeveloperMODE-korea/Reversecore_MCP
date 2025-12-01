@@ -628,3 +628,26 @@ async def match_libraries(
             f"Library signature matching failed: {str(e)}",
             hint="Ensure the binary is valid and radare2 signature databases are available. For custom databases, verify the .sig file format.",
         )
+
+
+from typing import Any
+
+from reversecore_mcp.core.plugin import Plugin
+
+
+class DiffToolsPlugin(Plugin):
+    """Plugin for binary diffing and comparison tools."""
+
+    @property
+    def name(self) -> str:
+        return "diff_tools"
+
+    @property
+    def description(self) -> str:
+        return "Tools for binary diffing, variant analysis, and library matching."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register diff tools."""
+        mcp_server.tool(diff_binaries)
+        mcp_server.tool(analyze_variant_changes)
+        mcp_server.tool(match_libraries)

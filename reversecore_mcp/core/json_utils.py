@@ -13,7 +13,7 @@ Performance comparison:
 """
 
 import json as _stdlib_json
-from typing import Any, Optional, Union
+from typing import Any
 
 try:
     import orjson
@@ -22,7 +22,7 @@ try:
     # Expose orjson's JSONDecodeError for compatibility
     JSONDecodeError = orjson.JSONDecodeError
 
-    def loads(s: Union[str, bytes]) -> Any:
+    def loads(s: str | bytes) -> Any:
         """
         Parse JSON with orjson (fast path).
 
@@ -36,7 +36,7 @@ try:
             s = s.encode("utf-8")
         return orjson.loads(s)
 
-    def dumps(obj: Any, indent: Optional[int] = None) -> str:
+    def dumps(obj: Any, indent: int | None = None) -> str:
         """
         Serialize object to JSON with orjson (fast path).
 
@@ -67,7 +67,7 @@ except ImportError:
     # Use stdlib JSONDecodeError for compatibility
     JSONDecodeError = _stdlib_json.JSONDecodeError
 
-    def loads(s: Union[str, bytes]) -> Any:
+    def loads(s: str | bytes) -> Any:
         """
         Parse JSON with standard library (fallback).
 
@@ -81,7 +81,7 @@ except ImportError:
             s = s.decode("utf-8")
         return _stdlib_json.loads(s)
 
-    def dumps(obj: Any, indent: Optional[int] = None) -> str:
+    def dumps(obj: Any, indent: int | None = None) -> str:
         """
         Serialize object to JSON with standard library (fallback).
 

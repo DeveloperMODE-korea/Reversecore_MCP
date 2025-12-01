@@ -4,9 +4,9 @@ More unit tests for tools.cli_tools covering additional branches.
 
 import pytest
 
-from reversecore_mcp.core.exceptions import ValidationError
-from reversecore_mcp.tools import cli_tools
 from reversecore_mcp.core import command_spec
+from reversecore_mcp.core.exceptions import ValidationError
+from reversecore_mcp.tools import r2_analysis, static_analysis
 
 
 @pytest.mark.asyncio
@@ -22,7 +22,7 @@ async def test_run_radare2_invalid_command_sanitization(
         raise ValidationError("invalid command")
 
     monkeypatch.setattr(command_spec, "validate_r2_command", _validate)
-    out = await cli_tools.run_radare2(str(path), "bad")
+    out = await r2_analysis.run_radare2(str(path), "bad")
     assert out.status == "error" and out.error_code == "VALIDATION_ERROR"
 
 
@@ -35,5 +35,5 @@ async def test_run_strings_validation_error(
     outside_file = tmp_path / "outside.bin"
     outside_file.write_text("nope")
 
-    out = await cli_tools.run_strings(str(outside_file))
+    out = await static_analysis.run_strings(str(outside_file))
     assert out.status == "error" and out.error_code == "VALIDATION_ERROR"

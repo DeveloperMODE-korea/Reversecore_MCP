@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from reversecore_mcp.core.security import WorkspaceConfig, validate_file_path
 from reversecore_mcp.core.exceptions import ValidationError
+from reversecore_mcp.core.security import WorkspaceConfig, validate_file_path
 
 
 class TestValidateFilePath:
@@ -23,7 +23,7 @@ class TestValidateFilePath:
         # Create file outside workspace
         outside_file = workspace_dir.parent / "outside_file.txt"
         outside_file.write_text("test")
-        
+
         with pytest.raises(ValidationError, match="outside allowed"):
             validate_file_path(str(outside_file), config=workspace_config)
 
@@ -43,14 +43,14 @@ class TestValidateFilePath:
         # Create file outside workspace
         outside_file = tmp_path / "outside.txt"
         outside_file.write_text("secret")
-        
+
         # Create symlink in workspace pointing outside
         symlink = workspace_dir / "symlink"
         try:
             symlink.symlink_to(outside_file)
         except OSError:
             pytest.skip("Symlinks not supported or insufficient privileges")
-        
+
         # Should be blocked because resolved path is outside workspace
         with pytest.raises(ValidationError, match="outside allowed"):
             validate_file_path(str(symlink), config=workspace_config)
@@ -59,7 +59,7 @@ class TestValidateFilePath:
         """Test that path traversal attempts are blocked."""
         # Try to access parent directory
         traversal_path = workspace_dir / ".." / ".." / "etc" / "passwd"
-        
+
         with pytest.raises(ValidationError):
             validate_file_path(str(traversal_path), config=workspace_config)
 
@@ -72,11 +72,11 @@ class TestValidateFilePath:
         rule_file.write_text("rule test { condition: true }")
 
         config = WorkspaceConfig(workspace=workspace_dir, read_only_dirs=(rules_dir,))
-        
+
         # Should work with read_only=True
         result = validate_file_path(str(rule_file), read_only=True, config=config)
         assert result == rule_file.resolve()
-        
+
         # Should fail with read_only=False
         with pytest.raises(ValidationError, match="outside allowed"):
             validate_file_path(str(rule_file), read_only=False, config=config)
@@ -88,8 +88,7 @@ class TestValidateFilePath:
         attack_dir.mkdir(exist_ok=True)
         attack_file = attack_dir / "file.txt"
         attack_file.write_text("attack")
-        
+
         # Should be blocked even though path starts with workspace
         with pytest.raises(ValidationError, match="outside allowed"):
             validate_file_path(str(attack_file), config=workspace_config)
-

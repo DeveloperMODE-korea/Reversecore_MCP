@@ -13,46 +13,6 @@ import pytest
 # ============================================================================
 
 
-class TestCliToolsResolveAddress:
-    """Tests for _resolve_address helper."""
-
-    def test_resolve_address_hex(self):
-        """Test _resolve_address with hex address."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        mock_proj.loader.find_symbol.return_value = None
-        mock_proj.loader.main_object.get_symbol.return_value = None
-
-        result = _resolve_address(mock_proj, "0x401000")
-        assert result == 0x401000
-
-    def test_resolve_address_symbol_found(self):
-        """Test _resolve_address with symbol name from main_object."""
-        from reversecore_mcp.tools.cli_tools import _resolve_address
-
-        mock_proj = MagicMock()
-        mock_symbol = MagicMock()
-        mock_symbol.rebased_addr = 0x401000
-        mock_proj.loader.main_object.get_symbol.return_value = mock_symbol
-
-        result = _resolve_address(mock_proj, "main")
-        assert result == 0x401000
-        mock_proj.loader.main_object.get_symbol.assert_called_once_with("main")
-
-
-class TestCliToolsRegister:
-    """Tests for register_cli_tools function."""
-
-    def test_register_cli_tools(self):
-        """Test register_cli_tools registers tools."""
-        from reversecore_mcp.tools.cli_tools import register_cli_tools
-
-        mock_mcp = MagicMock()
-        register_cli_tools(mock_mcp)
-        assert mock_mcp.tool.call_count >= 1
-
-
 # ============================================================================
 # Adaptive Vaccine Tests (57% -> higher)
 # ============================================================================

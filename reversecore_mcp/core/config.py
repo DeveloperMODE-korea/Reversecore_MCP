@@ -11,7 +11,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple
 
 from dotenv import load_dotenv
 
@@ -31,7 +30,7 @@ def _parse_int(value: str | None, default: int) -> int:
         return default
 
 
-def _split_paths(raw: str | None) -> Tuple[Path, ...]:
+def _split_paths(raw: str | None) -> tuple[Path, ...]:
     if not raw:
         return tuple()
     parts = [segment.strip() for segment in raw.split(",") if segment.strip()]
@@ -43,7 +42,7 @@ class Config:
     """Immutable snapshot of runtime configuration."""
 
     workspace: Path
-    read_only_dirs: Tuple[Path, ...]
+    read_only_dirs: tuple[Path, ...]
     log_level: str
     log_file: Path
     log_format: str
@@ -54,10 +53,10 @@ class Config:
     default_tool_timeout: int
 
     @classmethod
-    def from_env(cls) -> "Config":
+    def from_env(cls) -> Config:
         """Build a configuration object from environment variables."""
         strict_validation = _parse_bool(os.getenv("REVERSECORE_STRICT_PATHS"), default=False)
-        
+
         # Determine workspace: use env var, fallback to current directory if path doesn't exist
         workspace_env = os.getenv("REVERSECORE_WORKSPACE", "")
         if workspace_env:
@@ -65,7 +64,7 @@ class Config:
         else:
             # No env var set: use current working directory as default
             workspace = Path.cwd()
-        
+
         # If configured workspace doesn't exist or isn't a directory, handle based on strict mode
         if not workspace.exists() or not workspace.is_dir():
             if strict_validation:
@@ -75,7 +74,7 @@ class Config:
                     raise ValueError(f"Workspace path is not a directory: {workspace}")
             # Non-strict: fall back to cwd
             workspace = Path.cwd()
-        
+
         # Parse read directories, filtering out non-existent/non-directory paths
         read_dirs_env = os.getenv("REVERSECORE_READ_DIRS", "")
         if read_dirs_env:
@@ -84,7 +83,7 @@ class Config:
             read_dirs = tuple(d for d in all_read_dirs if d.exists() and d.is_dir())
         else:
             read_dirs = tuple()
-        
+
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
         log_file = Path(os.getenv("LOG_FILE", "/tmp/reversecore/app.log")).expanduser()
         log_format = os.getenv("LOG_FORMAT", "human").lower()
@@ -119,14 +118,15 @@ class Config:
 
     def validate_paths(self, strict: bool = True) -> None:
         """Validate that configured directories exist and are directories.
-        
+
         Args:
             strict: If True, raise ValueError for missing directories.
                    If False, only log warnings (useful for test environments).
         """
         import logging
+
         logger = logging.getLogger(__name__)
-        
+
         if not self.workspace.exists():
             msg = f"Workspace directory does not exist: {self.workspace}"
             if strict:

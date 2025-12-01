@@ -1,8 +1,9 @@
 """Unit tests for prompts module."""
 
-import pytest
 from unittest.mock import Mock
-from fastmcp import FastMCP
+
+import pytest
+
 from reversecore_mcp.prompts import register_prompts
 
 
@@ -20,25 +21,27 @@ class TestPromptsRegistration:
     def test_register_prompts_called(self, mock_mcp):
         """Test that register_prompts registers handlers with MCP."""
         register_prompts(mock_mcp)
-        
+
         # Should register 8 prompts (full, basic, game, firmware, vulnerability, crypto, trinity_defense, apt_hunting)
         assert mock_mcp.prompt.call_count == 8
 
     def test_full_analysis_mode_registered(self, mock_mcp):
         """Test full_analysis_mode prompt is registered."""
         registered_prompts = {}
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         assert "full_analysis_mode" in registered_prompts
         full_analysis_func = registered_prompts["full_analysis_mode"]
-        
+
         # Test the prompt generates content
         result = full_analysis_func("test.exe")
         assert isinstance(result, str)
@@ -50,18 +53,20 @@ class TestPromptsRegistration:
     def test_basic_analysis_mode_registered(self, mock_mcp):
         """Test basic_analysis_mode prompt is registered."""
         registered_prompts = {}
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         assert "basic_analysis_mode" in registered_prompts
         basic_analysis_func = registered_prompts["basic_analysis_mode"]
-        
+
         # Test the prompt generates content
         result = basic_analysis_func("sample.bin")
         assert isinstance(result, str)
@@ -73,18 +78,20 @@ class TestPromptsRegistration:
     def test_game_analysis_mode_registered(self, mock_mcp):
         """Test game_analysis_mode prompt is registered."""
         registered_prompts = {}
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         assert "game_analysis_mode" in registered_prompts
         game_analysis_func = registered_prompts["game_analysis_mode"]
-        
+
         # Test the prompt generates content
         result = game_analysis_func("game_client.exe")
         assert isinstance(result, str)
@@ -96,18 +103,20 @@ class TestPromptsRegistration:
     def test_firmware_analysis_mode_registered(self, mock_mcp):
         """Test firmware_analysis_mode prompt is registered."""
         registered_prompts = {}
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         assert "firmware_analysis_mode" in registered_prompts
         firmware_analysis_func = registered_prompts["firmware_analysis_mode"]
-        
+
         # Test the prompt generates content
         result = firmware_analysis_func("firmware.bin")
         assert isinstance(result, str)
@@ -119,18 +128,20 @@ class TestPromptsRegistration:
     def test_vulnerability_research_mode_registered(self, mock_mcp):
         """Test vulnerability_research_mode prompt is registered."""
         registered_prompts = {}
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         assert "vulnerability_research_mode" in registered_prompts
         vuln_research_func = registered_prompts["vulnerability_research_mode"]
-        
+
         # Test the prompt generates content
         result = vuln_research_func("target.exe")
         assert isinstance(result, str)
@@ -142,18 +153,20 @@ class TestPromptsRegistration:
     def test_crypto_analysis_mode_registered(self, mock_mcp):
         """Test crypto_analysis_mode prompt is registered."""
         registered_prompts = {}
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         assert "crypto_analysis_mode" in registered_prompts
         crypto_analysis_func = registered_prompts["crypto_analysis_mode"]
-        
+
         # Test the prompt generates content
         result = crypto_analysis_func("crypto_app.exe")
         assert isinstance(result, str)
@@ -170,19 +183,20 @@ class TestPromptContent:
         """Test full_analysis_mode generates comprehensive instructions."""
         mock_mcp = Mock()
         registered_prompts = {}
-        
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         full_analysis = registered_prompts["full_analysis_mode"]
         result = full_analysis("malware.exe")
-        
+
         # Check for key sections
         assert "Language Rule" in result
         assert "Analysis SOP" in result
@@ -190,7 +204,7 @@ class TestPromptContent:
         assert "Filtering" in result
         assert "Deep Analysis" in result
         assert "Reporting" in result
-        
+
         # Check for key tools mentioned
         assert "run_file" in result
         assert "extract_iocs" in result
@@ -204,19 +218,20 @@ class TestPromptContent:
         """Test basic_analysis_mode generates lightweight analysis instructions."""
         mock_mcp = Mock()
         registered_prompts = {}
-        
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         basic_analysis = registered_prompts["basic_analysis_mode"]
         result = basic_analysis("sample.exe")
-        
+
         # Check content
         assert "Rapid Static Analysis" in result
         assert "lightweight tools" in result
@@ -224,7 +239,7 @@ class TestPromptContent:
         assert "parse_binary_with_lief" in result
         assert "run_strings" in result
         assert "extract_iocs" in result
-        
+
         # Should NOT mention heavy tools
         assert "Ghidra" not in result or "Never use" in result
 
@@ -232,19 +247,20 @@ class TestPromptContent:
         """Test game_analysis_mode generates game-specific instructions."""
         mock_mcp = Mock()
         registered_prompts = {}
-        
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         game_analysis = registered_prompts["game_analysis_mode"]
         result = game_analysis("game.exe")
-        
+
         # Check game-specific content
         assert "Game Security Specialist" in result
         assert "Anti-Cheat" in result or "Protection Analysis" in result
@@ -256,19 +272,20 @@ class TestPromptContent:
         """Test firmware_analysis_mode generates firmware-specific instructions."""
         mock_mcp = Mock()
         registered_prompts = {}
-        
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         firmware_analysis = registered_prompts["firmware_analysis_mode"]
         result = firmware_analysis("firmware.bin")
-        
+
         # Check firmware-specific content
         assert "Embedded Systems" in result
         assert "run_binwalk" in result
@@ -280,19 +297,20 @@ class TestPromptContent:
         """Test vulnerability_research_mode generates vuln-specific instructions."""
         mock_mcp = Mock()
         registered_prompts = {}
-        
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         vuln_research = registered_prompts["vulnerability_research_mode"]
         result = vuln_research("target.exe")
-        
+
         # Check vuln research content
         assert "Vulnerability Researcher" in result
         assert "Buffer Overflow" in result or "strcpy" in result
@@ -304,19 +322,20 @@ class TestPromptContent:
         """Test crypto_analysis_mode generates crypto-specific instructions."""
         mock_mcp = Mock()
         registered_prompts = {}
-        
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         crypto_analysis = registered_prompts["crypto_analysis_mode"]
         result = crypto_analysis("crypto.exe")
-        
+
         # Check crypto-specific content
         assert "Cryptography Analyst" in result
         assert "AES" in result or "RSA" in result
@@ -333,18 +352,19 @@ class TestPromptParameterization:
         """Test that all prompts properly incorporate the filename parameter."""
         mock_mcp = Mock()
         registered_prompts = {}
-        
+
         def capture_prompt(name):
             def decorator(func):
                 registered_prompts[name] = func
                 return func
+
             return decorator
-        
+
         mock_mcp.prompt = capture_prompt
         register_prompts(mock_mcp)
-        
+
         test_filename = "unique_test_binary_12345.exe"
-        
+
         # Test each prompt
         for prompt_name, prompt_func in registered_prompts.items():
             result = prompt_func(test_filename)

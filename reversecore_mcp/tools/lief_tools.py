@@ -1,7 +1,7 @@
 """LIEF (Library to Instrument Executable Formats) parsing tools for binary analysis."""
 
 from itertools import islice
-from typing import Any, Dict, List
+from typing import Any
 
 # Use high-performance JSON implementation (3-5x faster)
 from reversecore_mcp.core import json_utils as json
@@ -13,7 +13,7 @@ from reversecore_mcp.core.result import ToolResult, failure, success
 from reversecore_mcp.core.security import validate_file_path
 
 
-def _extract_sections(binary: Any) -> List[Dict[str, Any]]:
+def _extract_sections(binary: Any) -> list[dict[str, Any]]:
     """Extract section information from binary."""
     if not hasattr(binary, "sections") or not binary.sections:
         return []
@@ -22,17 +22,15 @@ def _extract_sections(binary: Any) -> List[Dict[str, Any]]:
             "name": section.name,
             "virtual_address": hex(section.virtual_address),
             "size": section.size,
-            "entropy": (
-                round(section.entropy, 2) if hasattr(section, "entropy") else None
-            ),
+            "entropy": (round(section.entropy, 2) if hasattr(section, "entropy") else None),
         }
         for section in binary.sections
     ]
 
 
-def _extract_symbols(binary: Any) -> Dict[str, Any]:
+def _extract_symbols(binary: Any) -> dict[str, Any]:
     """Extract symbol information (imports/exports) from binary."""
-    symbols: Dict[str, Any] = {}
+    symbols: dict[str, Any] = {}
 
     if hasattr(binary, "imported_functions") and binary.imported_functions:
         # Use islice to avoid creating full list before slicing
@@ -51,7 +49,7 @@ def _extract_symbols(binary: Any) -> Dict[str, Any]:
         # Use islice to avoid creating intermediate list
         # OPTIMIZATION: Extract function list creation outside the dict to avoid
         # nested comprehension inside loop
-        formatted_imports: List[Dict[str, Any]] = []
+        formatted_imports: list[dict[str, Any]] = []
         for imp in islice(binary.imports, 20):
             entries = getattr(imp, "entries", [])
             # Process entries directly without intermediate list conversion
@@ -72,7 +70,7 @@ def _extract_symbols(binary: Any) -> Dict[str, Any]:
 
     if hasattr(binary, "exports") and binary.exports:
         # Use islice to avoid creating intermediate list
-        formatted_exports: List[Dict[str, Any]] = []
+        formatted_exports: list[dict[str, Any]] = []
         for exp in islice(binary.exports, 100):
             formatted_exports.append(
                 {
@@ -86,7 +84,7 @@ def _extract_symbols(binary: Any) -> Dict[str, Any]:
     return symbols
 
 
-def _format_lief_output(result: Dict[str, Any], format: str) -> str:
+def _format_lief_output(result: dict[str, Any], format: str) -> str:
     """Format LIEF parsing result as JSON or text."""
     if format.lower() == "json":
         return json.dumps(result, indent=2)
@@ -172,11 +170,9 @@ def parse_binary_with_lief(file_path: str, format: str = "json") -> ToolResult:
             hint="LIEF supports ELF, PE, and Mach-O formats",
         )
 
-    result_data: Dict[str, Any] = {
+    result_data: dict[str, Any] = {
         "format": str(binary.format).split(".")[-1].lower(),
-        "entry_point": (
-            hex(binary.entrypoint) if hasattr(binary, "entrypoint") else None
-        ),
+        "entry_point": (hex(binary.entrypoint) if hasattr(binary, "entrypoint") else None),
     }
 
     sections = _extract_sections(binary)

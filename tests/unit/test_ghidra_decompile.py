@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from reversecore_mcp.tools import cli_tools
+from reversecore_mcp.tools import decompilation
 
 
 @pytest.mark.asyncio
@@ -43,7 +43,7 @@ class TestGhidraDecompile:
             patch("reversecore_mcp.core.ghidra.ensure_ghidra_available", return_value=True),
             patch("reversecore_mcp.core.ghidra.decompile_function_with_ghidra", mock_decompile),
         ):
-            result = await cli_tools.smart_decompile(str(test_file), "main", use_ghidra=True)
+            result = await decompilation.smart_decompile(str(test_file), "main", use_ghidra=True)
 
             assert result.status == "success"
             assert "void main" in result.data
@@ -64,7 +64,7 @@ class TestGhidraDecompile:
             new_callable=AsyncMock,
             return_value=(mock_output, len(mock_output)),
         ):
-            result = await cli_tools.smart_decompile(str(test_file), "main", use_ghidra=False)
+            result = await decompilation.smart_decompile(str(test_file), "main", use_ghidra=False)
 
             assert result.status == "success"
             assert result.metadata.get("decompiler") == "radare2"
@@ -88,7 +88,7 @@ class TestGhidraDecompile:
                 return_value=(mock_r2_output, len(mock_r2_output)),
             ),
         ):
-            result = await cli_tools.smart_decompile(str(test_file), "main", use_ghidra=True)
+            result = await decompilation.smart_decompile(str(test_file), "main", use_ghidra=True)
 
             assert result.status == "success"
             assert result.metadata.get("decompiler") == "radare2"
@@ -114,7 +114,7 @@ class TestGhidraDecompile:
                 return_value=(mock_r2_output, len(mock_r2_output)),
             ),
         ):
-            result = await cli_tools.smart_decompile(str(test_file), "main", use_ghidra=True)
+            result = await decompilation.smart_decompile(str(test_file), "main", use_ghidra=True)
 
             assert result.status == "success"
             assert result.metadata.get("decompiler") == "radare2"
@@ -139,7 +139,9 @@ class TestGhidraDecompile:
             # but ensure_ghidra_available returns False
             # Mock core.ghidra (new unified module)
             with patch("reversecore_mcp.core.ghidra.ensure_ghidra_available", return_value=False):
-                result = await cli_tools.smart_decompile(str(test_file), "main", use_ghidra=True)
+                result = await decompilation.smart_decompile(
+                    str(test_file), "main", use_ghidra=True
+                )
 
                 assert result.status == "success"
                 assert result.metadata.get("decompiler") == "radare2"
@@ -170,7 +172,9 @@ class TestGhidraDecompile:
             patch("reversecore_mcp.core.ghidra.ensure_ghidra_available", return_value=True),
             patch("reversecore_mcp.core.ghidra.decompile_function_with_ghidra", mock_decompile),
         ):
-            result = await cli_tools.smart_decompile(str(test_file), "0x401000", use_ghidra=True)
+            result = await decompilation.smart_decompile(
+                str(test_file), "0x401000", use_ghidra=True
+            )
 
             assert result.status == "success"
             assert "fcn_401000" in result.data

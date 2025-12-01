@@ -47,8 +47,9 @@ def test_yara_result_processing_with_many_matches(
     rule_file.write_text("rule perf { condition: true }")
 
     import sys
+
     mock_yara_module = MagicMock()
-    sys.modules['yara'] = mock_yara_module
+    sys.modules["yara"] = mock_yara_module
     mock_yara_module.compile.return_value.match.return_value = mock_matches
 
     try:
@@ -64,8 +65,8 @@ def test_yara_result_processing_with_many_matches(
         assert result.data["match_count"] == len(mock_matches)
         assert result.data["matches"][0]["rule"] == "TestRule"
     finally:
-        if 'yara' in sys.modules:
-            del sys.modules['yara']
+        if "yara" in sys.modules:
+            del sys.modules["yara"]
 
 
 def test_file_path_validation_string_conversion_optimization(workspace_config):
@@ -130,8 +131,8 @@ def test_lief_output_formatting_no_redundant_slicing():
 
 def test_subprocess_polling_adaptive_backoff():
     """Test that subprocess polling uses adaptive backoff correctly."""
-    from reversecore_mcp.core.execution import execute_subprocess_streaming
     from reversecore_mcp.core.exceptions import ExecutionTimeoutError
+    from reversecore_mcp.core.execution import execute_subprocess_streaming
 
     # Test a command that completes quickly
     start_time = time.time()
@@ -159,20 +160,22 @@ def test_subprocess_polling_adaptive_backoff():
 def test_ioc_extraction_with_precompiled_patterns():
     """Test that IOC extraction uses pre-compiled patterns for better performance."""
     from reversecore_mcp.tools.lib_tools import extract_iocs
-    
+
     # Create a large text with many IOCs
-    test_text = "\n".join([
-        f"Server at 192.168.{i}.{j} running http://example{i}{j}.com and admin{i}{j}@test.com"
-        for i in range(10)
-        for j in range(10)
-    ])
-    
+    test_text = "\n".join(
+        [
+            f"Server at 192.168.{i}.{j} running http://example{i}{j}.com and admin{i}{j}@test.com"
+            for i in range(10)
+            for j in range(10)
+        ]
+    )
+
     # Test performance - should complete quickly with pre-compiled patterns
     start_time = time.time()
     for _ in range(10):
         result = extract_iocs(test_text)
     elapsed = time.time() - start_time
-    
+
     # 10 iterations should complete in under 0.5 seconds with pre-compiled patterns
     assert elapsed < 0.5, f"IOC extraction took too long: {elapsed}s"
     assert result.status == "success"
@@ -183,51 +186,55 @@ def test_ioc_extraction_with_precompiled_patterns():
 def test_regex_pattern_reuse_performance():
     """Test that pre-compiled regex patterns are at least as fast as inline compilation."""
     import re
-    
+
     # Import the pre-compiled pattern for comparison
     from reversecore_mcp.tools.lib_tools import _IOC_IPV4_PATTERN
-    
+
     # Simulate the old approach (compiling each time)
     text = "Test 192.168.1.1 and http://example.com and test@email.com " * 1000
-    
+
     start_time = time.time()
     for _ in range(100):
         # Old approach - compile each time (using same pattern as production)
         ip_pattern = re.compile(_IOC_IPV4_PATTERN.pattern)
         ip_pattern.findall(text)
     old_elapsed = time.time() - start_time
-    
+
     # New approach - use pre-compiled pattern
     start_time = time.time()
     for _ in range(100):
         _IOC_IPV4_PATTERN.findall(text)
     new_elapsed = time.time() - start_time
-    
+
     # Pre-compiled should be at least as fast (not slower)
     # Note: Actual performance gain depends on Python version and system
-    assert new_elapsed <= old_elapsed * 1.1, f"Pre-compiled pattern is slower: {new_elapsed}s vs {old_elapsed}s"
+    assert new_elapsed <= old_elapsed * 1.1, (
+        f"Pre-compiled pattern is slower: {new_elapsed}s vs {old_elapsed}s"
+    )
 
 
 def test_islice_vs_list_slicing_performance():
     """Test that islice provides memory and performance benefits over list slicing."""
     from itertools import islice
-    
+
     # Create a large iterable
     large_iterable = (x for x in range(100000))
-    
+
     # Test islice approach (new)
     start_time = time.time()
     result = list(islice(large_iterable, 100))
     islice_elapsed = time.time() - start_time
-    
+
     # Test list conversion approach (old)
     large_iterable = (x for x in range(100000))
     start_time = time.time()
     result = list(large_iterable)[:100]
     list_elapsed = time.time() - start_time
-    
+
     # islice should be significantly faster (at least 10x)
-    assert islice_elapsed < list_elapsed / 10, f"islice not significantly faster: {islice_elapsed}s vs {list_elapsed}s"
+    assert islice_elapsed < list_elapsed / 10, (
+        f"islice not significantly faster: {islice_elapsed}s vs {list_elapsed}s"
+    )
     assert len(result) == 100
 
 

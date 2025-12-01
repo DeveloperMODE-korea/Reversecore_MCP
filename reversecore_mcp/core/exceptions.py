@@ -5,8 +5,6 @@ All exceptions inherit from ReversecoreError to allow for centralized
 exception handling at the MCP server level.
 """
 
-from typing import Optional
-
 
 class ReversecoreError(Exception):
     """Base exception for all Reversecore_MCP errors."""
@@ -17,8 +15,8 @@ class ReversecoreError(Exception):
     def __init__(
         self,
         message: str,
-        error_code: Optional[str] = None,
-        error_type: Optional[str] = None,
+        error_code: str | None = None,
+        error_type: str | None = None,
     ):
         self.message = message
         if error_code:
@@ -74,7 +72,7 @@ class ValidationError(ReversecoreError):
     error_code = "RCMCP-E001"
     error_type = "VALIDATION_ERROR"
 
-    def __init__(self, message: str, details: Optional[dict] = None):
+    def __init__(self, message: str, details: dict | None = None):
         self.details = details or {}
         super().__init__(message, self.error_code, self.error_type)
 

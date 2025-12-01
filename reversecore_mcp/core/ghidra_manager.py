@@ -7,7 +7,7 @@ It ensures the JVM is started only once and projects are cached for performance.
 
 import asyncio
 import threading
-from typing import Dict, Any, Optional
+from typing import Any
 
 from reversecore_mcp.core.logging_config import get_logger
 
@@ -40,9 +40,9 @@ class GhidraManager:
             return
 
         self._jvm_started = False
-        self._projects: Dict[str, Any] = (
-            {}
-        )  # Cache for loaded programs (path -> (program, flat_api))
+        self._projects: dict[
+            str, Any
+        ] = {}  # Cache for loaded programs (path -> (program, flat_api))
         self._project_lock = threading.RLock()
         self._max_projects = 1  # Keep only 1 project in memory to avoid OOM
         self._initialized = True
@@ -117,7 +117,7 @@ class GhidraManager:
             self._projects[file_path] = (program, flat_api, ctx)
             return program, flat_api, ctx
 
-    def decompile(self, file_path: str, function_address: Optional[str] = None) -> str:
+    def decompile(self, file_path: str, function_address: str | None = None) -> str:
         """
         Decompile a function or the entire file.
 
@@ -182,9 +182,7 @@ class GhidraManager:
                         del self._projects[file_path]
                 raise
 
-    async def decompile_async(
-        self, file_path: str, function_address: Optional[str] = None
-    ) -> str:
+    async def decompile_async(self, file_path: str, function_address: str | None = None) -> str:
         """Execute decompilation asynchronously."""
         return await asyncio.to_thread(self.decompile, file_path, function_address)
 

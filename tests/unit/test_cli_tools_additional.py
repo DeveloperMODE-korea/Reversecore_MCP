@@ -6,7 +6,7 @@ import pytest
 
 from reversecore_mcp.core import command_spec, r2_helpers
 from reversecore_mcp.core.exceptions import ExecutionTimeoutError, ToolNotFoundError
-from reversecore_mcp.tools import cli_tools, file_operations, static_analysis
+from reversecore_mcp.tools import file_operations, r2_analysis, static_analysis
 
 
 def _create_workspace_file(workspace_dir, name: str, data: str | bytes = "stub"):
@@ -30,7 +30,7 @@ async def test_run_file_success(monkeypatch, workspace_dir, patched_workspace_co
         "execute_subprocess_async",
         mock_exec,
     )
-    out = await cli_tools.run_file(str(mocked_path))
+    out = await file_operations.run_file(str(mocked_path))
     assert out.status == "success" and "ELF" in out.data
 
 
@@ -42,7 +42,7 @@ async def test_run_file_tool_not_found(monkeypatch, workspace_dir, patched_works
         raise ToolNotFoundError("file")
 
     monkeypatch.setattr(file_operations, "execute_subprocess_async", raise_not_found)
-    out = await cli_tools.run_file(str(mocked_path))
+    out = await file_operations.run_file(str(mocked_path))
     assert out.status == "error" and out.error_code == "TOOL_NOT_FOUND"
 
 
@@ -54,7 +54,7 @@ async def test_run_strings_timeout(monkeypatch, workspace_dir, patched_workspace
         raise ExecutionTimeoutError(1)
 
     monkeypatch.setattr(static_analysis, "execute_subprocess_async", raise_timeout)
-    out = await cli_tools.run_strings(str(mocked_path))
+    out = await static_analysis.run_strings(str(mocked_path))
     assert out.status == "error" and out.error_code == "TIMEOUT"
 
 
@@ -70,7 +70,7 @@ async def test_run_strings_called_process_error(
         raise subprocess.CalledProcessError(1, cmd, output="", stderr="bad")
 
     monkeypatch.setattr(static_analysis, "execute_subprocess_async", raise_cpe)
-    out = await cli_tools.run_strings(str(mocked_path))
+    out = await static_analysis.run_strings(str(mocked_path))
     assert out.status == "error" and out.error_code == "INTERNAL_ERROR"
 
 
@@ -86,7 +86,7 @@ async def test_run_binwalk_success(monkeypatch, workspace_dir, patched_workspace
         "execute_subprocess_async",
         mock_exec,
     )
-    out = await cli_tools.run_binwalk(str(mocked_path))
+    out = await static_analysis.run_binwalk(str(mocked_path))
     assert out.status == "success" and "BINWALK" in out.data
 
 
@@ -102,7 +102,7 @@ async def test_run_binwalk_called_process_error(
         raise subprocess.CalledProcessError(2, cmd, output="", stderr="bad arg")
 
     monkeypatch.setattr(static_analysis, "execute_subprocess_async", raise_cpe)
-    out = await cli_tools.run_binwalk(str(mocked_path))
+    out = await static_analysis.run_binwalk(str(mocked_path))
     assert out.status == "error" and out.error_code == "INTERNAL_ERROR"
 
 
@@ -120,7 +120,7 @@ async def test_run_radare2_success(monkeypatch, workspace_dir, patched_workspace
         "execute_subprocess_async",
         mock_exec,
     )
-    out = await cli_tools.run_radare2(str(mocked_path), "i")
+    out = await r2_analysis.run_radare2(str(mocked_path), "i")
     assert out.status == "success" and out.data == "r2 out"
 
 
@@ -138,5 +138,5 @@ async def test_run_radare2_tool_not_found(
 
     # Mock r2_helpers where execute_subprocess_async is actually used
     monkeypatch.setattr(r2_helpers, "execute_subprocess_async", raise_not_found)
-    out = await cli_tools.run_radare2(str(mocked_path), "i")
+    out = await r2_analysis.run_radare2(str(mocked_path), "i")
     assert out.status == "error" and out.error_code == "TOOL_NOT_FOUND"

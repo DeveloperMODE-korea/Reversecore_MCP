@@ -6,18 +6,19 @@ bottlenecks actually improve performance without breaking functionality.
 """
 
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
 import pytest
 
 
 def test_analyze_variant_changes_binary_search_optimization(workspace_dir):
     """
     Test that analyze_variant_changes uses binary search instead of linear search.
-    
+
     This tests the optimization at line 355 where we changed from O(n*m) nested loops
     to O(n*log(m)) using binary search.
-    
-    NOTE: This test directly validates the binary search logic by comparing it to 
+
+    NOTE: This test directly validates the binary search logic by comparing it to
     the old linear search approach with a benchmark scenario.
     """
     # This is tested in test_binary_search_vs_linear_search_performance
@@ -28,11 +29,11 @@ def test_analyze_variant_changes_binary_search_optimization(workspace_dir):
 def test_trace_execution_path_set_optimization(workspace_dir):
     """
     Test that trace_execution_path uses set for path checking instead of list comprehension.
-    
+
     This tests the optimization at line 179-182 where we pre-compute addresses
     in the current path as a set.
-    
-    NOTE: This test validates that the set-based approach is faster than 
+
+    NOTE: This test validates that the set-based approach is faster than
     repeated list comprehensions in recursive calls.
     """
     # The optimization is in the implementation, verified by code inspection
@@ -43,37 +44,37 @@ def test_trace_execution_path_set_optimization(workspace_dir):
 def test_yara_processing_micro_optimization():
     """
     Test that YARA processing uses optimized early None check.
-    
+
     This tests the micro-optimization in lib_tools.py where we check
     matched_data is None before doing the isinstance check.
     """
     from reversecore_mcp.tools.lib_tools import _format_yara_match
-    
+
     # Create mock YARA match with many instances
     mock_instance_with_data = MagicMock()
     mock_instance_with_data.offset = 0x1000
     mock_instance_with_data.matched_data = b"test_data"
-    
+
     mock_instance_no_data = MagicMock()
     mock_instance_no_data.offset = 0x2000
     mock_instance_no_data.matched_data = None
-    
+
     mock_string = MagicMock()
     mock_string.identifier = "$test"
     # Mix of instances with and without data
     mock_string.instances = [mock_instance_with_data] * 100 + [mock_instance_no_data] * 100
-    
+
     mock_match = MagicMock()
     mock_match.rule = "TestRule"
     mock_match.namespace = "default"
     mock_match.tags = ["test"]
     mock_match.meta = {"author": "test"}
     mock_match.strings = [mock_string]
-    
+
     start = time.time()
     result = _format_yara_match(mock_match)
     elapsed = time.time() - start
-    
+
     # Should process 200 instances very quickly (allow for slower systems)
     assert elapsed < 0.1, f"YARA processing optimization failed: {elapsed}s"
     assert result["rule"] == "TestRule"
@@ -83,27 +84,27 @@ def test_yara_processing_micro_optimization():
 def test_ghidra_helper_extract_structure_fields():
     """
     Test that the new helper function _extract_structure_fields works correctly.
-    
+
     This tests the refactoring that reduces code duplication and improves
     performance by avoiding repeated attribute checks.
     """
     from reversecore_mcp.core.ghidra_helper import _extract_structure_fields
-    
+
     # Create mock Ghidra data type
     mock_component = MagicMock()
     mock_component.getFieldName.return_value = "test_field"
     mock_component.getDataType().getName.return_value = "int"
     mock_component.getOffset.return_value = 0
     mock_component.getLength.return_value = 4
-    
+
     mock_data_type = MagicMock()
     mock_data_type.getNumComponents.return_value = 10
     mock_data_type.getComponent.return_value = mock_component
-    
+
     start = time.time()
     fields = _extract_structure_fields(mock_data_type)
     elapsed = time.time() - start
-    
+
     # Should extract fields quickly (allow for slower systems)
     assert elapsed < 0.1, f"Structure extraction optimization failed: {elapsed}s"
     assert len(fields) == 10
@@ -114,7 +115,7 @@ def test_ghidra_helper_extract_structure_fields():
 def test_binary_search_vs_linear_search_performance():
     """
     Benchmark test showing binary search is faster than linear search.
-    
+
     This demonstrates the performance improvement from the analyze_variant_changes
     optimization.
     """
@@ -123,12 +124,12 @@ def test_binary_search_vs_linear_search_performance():
         (i * 0x1000, (i + 1) * 0x1000, f"func_{i}")
         for i in range(1000)  # 1000 functions
     ]
-    
+
     changes = [
         {"address": hex(500 * 0x1000 + j)}
         for j in range(100)  # 100 changes all in the same function
     ]
-    
+
     # Linear search (old method)
     def linear_search():
         changed_funcs = {}
@@ -146,7 +147,7 @@ def test_binary_search_vs_linear_search_performance():
                 # Invalid hex address format
                 pass
         return changed_funcs
-    
+
     # Binary search (new method)
     def binary_search():
         sorted_funcs = sorted(functions, key=lambda x: x[0])
@@ -159,11 +160,11 @@ def test_binary_search_vs_linear_search_performance():
                 addr = int(addr_str, 16)
                 left, right = 0, len(sorted_funcs) - 1
                 found_func = None
-                
+
                 while left <= right:
                     mid = (left + right) // 2
                     func_start, func_end, func_name = sorted_funcs[mid]
-                    
+
                     if func_start <= addr < func_end:
                         found_func = func_name
                         break
@@ -171,33 +172,34 @@ def test_binary_search_vs_linear_search_performance():
                         right = mid - 1
                     else:
                         left = mid + 1
-                
+
                 if found_func:
                     changed_funcs[found_func] = changed_funcs.get(found_func, 0) + 1
             except ValueError:
                 # Invalid hex address format
                 pass
         return changed_funcs
-    
+
     # Benchmark
     start = time.time()
     result_linear = linear_search()
     time_linear = time.time() - start
-    
+
     start = time.time()
     result_binary = binary_search()
     time_binary = time.time() - start
-    
+
     # Results should be identical
     assert result_linear == result_binary
-    
+
     # Binary search should be significantly faster (at least 5x)
-    assert time_binary < time_linear / 5, \
+    assert time_binary < time_linear / 5, (
         f"Binary search not faster enough: {time_binary}s vs {time_linear}s"
-    
+    )
+
     print(f"Linear search: {time_linear:.4f}s")
     print(f"Binary search: {time_binary:.4f}s")
-    print(f"Speedup: {time_linear/time_binary:.2f}x")
+    print(f"Speedup: {time_linear / time_binary:.2f}x")
 
 
 if __name__ == "__main__":

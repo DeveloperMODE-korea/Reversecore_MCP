@@ -5,13 +5,13 @@ This module provides utilities for decompiling binaries using Ghidra's
 DecompInterface API through PyGhidra.
 """
 
-import re
-import tempfile
 import os
+import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 from reversecore_mcp.core.exceptions import ValidationError
 from reversecore_mcp.core.logging_config import get_logger
@@ -108,7 +108,7 @@ def _configure_ghidra_environment():
 
 def decompile_function_with_ghidra(
     file_path: Path, function_address: str, timeout: int = 300
-) -> Tuple[str, Dict[str, Any]]:
+) -> tuple[str, dict[str, Any]]:
     """
     Decompile a function using Ghidra's decompiler.
 
@@ -129,9 +129,7 @@ def decompile_function_with_ghidra(
 
         _configure_ghidra_environment()
     except ImportError as e:
-        raise ImportError(
-            "PyGhidra is not installed. Install with: pip install pyghidra"
-        ) from e
+        raise ImportError("PyGhidra is not installed. Install with: pip install pyghidra") from e
 
     # Create temporary project directory
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -149,7 +147,7 @@ def decompile_function_with_ghidra(
                 analyze=True,  # Run auto-analysis
             ) as flat_api:
                 # Import Ghidra classes here, after JVM is started
-                from ghidra.app.decompiler import DecompInterface, DecompileResults
+                from ghidra.app.decompiler import DecompileResults, DecompInterface
 
                 program = flat_api.getCurrentProgram()
 
@@ -219,9 +217,7 @@ def decompile_function_with_ghidra(
 
         except subprocess.CalledProcessError as e:
             if "LaunchSupport" in str(e.cmd):
-                logger.error(
-                    "Ghidra LaunchSupport failed. Check JAVA_HOME and permissions."
-                )
+                logger.error("Ghidra LaunchSupport failed. Check JAVA_HOME and permissions.")
                 raise ValidationError(
                     "Ghidra failed to launch. Please ensure JAVA_HOME is set correctly and the user has write permissions to Ghidra installation.",
                     details={"error": str(e), "command": str(e.cmd)},
@@ -232,9 +228,7 @@ def decompile_function_with_ghidra(
             raise
 
 
-def _resolve_function(
-    flat_api: "FlatProgramAPI", address_str: str
-) -> Optional["Function"]:
+def _resolve_function(flat_api: "FlatProgramAPI", address_str: str) -> Optional["Function"]:
     """
     Resolve a function from an address string or symbol name.
 
@@ -279,7 +273,7 @@ def _resolve_function(
     return None
 
 
-def get_ghidra_version() -> Optional[str]:
+def get_ghidra_version() -> str | None:
     """
     Get the installed Ghidra version.
 
@@ -302,7 +296,7 @@ def get_ghidra_version() -> Optional[str]:
 
 def recover_structures_with_ghidra(
     file_path: Path, function_address: str, timeout: int = 600
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     Recover structure definitions from a function using Ghidra's data type analysis.
 
@@ -326,9 +320,7 @@ def recover_structures_with_ghidra(
 
         _configure_ghidra_environment()
     except ImportError as e:
-        raise ImportError(
-            "PyGhidra is not installed. Install with: pip install pyghidra"
-        ) from e
+        raise ImportError("PyGhidra is not installed. Install with: pip install pyghidra") from e
 
     # Create temporary project directory
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -337,9 +329,7 @@ def recover_structures_with_ghidra(
 
         try:
             # Open program with PyGhidra
-            logger.info(
-                f"Opening binary with Ghidra for structure recovery: {file_path}"
-            )
+            logger.info(f"Opening binary with Ghidra for structure recovery: {file_path}")
 
             with pyghidra.open_program(
                 str(file_path),
@@ -348,8 +338,8 @@ def recover_structures_with_ghidra(
                 analyze=True,  # Run auto-analysis for better structure detection
             ) as flat_api:
                 # Import Ghidra classes here
+                from ghidra.app.decompiler import DecompileResults, DecompInterface
                 from ghidra.program.model.pcode import HighFunction, HighVariable
-                from ghidra.app.decompiler import DecompInterface, DecompileResults
 
                 program = flat_api.getCurrentProgram()
 
@@ -368,9 +358,7 @@ def recover_structures_with_ghidra(
 
                 try:
                     # Decompile the function to get high-level representation
-                    logger.info(
-                        f"Analyzing structures in function: {function.getName()}"
-                    )
+                    logger.info(f"Analyzing structures in function: {function.getName()}")
 
                     results: DecompileResults = decompiler.decompileFunction(
                         function, timeout, None
@@ -413,10 +401,7 @@ def recover_structures_with_ghidra(
                                 type_name = data_type.getName()
 
                                 # Look for structure types (including pointers to structures)
-                                if (
-                                    "struct" in type_name.lower()
-                                    or data_type.getLength() > 8
-                                ):
+                                if "struct" in type_name.lower() or data_type.getLength() > 8:
                                     # Try to get the underlying structure
                                     actual_type = data_type
 
@@ -443,10 +428,7 @@ def recover_structures_with_ghidra(
                         if param_type is not None:
                             type_name = param_type.getName()
 
-                            if (
-                                "struct" in type_name.lower()
-                                and type_name not in structures_found
-                            ):
+                            if "struct" in type_name.lower() and type_name not in structures_found:
                                 # OPTIMIZATION: Use helper function to extract fields
                                 fields = _extract_structure_fields(param_type)
 
@@ -505,9 +487,7 @@ def recover_structures_with_ghidra(
 
         except subprocess.CalledProcessError as e:
             if "LaunchSupport" in str(e.cmd):
-                logger.error(
-                    "Ghidra LaunchSupport failed. Check JAVA_HOME and permissions."
-                )
+                logger.error("Ghidra LaunchSupport failed. Check JAVA_HOME and permissions.")
                 raise ValidationError(
                     "Ghidra failed to launch. Please ensure JAVA_HOME is set correctly and the user has write permissions to Ghidra installation.",
                     details={"error": str(e), "command": str(e.cmd)},

@@ -1,14 +1,12 @@
 """Unit tests for core.execution module."""
 
 import asyncio
-from io import StringIO
 import subprocess
-import sys
 
 import pytest
 
 from reversecore_mcp.core.exceptions import ExecutionTimeoutError, ToolNotFoundError
-from reversecore_mcp.core.execution import execute_subprocess_streaming, execute_subprocess_async
+from reversecore_mcp.core.execution import execute_subprocess_streaming
 
 
 class AsyncDummyProcess:
@@ -41,10 +39,10 @@ class AsyncStreamReader:
 
     async def read(self, n: int = -1):
         if n == -1:
-            chunk = self._data[self._pos:]
+            chunk = self._data[self._pos :]
             self._pos = len(self._data)
         else:
-            chunk = self._data[self._pos:self._pos + n]
+            chunk = self._data[self._pos : self._pos + n]
             self._pos += len(chunk)
         # Simulate async I/O
         await asyncio.sleep(0)
@@ -101,20 +99,18 @@ class TestExecuteSubprocessStreaming:
         """Test that long-running command raises ExecutionTimeoutError."""
         # Create a process that will take longer than timeout
         fake_async_subprocess(stdout_data=b"", return_code=0)
-        
+
         # Patch asyncio.wait_for to raise TimeoutError
         original_wait_for = asyncio.wait_for
-        
+
         async def fake_wait_for(coro, timeout):
             coro.close()
             raise asyncio.TimeoutError()
-        
+
         monkeypatch.setattr("asyncio.wait_for", fake_wait_for)
 
         with pytest.raises(ExecutionTimeoutError):
-            execute_subprocess_streaming(
-                ["long", "running"], max_output_size=1000, timeout=1
-            )
+            execute_subprocess_streaming(["long", "running"], max_output_size=1000, timeout=1)
 
     def test_output_size_limit(self, fake_async_subprocess):
         """Test that output is truncated when exceeding max_output_size."""
@@ -137,9 +133,7 @@ class TestExecuteSubprocessStreaming:
             return_code=1,
         )
         with pytest.raises(subprocess.CalledProcessError):
-            execute_subprocess_streaming(
-                ["fails"], max_output_size=1000, timeout=10
-            )
+            execute_subprocess_streaming(["fails"], max_output_size=1000, timeout=10)
 
     def test_empty_output(self, fake_async_subprocess):
         """Test command with no output."""
@@ -166,4 +160,3 @@ class TestExecuteSubprocessStreaming:
             ["loop", "command"], max_output_size=1000, timeout=10
         )
         assert "loop-aware" in output
-

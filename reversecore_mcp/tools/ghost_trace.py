@@ -494,3 +494,24 @@ async def _verify_hypothesis_with_emulation(
             "raw_output_preview": output[:200] + "..." if len(output) > 200 else output,
         }
     )
+
+
+from typing import Any
+
+from reversecore_mcp.core.plugin import Plugin
+
+
+class GhostTracePlugin(Plugin):
+    """Plugin for Ghost Trace tool."""
+
+    @property
+    def name(self) -> str:
+        return "ghost_trace"
+
+    @property
+    def description(self) -> str:
+        return "Hybrid reverse engineering tool (Static + Emulation) for detecting hidden malicious behaviors."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register Ghost Trace tool."""
+        mcp_server.tool(ghost_trace)

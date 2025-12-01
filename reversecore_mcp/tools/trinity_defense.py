@@ -10,20 +10,21 @@ Architecture: DISCOVER → UNDERSTAND → NEUTRALIZE
 """
 
 import asyncio
-from typing import Dict, Any, List, Tuple
+from typing import Any
 
-from fastmcp import FastMCP, Context
-from reversecore_mcp.core.logging_config import get_logger
-from reversecore_mcp.core.result import ToolResult, success, failure
+from fastmcp import Context, FastMCP
+
 from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_handling import handle_tool_errors
+from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.metrics import track_metrics
+from reversecore_mcp.core.result import ToolResult, failure, success
 from reversecore_mcp.core.security import validate_file_path
+from reversecore_mcp.tools.adaptive_vaccine import adaptive_vaccine
 
 # Import the three signature tools
 from reversecore_mcp.tools.ghost_trace import ghost_trace
 from reversecore_mcp.tools.neural_decompiler import neural_decompile
-from reversecore_mcp.tools.adaptive_vaccine import adaptive_vaccine
 
 logger = get_logger(__name__)
 
@@ -68,9 +69,7 @@ async def trinity_defense(
     validated_path = validate_file_path(file_path)
 
     if ctx:
-        await ctx.info(
-            "🔱 Trinity Defense System: Initiating full-spectrum analysis..."
-        )
+        await ctx.info("🔱 Trinity Defense System: Initiating full-spectrum analysis...")
         await ctx.info(f"📁 Target: {validated_path.name}")
         await ctx.info(f"⚙️ Mode: {mode.upper()}")
 
@@ -128,9 +127,7 @@ async def trinity_defense(
     # ============================================================
     if ctx:
         await ctx.info("\\n🧠 PHASE 2: UNDERSTAND (Neural Decompiler)")
-        await ctx.info(
-            f"📊 Analyzing top {min(max_threats, len(all_threats))} threats..."
-        )
+        await ctx.info(f"📊 Analyzing top {min(max_threats, len(all_threats))} threats...")
 
     refined_threats = []
 
@@ -149,15 +146,13 @@ async def trinity_defense(
         if ctx:
             await ctx.info("  🔄 Parallel analysis in progress...")
 
-        results = await asyncio.gather(
-            *[task for _, task in tasks], return_exceptions=True
-        )
+        results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
 
         # Process results
-        for i, ((threat, _), result) in enumerate(zip(tasks, results)):
+        for i, ((threat, _), result) in enumerate(zip(tasks, results, strict=False)):
             if ctx:
                 await ctx.info(
-                    f"  [{i+1}/{len(tasks)}] Processed {threat.get('function', threat.get('address'))}"
+                    f"  [{i + 1}/{len(tasks)}] Processed {threat.get('function', threat.get('address'))}"
                 )
 
             if isinstance(result, Exception):
@@ -226,7 +221,7 @@ async def trinity_defense(
             for i, threat in enumerate(refined_threats):
                 if ctx:
                     await ctx.info(
-                        f"  [{i+1}/{len(refined_threats)}] Generating defense for {threat.get('function', threat.get('address'))}..."
+                        f"  [{i + 1}/{len(refined_threats)}] Generating defense for {threat.get('function', threat.get('address'))}..."
                     )
 
                 try:
@@ -240,9 +235,7 @@ async def trinity_defense(
                     if vaccine_result.status != "error":
                         defenses.append(vaccine_result.data)
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to generate vaccine for {threat.get('address')}: {e}"
-                    )
+                    logger.warning(f"Failed to generate vaccine for {threat.get('address')}: {e}")
 
         logger.info(f"Phase 3 complete: {len(defenses)} defenses generated")
 
@@ -283,8 +276,8 @@ async def trinity_defense(
 
 
 def _infer_intent_with_confidence(
-    neural_result: Dict[str, Any], threat_info: Dict[str, Any]
-) -> Tuple[str, float]:
+    neural_result: dict[str, Any], threat_info: dict[str, Any]
+) -> tuple[str, float]:
     """Infer threat intent with confidence score using context-aware analysis.
 
     Args:
@@ -370,9 +363,7 @@ def _infer_intent_with_confidence(
     # If multiple high-confidence intents, mark as multi-stage
     high_conf_intents = [i for i, c in scores.items() if c >= 0.7]
     if len(high_conf_intents) > 1:
-        combined_conf = sum(scores[i] for i in high_conf_intents) / len(
-            high_conf_intents
-        )
+        combined_conf = sum(scores[i] for i in high_conf_intents) / len(high_conf_intents)
         return f"multi_stage_attack({','.join(high_conf_intents)})", combined_conf
 
     return intent, confidence
@@ -417,7 +408,7 @@ def _infer_intent(code: str) -> str:
         return f"multi_stage_attack({','.join(detected_intents)})"
 
 
-def _generate_recommendations(threats: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _generate_recommendations(threats: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Generate detailed, actionable recommendations based on discovered threats.
 
     Args:
@@ -598,3 +589,24 @@ def _generate_recommendations(threats: List[Dict[str, Any]]) -> List[Dict[str, A
         )
 
     return recommendations
+
+
+from typing import Any
+
+from reversecore_mcp.core.plugin import Plugin
+
+
+class TrinityDefensePlugin(Plugin):
+    """Plugin for Trinity Defense System."""
+
+    @property
+    def name(self) -> str:
+        return "trinity_defense"
+
+    @property
+    def description(self) -> str:
+        return "Integrated automated defense framework (Ghost Trace, Neural Decompiler, Adaptive Vaccine)."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register Trinity Defense tools."""
+        mcp_server.tool(trinity_defense)

@@ -257,3 +257,24 @@ def _refine_code(code: str) -> str:
     # This is a simple heuristic and could be expanded
 
     return "\n".join(refined_lines)
+
+
+from typing import Any
+
+from reversecore_mcp.core.plugin import Plugin
+
+
+class NeuralDecompilerPlugin(Plugin):
+    """Plugin for Neural Decompiler tool."""
+
+    @property
+    def name(self) -> str:
+        return "neural_decompiler"
+
+    @property
+    def description(self) -> str:
+        return "AI-Simulated Code Refinement Tool for transforming raw decompilation into human-like code."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register Neural Decompiler tool."""
+        mcp_server.tool(neural_decompile)

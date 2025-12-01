@@ -388,3 +388,25 @@ async def generate_yara_rule(
         hex_bytes=formatted_bytes,
         description=f"YARA rule '{rule_name}' generated from {byte_length} bytes at {function_address}",
     )
+
+
+from typing import Any
+
+from reversecore_mcp.core.plugin import Plugin
+
+
+class SignatureToolsPlugin(Plugin):
+    """Plugin for signature generation tools."""
+
+    @property
+    def name(self) -> str:
+        return "signature_tools"
+
+    @property
+    def description(self) -> str:
+        return "Tools for generating YARA rules and binary signatures."
+
+    def register(self, mcp_server: Any) -> None:
+        """Register signature tools."""
+        mcp_server.tool(generate_signature)
+        mcp_server.tool(generate_yara_rule)

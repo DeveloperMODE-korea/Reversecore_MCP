@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from reversecore_mcp.tools import cli_tools, r2_analysis
+from reversecore_mcp.tools import r2_analysis
 
 
 def test_radare2_json_to_mermaid_basic():
@@ -69,7 +69,7 @@ async def test_generate_function_graph_validation_error(
 ):
     """Test generate_function_graph with invalid parameters."""
     # Test invalid format
-    result = await cli_tools.generate_function_graph(
+    result = await r2_analysis.generate_function_graph(
         file_path=str(workspace_dir / "test.bin"), function_address="main", format="invalid_format"
     )
 
@@ -97,7 +97,7 @@ async def test_generate_function_graph_json_format(
     # Patch in the r2_analysis module where it's imported
     monkeypatch.setattr(r2_analysis, "_execute_r2_command", mock_exec)
 
-    result = await cli_tools.generate_function_graph(
+    result = await r2_analysis.generate_function_graph(
         file_path=str(test_file), function_address="main", format="json"
     )
 
@@ -131,7 +131,7 @@ async def test_generate_function_graph_mermaid_format(
 
     monkeypatch.setattr(r2_analysis, "_execute_r2_command", mock_exec)
 
-    result = await cli_tools.generate_function_graph(
+    result = await r2_analysis.generate_function_graph(
         file_path=str(test_file), function_address="0x1000", format="mermaid"
     )
 
@@ -150,7 +150,7 @@ async def test_generate_function_graph_invalid_address(
     test_file.write_bytes(b"\x00" * 100)
 
     # Test with shell injection attempt
-    result = await cli_tools.generate_function_graph(
+    result = await r2_analysis.generate_function_graph(
         file_path=str(test_file), function_address="main; rm -rf /", format="json"
     )
 
@@ -173,7 +173,7 @@ async def test_generate_function_graph_dot_format(
 
     monkeypatch.setattr(r2_analysis, "_execute_r2_command", mock_exec)
 
-    result = await cli_tools.generate_function_graph(
+    result = await r2_analysis.generate_function_graph(
         file_path=str(test_file), function_address="main", format="dot"
     )
 

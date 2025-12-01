@@ -33,11 +33,13 @@ class TestRunFile:
         assert result.status == "error" and result.error_code == "VALIDATION_ERROR"
 
     @pytest.mark.asyncio
-    async def test_run_file_outside_workspace(self, workspace_dir, tmp_path, patched_workspace_config):
+    async def test_run_file_outside_workspace(
+        self, workspace_dir, tmp_path, patched_workspace_config
+    ):
         """Test that file outside workspace is rejected."""
         outside_file = tmp_path / "outside.txt"
         outside_file.write_text("test")
-        
+
         result = await cli_tools.run_file(str(outside_file))
         assert result.status == "error"
         assert "outside" in result.message.lower()
@@ -98,4 +100,3 @@ class TestRunRadare2:
         result = cli_tools.run_radare2(str(sample_binary_path), "invalid_command_xyz")
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"
-

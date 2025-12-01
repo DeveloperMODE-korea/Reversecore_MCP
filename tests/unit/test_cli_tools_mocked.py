@@ -3,7 +3,13 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from reversecore_mcp.tools import cli_tools
+from reversecore_mcp.tools import (
+    decompilation,
+    diff_tools,
+    r2_analysis,
+    signature_tools,
+    static_analysis,
+)
 
 
 @pytest.mark.asyncio
@@ -21,7 +27,7 @@ class TestCliToolsMocked:
         ) as mock_exec:
             mock_exec.return_value = (mock_output, len(mock_output))
 
-            result = await cli_tools.generate_signature(str(test_file), "0x401000", length=4)
+            result = await signature_tools.generate_signature(str(test_file), "0x401000", length=4)
 
             assert result.status == "success"
             assert "rule suspicious_test_x401000" in result.data
@@ -31,7 +37,7 @@ class TestCliToolsMocked:
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE")
 
-        result = await cli_tools.generate_signature(str(test_file), "0x401000", length=0)
+        result = await signature_tools.generate_signature(str(test_file), "0x401000", length=0)
         assert result.status == "error"
         assert "Length must be between" in result.message
 
@@ -41,7 +47,7 @@ class TestCliToolsMocked:
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE")
 
-        result = await cli_tools.generate_signature(str(test_file), "invalid;cmd")
+        result = await signature_tools.generate_signature(str(test_file), "invalid;cmd")
         assert result.status == "error"
         # Updated to match the new error message from validate_address_format
         assert "must contain only alphanumeric characters" in result.message
@@ -58,7 +64,7 @@ class TestCliToolsMocked:
         ) as mock_exec:
             mock_exec.return_value = ("", 0)
 
-            result = await cli_tools.generate_signature(str(test_file), "0x401000")
+            result = await signature_tools.generate_signature(str(test_file), "0x401000")
 
             assert result.status == "error"
             assert "Failed to extract valid hex bytes" in result.message
@@ -79,7 +85,7 @@ _ZTIMyClass
         ) as mock_exec:
             mock_exec.return_value = (mock_output, len(mock_output))
 
-            result = await cli_tools.extract_rtti_info(str(test_file))
+            result = await static_analysis.extract_rtti_info(str(test_file))
 
             assert result.status == "success"
             data = result.data
@@ -96,7 +102,7 @@ _ZTIMyClass
         ) as mock_exec:
             mock_exec.return_value = ("NO RTTI HERE", 10)
 
-            result = await cli_tools.extract_rtti_info(str(test_file))
+            result = await static_analysis.extract_rtti_info(str(test_file))
 
             # Should succeed but return empty results
             assert result.status == "success"
@@ -118,7 +124,7 @@ _ZTIMyClass
         ) as mock_exec:
             mock_exec.return_value = (output, len(output))
 
-            result = await cli_tools.analyze_xrefs(str(test_file), "0x401000", xref_type="all")
+            result = await r2_analysis.analyze_xrefs(str(test_file), "0x401000", xref_type="all")
 
             assert result.status == "success"
             data = result.data
@@ -130,7 +136,7 @@ _ZTIMyClass
         test_file = workspace_dir / "test.exe"
         test_file.write_bytes(b"FAKE")
 
-        result = await cli_tools.analyze_xrefs(str(test_file), "0x401000", xref_type="invalid")
+        result = await r2_analysis.analyze_xrefs(str(test_file), "0x401000", xref_type="invalid")
         assert result.status == "error"
         assert "Invalid xref_type" in result.message
 
@@ -151,7 +157,9 @@ _ZTIMyClass
         ) as mock_exec:
             mock_exec.return_value = (vars_json, len(vars_json))
 
-            result = await cli_tools.recover_structures(str(test_file), "main", use_ghidra=False)
+            result = await decompilation.recover_structures(
+                str(test_file), "main", use_ghidra=False
+            )
 
             assert result.status == "success"
             data = result.data
@@ -174,7 +182,7 @@ _ZTIMyClass
                 return_value=(mock_structures, mock_metadata),
             ),
         ):
-            result = await cli_tools.recover_structures(str(test_file), "main", use_ghidra=True)
+            result = await decompilation.recover_structures(str(test_file), "main", use_ghidra=True)
 
             assert result.status == "success"
             assert result.data["structures"] == mock_structures
@@ -198,7 +206,7 @@ _ZTIMyClass
         ):
             mock_exec.return_value = (vars_json, len(vars_json))
 
-            result = await cli_tools.recover_structures(str(test_file), "main", use_ghidra=True)
+            result = await decompilation.recover_structures(str(test_file), "main", use_ghidra=True)
 
             # Should succeed via fallback
             assert result.status == "success"
@@ -220,7 +228,7 @@ _ZTIMyClass
         ) as mock_exec:
             mock_exec.side_effect = [(diff_output, len(diff_output)), (sim_output, len(sim_output))]
 
-            result = await cli_tools.diff_binaries(str(file_a), str(file_b))
+            result = await diff_tools.diff_binaries(str(file_a), str(file_b))
 
             assert result.status == "success"
             data = json.loads(result.data)
@@ -242,7 +250,7 @@ _ZTIMyClass
         ) as mock_exec:
             mock_exec.return_value = (funcs_json, len(funcs_json))
 
-            result = await cli_tools.match_libraries(str(test_file))
+            result = await diff_tools.match_libraries(str(test_file))
 
             assert result.status == "success"
             data = json.loads(result.data)
@@ -261,7 +269,7 @@ _ZTIMyClass
         ) as mock_exec:
             mock_exec.return_value = ("INVALID", 10)
 
-            result = await cli_tools.match_libraries(str(test_file))
+            result = await diff_tools.match_libraries(str(test_file))
 
             assert result.status == "error"
             assert "Failed to parse function list" in result.message

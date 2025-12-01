@@ -8,7 +8,8 @@ by centralizing logging, error handling, and execution time measurement.
 import functools
 import os
 import time
-from typing import Any, Callable, Optional, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.result import ToolResult, failure
@@ -18,7 +19,7 @@ logger = get_logger(__name__)
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
+def log_execution(tool_name: str | None = None) -> Callable[[F], F]:
     """
     Decorator to add logging and error handling to tool functions.
 
@@ -81,9 +82,7 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
                         result.metadata["execution_time_ms"] = execution_time
 
                     log_extra["execution_time_ms"] = execution_time
-                    logger.info(
-                        f"{actual_tool_name} completed successfully", extra=log_extra
-                    )
+                    logger.info(f"{actual_tool_name} completed successfully", extra=log_extra)
                     return result
                 except Exception as exc:
                     execution_time = int((time.time() - start_time) * 1000)
@@ -137,9 +136,7 @@ def log_execution(tool_name: Optional[str] = None) -> Callable[[F], F]:
                     result.metadata["execution_time_ms"] = execution_time
 
                 log_extra["execution_time_ms"] = execution_time
-                logger.info(
-                    f"{actual_tool_name} completed successfully", extra=log_extra
-                )
+                logger.info(f"{actual_tool_name} completed successfully", extra=log_extra)
                 return result
             except Exception as exc:
                 execution_time = int((time.time() - start_time) * 1000)

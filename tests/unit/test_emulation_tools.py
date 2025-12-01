@@ -3,7 +3,7 @@
 import pytest
 
 from reversecore_mcp.core import r2_helpers
-from reversecore_mcp.tools import cli_tools, decompilation
+from reversecore_mcp.tools import decompilation
 
 
 def test_parse_register_state_basic():
@@ -63,7 +63,7 @@ async def test_emulate_machine_code_validation_error(
     test_file.write_bytes(b"\x00" * 100)
 
     # Test instructions count too high
-    result = await cli_tools.emulate_machine_code(
+    result = await decompilation.emulate_machine_code(
         file_path=str(test_file),
         start_address="main",
         instructions=2000,  # Exceeds 1000 limit
@@ -82,7 +82,7 @@ async def test_emulate_machine_code_invalid_address(
     test_file.write_bytes(b"\x00" * 100)
 
     # Test with shell injection attempt
-    result = await cli_tools.emulate_machine_code(
+    result = await decompilation.emulate_machine_code(
         file_path=str(test_file), start_address="main; rm -rf /", instructions=10
     )
 
@@ -108,7 +108,7 @@ rip = 0x00401234"""
     # Mock r2_helpers where execute_subprocess_async is actually used
     monkeypatch.setattr(r2_helpers, "execute_subprocess_async", mock_exec)
 
-    result = await cli_tools.emulate_machine_code(
+    result = await decompilation.emulate_machine_code(
         file_path=str(test_file), start_address="main", instructions=50
     )
 
@@ -135,7 +135,7 @@ async def test_emulate_machine_code_empty_registers(
     # Mock r2_helpers where execute_subprocess_async is actually used
     monkeypatch.setattr(r2_helpers, "execute_subprocess_async", mock_exec)
 
-    result = await cli_tools.emulate_machine_code(
+    result = await decompilation.emulate_machine_code(
         file_path=str(test_file), start_address="main", instructions=10
     )
 
@@ -161,7 +161,7 @@ async def test_emulate_machine_code_default_instructions(
     # Mock r2_helpers where execute_subprocess_async is actually used
     monkeypatch.setattr(r2_helpers, "execute_subprocess_async", mock_exec)
 
-    result = await cli_tools.emulate_machine_code(
+    result = await decompilation.emulate_machine_code(
         file_path=str(test_file), start_address="0x401000"
     )
 
@@ -185,7 +185,7 @@ async def test_emulate_machine_code_hex_address(
     # Mock r2_helpers where execute_subprocess_async is actually used
     monkeypatch.setattr(r2_helpers, "execute_subprocess_async", mock_exec)
 
-    result = await cli_tools.emulate_machine_code(
+    result = await decompilation.emulate_machine_code(
         file_path=str(test_file), start_address="0x401000", instructions=10
     )
 
@@ -208,7 +208,7 @@ async def test_emulate_machine_code_symbol_address(
     # Mock r2_helpers where execute_subprocess_async is actually used
     monkeypatch.setattr(r2_helpers, "execute_subprocess_async", mock_exec)
 
-    result = await cli_tools.emulate_machine_code(
+    result = await decompilation.emulate_machine_code(
         file_path=str(test_file), start_address="sym.decrypt", instructions=100
     )
 

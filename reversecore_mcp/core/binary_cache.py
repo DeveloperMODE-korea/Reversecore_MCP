@@ -6,8 +6,8 @@ It prevents redundant analysis of the same files.
 """
 
 import time
-from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
+from typing import Any
 
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.metrics import metrics_collector
@@ -31,9 +31,9 @@ class BinaryMetadataCache:
     """
 
     def __init__(self, ttl_seconds: int = DEFAULT_CACHE_TTL_SECONDS):
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
         # Store (mtime, last_check_time) tuple to reduce stat() calls
-        self._file_timestamps: Dict[str, Tuple[float, float]] = {}
+        self._file_timestamps: dict[str, tuple[float, float]] = {}
         self._ttl_seconds = ttl_seconds
 
     def _get_cache_key(self, file_path: str) -> str:
@@ -87,7 +87,7 @@ class BinaryMetadataCache:
                 del self._file_timestamps[key]
             return False
 
-    def get(self, file_path: str, key: str) -> Optional[Any]:
+    def get(self, file_path: str, key: str) -> Any | None:
         """Get a specific metadata item for a file."""
         cache_key = self._get_cache_key(file_path)
         if self._is_valid(file_path):
