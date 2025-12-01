@@ -25,13 +25,49 @@ AI 에이전트가 자연어 명령을 통해 포괄적인 바이너리 분석�
 # Intel/AMD
 docker compose --profile x86 up -d
 
-# Apple Silicon (M1/M2/M3/M4)
+# Apple Silicon (M1/M2/M3/M4)/
 docker compose --profile arm64 up -d
 ```
 
 ### MCP 클라이언트 설정 (Cursor AI)
 
+**1단계: Docker 이미지 빌드**
+
+```bash
+# macOS Apple Silicon (M1/M2/M3/M4)
+docker build -f Dockerfile.arm64 -t reversecore-mcp:arm64 .
+
+# macOS Intel / Linux / Windows (x86_64)
+docker build -f Dockerfile -t reversecore-mcp:latest .
+```
+
+**2단계: MCP 클라이언트 설정**
+
 `~/.cursor/mcp.json`에 추가:
+
+<details>
+<summary>🍎 <b>macOS Apple Silicon (M1/M2/M3/M4)</b></summary>
+
+```json
+{
+  "mcpServers": {
+    "reversecore": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "/Users/YOUR_USERNAME/Reversecore_Workspace:/app/workspace",
+        "-e", "REVERSECORE_WORKSPACE=/app/workspace",
+        "-e", "MCP_TRANSPORT=stdio",
+        "reversecore-mcp:arm64"
+      ]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>🖥️ <b>macOS Intel / Linux (x86_64)</b></summary>
 
 ```json
 {
@@ -41,13 +77,36 @@ docker compose --profile arm64 up -d
       "args": [
         "run", "-i", "--rm",
         "-v", "/path/to/workspace:/app/workspace",
+        "-e", "REVERSECORE_WORKSPACE=/app/workspace",
         "-e", "MCP_TRANSPORT=stdio",
-        "reversecore-mcp"
+        "reversecore-mcp:latest"
       ]
     }
   }
 }
 ```
+</details>
+
+<details>
+<summary>🪟 <b>Windows (x86_64)</b></summary>
+
+```json
+{
+  "mcpServers": {
+    "reversecore": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "C:/Reversecore_Workspace:/app/workspace",
+        "-e", "REVERSECORE_WORKSPACE=/app/workspace",
+        "-e", "MCP_TRANSPORT=stdio",
+        "reversecore-mcp:latest"
+      ]
+    }
+  }
+}
+```
+</details>
 
 ## ✨ 핵심 기능
 
@@ -139,11 +198,12 @@ reversecore_mcp/
 ./scripts/run-docker.sh logs         # 로그 보기
 ./scripts/run-docker.sh shell        # 셸 접근
 
-# 수동 Docker 명령
-docker build -t reversecore-mcp .
-docker run -it -p 8000:8000 \
-  -v $(pwd)/workspace:/app/workspace \
-  reversecore-mcp
+# 수동 Docker 빌드 명령
+# Apple Silicon (M1/M2/M3/M4)
+docker build -f Dockerfile.arm64 -t reversecore-mcp:arm64 .
+
+# Intel/AMD (x86_64)
+docker build -f Dockerfile -t reversecore-mcp:latest .
 ```
 
 ### 환경 변수

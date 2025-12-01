@@ -31,7 +31,43 @@ docker compose --profile arm64 up -d
 
 ### MCP Client Configuration (Cursor AI)
 
+**Step 1: Build Docker Image**
+
+```bash
+# macOS Apple Silicon (M1/M2/M3/M4)
+docker build -f Dockerfile.arm64 -t reversecore-mcp:arm64 .
+
+# macOS Intel / Linux / Windows (x86_64)
+docker build -f Dockerfile -t reversecore-mcp:latest .
+```
+
+**Step 2: Configure MCP Client**
+
 Add to `~/.cursor/mcp.json`:
+
+<details>
+<summary>🍎 <b>macOS Apple Silicon (M1/M2/M3/M4)</b></summary>
+
+```json
+{
+  "mcpServers": {
+    "reversecore": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "/Users/YOUR_USERNAME/Reversecore_Workspace:/app/workspace",
+        "-e", "REVERSECORE_WORKSPACE=/app/workspace",
+        "-e", "MCP_TRANSPORT=stdio",
+        "reversecore-mcp:arm64"
+      ]
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary>🖥️ <b>macOS Intel / Linux (x86_64)</b></summary>
 
 ```json
 {
@@ -41,13 +77,36 @@ Add to `~/.cursor/mcp.json`:
       "args": [
         "run", "-i", "--rm",
         "-v", "/path/to/workspace:/app/workspace",
+        "-e", "REVERSECORE_WORKSPACE=/app/workspace",
         "-e", "MCP_TRANSPORT=stdio",
-        "reversecore-mcp"
+        "reversecore-mcp:latest"
       ]
     }
   }
 }
 ```
+</details>
+
+<details>
+<summary>🪟 <b>Windows (x86_64)</b></summary>
+
+```json
+{
+  "mcpServers": {
+    "reversecore": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "C:/Reversecore_Workspace:/app/workspace",
+        "-e", "REVERSECORE_WORKSPACE=/app/workspace",
+        "-e", "MCP_TRANSPORT=stdio",
+        "reversecore-mcp:latest"
+      ]
+    }
+  }
+}
+```
+</details>
 
 ## ✨ Key Features
 
@@ -139,11 +198,12 @@ reversecore_mcp/
 ./scripts/run-docker.sh logs         # View logs
 ./scripts/run-docker.sh shell        # Shell access
 
-# Manual Docker commands
-docker build -t reversecore-mcp .
-docker run -it -p 8000:8000 \
-  -v \$(pwd)/workspace:/app/workspace \
-  reversecore-mcp
+# Manual Docker build commands
+# Apple Silicon (M1/M2/M3/M4)
+docker build -f Dockerfile.arm64 -t reversecore-mcp:arm64 .
+
+# Intel/AMD (x86_64)
+docker build -f Dockerfile -t reversecore-mcp:latest .
 ```
 
 ### Environment Variables

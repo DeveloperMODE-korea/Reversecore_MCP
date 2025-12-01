@@ -18,9 +18,10 @@ def register_prompts(mcp: FastMCP):
         [Analysis SOP (Standard Operating Procedure)]
         Strictly follow these procedures in order and call the tools:
 
-        1. Reconnaissance:
+        1. Reconnaissance & Hidden Threat Detection:
            - Identify the file type with `run_file`.
            - Extract IOCs (IP, URL, Email) with `extract_iocs` after running `run_strings`.
+           - Detect hidden logic/orphan functions using `ghost_trace` (Crucial for finding backdoors).
            - Report immediately if traces of packers (UPX, PyInstaller, etc.) are found.
 
         2. Filtering:
@@ -31,6 +32,7 @@ def register_prompts(mcp: FastMCP):
              A. Understand the call relationship (context) with `analyze_xrefs`.
              B. Understand the data structure with `recover_structures`.
              C. Analyze the logic by securing pseudo-code (Pseudo-C) with `smart_decompile`.
+             D. For complex or obfuscated functions, use `neural_decompile` to get AI-refined code.
            - If obfuscation is suspected or execution results are curious, safely execute a part with `emulate_machine_code`.
 
         4. Reporting:
@@ -38,6 +40,68 @@ def register_prompts(mcp: FastMCP):
            - Finally, write a final report including the file's function, risk level, found IOCs, and YARA rules.
 
         Start from step 1 right now.
+        """
+
+    @mcp.prompt("malware_analysis_mode")
+    def malware_analysis_mode(filename: str) -> str:
+        """Focused analysis on Malware behaviors (Ransomware, Stealer, Backdoor)."""
+        return f"""
+        You are a Malware Analyst.
+        Analyze the file '{filename}' focusing on malicious behaviors and indicators of compromise (IOCs).
+
+        [Language Rule]
+        - Answer in the same language as the user's request.
+
+        [Analysis SOP]
+        1. Behavioral Triage:
+           - Check for Ransomware indicators (crypto constants, file enumeration) using `run_yara` and `run_strings`.
+           - Check for Stealer behaviors (browser paths, credential vaults) using `run_strings`.
+           - Check for Backdoor/C2 (socket APIs, connect, listen) using `run_radare2` imports.
+
+        2. Evasion Detection:
+           - Use `ghost_trace` to find anti-analysis tricks (IsDebuggerPresent, sleep loops, time checks).
+           - Check for packing using `parse_binary_with_lief`.
+
+        3. Persistence Mechanism:
+           - Look for Registry keys (Run, RunOnce), Service creation, or Scheduled Tasks in strings or imports.
+
+        4. Payload Analysis:
+           - Decompile suspicious functions using `neural_decompile` to understand the payload logic.
+
+        5. Reporting:
+           - Map behaviors to MITRE ATT&CK framework.
+           - Extract all IOCs (C2, Hashes, Mutexes).
+           - Generate a YARA rule for detection.
+        """
+
+    @mcp.prompt("patch_analysis_mode")
+    def patch_analysis_mode(original_binary: str, patched_binary: str) -> str:
+        """Analyze the differences between two binaries to identify patches or vulnerabilities (1-day analysis)."""
+        return f"""
+        You are a Patch Analyst / 1-Day Exploit Researcher.
+        Compare '{original_binary}' (vulnerable) and '{patched_binary}' (patched) to understand the security fix.
+
+        [Language Rule]
+        - Answer in the same language as the user's request.
+
+        [Analysis SOP]
+        1. Binary Diffing:
+           - Run `diff_binaries("{original_binary}", "{patched_binary}")` to find changed functions.
+           - Focus on functions with 'unsafe' or 'security' related changes.
+
+        2. Change Analysis:
+           - For each changed function:
+             A. Decompile both versions using `smart_decompile` or `neural_decompile`.
+             B. Compare the logic to identify added checks (bounds check, integer overflow check, input validation).
+
+        3. Vulnerability Reconstruction:
+           - Based on the added check, infer the original vulnerability (Buffer Overflow, UAF, Integer Overflow).
+           - Determine if the patch is complete or if it can be bypassed.
+
+        4. Reporting:
+           - Summarize the vulnerability (CVE style).
+           - Explain the patch logic.
+           - Suggest a Proof-of-Concept (PoC) strategy to trigger the original bug.
         """
 
     @mcp.prompt("basic_analysis_mode")
@@ -68,7 +132,11 @@ def register_prompts(mcp: FastMCP):
 
         4. Quick Triage Report:
            - Summarize the file's identity, major IOCs found, and suspicious API behaviors.
-           - Estimate the probability of the file being malicious (High/Medium/Low) and advise if deep analysis via `full_analysis_mode` is needed.
+           - Estimate the probability of the file being malicious (High/Medium/Low).
+           - Advise the next step:
+             * General Malware -> `malware_analysis_mode`
+             * Complex/Hidden Threats -> `full_analysis_mode` or `apt_hunting_mode`
+             * Game/Firmware -> Specialized modes
         """
 
     @mcp.prompt("game_analysis_mode")
@@ -184,14 +252,14 @@ def register_prompts(mcp: FastMCP):
         - Keep tool names and technical terms in English.
 
         [Trinity Defense SOP - 3 Phase Pipeline]
-        
+
         OPTION 1: Full Automation (Recommended)
         ----------------------------------------
         Use `trinity_defense("{filename}", mode="full")` for complete automation:
         - Phase 1 (DISCOVER): Ghost Trace finds hidden threats
         - Phase 2 (UNDERSTAND): Neural Decompiler analyzes intent
         - Phase 3 (NEUTRALIZE): Adaptive Vaccine generates defenses
-        
+
         This single command will:
         1. Scan for orphan functions and logic bombs
         2. Analyze suspicious code with AI-powered decompilation
@@ -261,7 +329,7 @@ def register_prompts(mcp: FastMCP):
         - Answer in the same language as the user's request.
 
         [APT Hunting SOP]
-        
+
         1. Ghost Trace Analysis (Primary Detection):
         Use `ghost_trace("{filename}")` to find APT characteristics:
         - Orphan Functions: APTs often hide backdoors in unused code paths
@@ -299,7 +367,7 @@ def register_prompts(mcp: FastMCP):
         - Create IOC list for threat intelligence sharing
 
         [Report Format]
-        
+
         ## 🎯 APT Hunting Report
 
         ### Ghost Trace Findings
