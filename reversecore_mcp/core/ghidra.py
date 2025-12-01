@@ -113,12 +113,15 @@ class GhidraService:
 
                 self._configure_environment()
 
-                # OPTIMIZATION: Use G1GC for better performance with large heaps
-                # No memory limit - let Ghidra use what it needs for faster analysis
+                # OPTIMIZATION: Configure JVM for large binary analysis
+                # Memory settings to handle 10MB+ binaries without OOM
                 jvm_args = [
+                    "-Xms512m",  # Initial heap size (512MB)
+                    "-Xmx4g",  # Maximum heap size (4GB) - handles large binaries
                     "-XX:+UseG1GC",  # G1 garbage collector (better for large heaps)
                     "-XX:MaxGCPauseMillis=200",  # Limit GC pause time
                     "-XX:+ParallelRefProcEnabled",  # Parallel reference processing
+                    "-XX:G1HeapRegionSize=16m",  # Larger regions for big objects
                 ]
 
                 logger.info("Starting Ghidra JVM...")
