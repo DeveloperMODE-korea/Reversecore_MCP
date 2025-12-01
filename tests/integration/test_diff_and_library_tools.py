@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from reversecore_mcp.tools import cli_tools
+from reversecore_mcp.tools import diff_tools
 
 
 def _require_radare2() -> None:
@@ -27,15 +27,11 @@ class TestDiffBinaries:
     """Integration tests for diff_binaries tool."""
 
     @pytest.mark.asyncio
-    async def test_diff_binaries_same_file(
-        self, sample_binary_path, patched_workspace_config
-    ):
+    async def test_diff_binaries_same_file(self, sample_binary_path, patched_workspace_config):
         """Test diffing a binary against itself should show high similarity."""
         _require_radiff2()
 
-        result = await cli_tools.diff_binaries(
-            str(sample_binary_path), str(sample_binary_path)
-        )
+        result = await diff_tools.diff_binaries(str(sample_binary_path), str(sample_binary_path))
 
         assert result.status == "success"
         assert isinstance(result.data, str)
@@ -53,13 +49,11 @@ class TestDiffBinaries:
         assert data["function_specific"] is False
 
     @pytest.mark.asyncio
-    async def test_diff_binaries_with_function(
-        self, sample_binary_path, patched_workspace_config
-    ):
+    async def test_diff_binaries_with_function(self, sample_binary_path, patched_workspace_config):
         """Test function-specific binary diff."""
         _require_radiff2()
 
-        result = await cli_tools.diff_binaries(
+        result = await diff_tools.diff_binaries(
             str(sample_binary_path), str(sample_binary_path), function_name="entry0"
         )
 
@@ -79,7 +73,7 @@ class TestDiffBinaries:
         """Test diff with nonexistent first file."""
         _require_radiff2()
 
-        result = await cli_tools.diff_binaries(
+        result = await diff_tools.diff_binaries(
             str(workspace_dir / "nonexistent1.bin"), str(sample_binary_path)
         )
 
@@ -93,7 +87,7 @@ class TestDiffBinaries:
         """Test diff with nonexistent second file."""
         _require_radiff2()
 
-        result = await cli_tools.diff_binaries(
+        result = await diff_tools.diff_binaries(
             str(sample_binary_path), str(workspace_dir / "nonexistent2.bin")
         )
 
@@ -111,22 +105,18 @@ class TestDiffBinaries:
         outside_file = tmp_path / "outside.bin"
         outside_file.write_bytes(b"\x7fELF")
 
-        result = await cli_tools.diff_binaries(
-            str(sample_binary_path), str(outside_file)
-        )
+        result = await diff_tools.diff_binaries(str(sample_binary_path), str(outside_file))
 
         assert result.status == "error"
         assert "outside" in result.message.lower()
 
     @pytest.mark.asyncio
-    async def test_diff_binaries_timeout(
-        self, sample_binary_path, patched_workspace_config
-    ):
+    async def test_diff_binaries_timeout(self, sample_binary_path, patched_workspace_config):
         """Test diff with very short timeout."""
         _require_radiff2()
 
         # Use a very short timeout to test timeout handling
-        result = await cli_tools.diff_binaries(
+        result = await diff_tools.diff_binaries(
             str(sample_binary_path),
             str(sample_binary_path),
             timeout=1,  # 1 second timeout
@@ -140,13 +130,11 @@ class TestMatchLibraries:
     """Integration tests for match_libraries tool."""
 
     @pytest.mark.asyncio
-    async def test_match_libraries_success(
-        self, sample_binary_path, patched_workspace_config
-    ):
+    async def test_match_libraries_success(self, sample_binary_path, patched_workspace_config):
         """Test successful library matching."""
         _require_radare2()
 
-        result = await cli_tools.match_libraries(str(sample_binary_path))
+        result = await diff_tools.match_libraries(str(sample_binary_path))
 
         assert result.status == "success"
         assert isinstance(result.data, str)
@@ -174,13 +162,11 @@ class TestMatchLibraries:
         assert isinstance(data["user_function_list"], list)
 
     @pytest.mark.asyncio
-    async def test_match_libraries_metadata(
-        self, sample_binary_path, patched_workspace_config
-    ):
+    async def test_match_libraries_metadata(self, sample_binary_path, patched_workspace_config):
         """Test that metadata is properly returned."""
         _require_radare2()
 
-        result = await cli_tools.match_libraries(str(sample_binary_path))
+        result = await diff_tools.match_libraries(str(sample_binary_path))
 
         if result.status == "success":
             assert result.metadata is not None
@@ -190,21 +176,17 @@ class TestMatchLibraries:
             assert "noise_reduction" in result.metadata
 
     @pytest.mark.asyncio
-    async def test_match_libraries_nonexistent_file(
-        self, workspace_dir, patched_workspace_config
-    ):
+    async def test_match_libraries_nonexistent_file(self, workspace_dir, patched_workspace_config):
         """Test library matching on nonexistent file."""
         _require_radare2()
 
-        result = await cli_tools.match_libraries(str(workspace_dir / "nonexistent.bin"))
+        result = await diff_tools.match_libraries(str(workspace_dir / "nonexistent.bin"))
 
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"
 
     @pytest.mark.asyncio
-    async def test_match_libraries_outside_workspace(
-        self, tmp_path, patched_workspace_config
-    ):
+    async def test_match_libraries_outside_workspace(self, tmp_path, patched_workspace_config):
         """Test that files outside workspace are rejected."""
         _require_radare2()
 
@@ -212,7 +194,7 @@ class TestMatchLibraries:
         outside_file = tmp_path / "outside.bin"
         outside_file.write_bytes(b"\x7fELF")
 
-        result = await cli_tools.match_libraries(str(outside_file))
+        result = await diff_tools.match_libraries(str(outside_file))
 
         assert result.status == "error"
         assert "outside" in result.message.lower()
@@ -228,7 +210,7 @@ class TestMatchLibraries:
         sig_file = workspace_dir / "test.sig"
         sig_file.write_text("# Test signature file\n")
 
-        result = await cli_tools.match_libraries(
+        result = await diff_tools.match_libraries(
             str(sample_binary_path), signature_db=str(sig_file)
         )
 
@@ -242,14 +224,12 @@ class TestMatchLibraries:
             assert data["signature_db_used"] == str(sig_file)
 
     @pytest.mark.asyncio
-    async def test_match_libraries_timeout(
-        self, sample_binary_path, patched_workspace_config
-    ):
+    async def test_match_libraries_timeout(self, sample_binary_path, patched_workspace_config):
         """Test library matching with short timeout."""
         _require_radare2()
 
         # Use a very short timeout
-        result = await cli_tools.match_libraries(str(sample_binary_path), timeout=1)
+        result = await diff_tools.match_libraries(str(sample_binary_path), timeout=1)
 
         # Should either succeed quickly or timeout
         assert result.status in ["success", "error"]
@@ -262,7 +242,7 @@ class TestMatchLibraries:
         _require_radare2()
 
         # Test invalid timeout
-        result = await cli_tools.match_libraries(str(sample_binary_path), timeout=-1)
+        result = await diff_tools.match_libraries(str(sample_binary_path), timeout=-1)
 
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"

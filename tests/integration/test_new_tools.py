@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from reversecore_mcp.tools import cli_tools
+from reversecore_mcp.tools import decompilation, signature_tools, static_analysis
 
 
 def _require_radare2() -> None:
@@ -23,7 +23,7 @@ class TestGetPseudoCode:
         """Test successful pseudo C code generation."""
         _require_radare2()
 
-        result = await cli_tools.get_pseudo_code(str(sample_binary_path), "entry0")
+        result = await decompilation.get_pseudo_code(str(sample_binary_path), "entry0")
         assert result.status == "success"
         assert isinstance(result.data, str)
         assert result.metadata and "bytes_read" in result.metadata
@@ -38,7 +38,7 @@ class TestGetPseudoCode:
 
         # Default address is 'main', which may not exist in test binary
         # The tool should return an error or empty result gracefully
-        result = await cli_tools.get_pseudo_code(str(sample_binary_path))
+        result = await decompilation.get_pseudo_code(str(sample_binary_path))
         # Either success (if main exists) or error (if not found)
         assert result.status in ["success", "error"]
 
@@ -50,7 +50,7 @@ class TestGetPseudoCode:
         _require_radare2()
 
         # Test with shell injection attempt
-        result = await cli_tools.get_pseudo_code(str(sample_binary_path), "main; ls")
+        result = await decompilation.get_pseudo_code(str(sample_binary_path), "main; ls")
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"
 
@@ -59,7 +59,7 @@ class TestGetPseudoCode:
         """Test pseudo code on nonexistent file."""
         _require_radare2()
 
-        result = await cli_tools.get_pseudo_code(str(workspace_dir / "nonexistent.bin"))
+        result = await decompilation.get_pseudo_code(str(workspace_dir / "nonexistent.bin"))
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"
 
@@ -72,7 +72,7 @@ class TestGenerateSignature:
         """Test successful YARA signature generation."""
         _require_radare2()
 
-        result = await cli_tools.generate_signature(str(sample_binary_path), "0x0", 16)
+        result = await signature_tools.generate_signature(str(sample_binary_path), "0x0", 16)
         assert result.status == "success"
         assert isinstance(result.data, str)
         assert "rule suspicious_" in result.data
@@ -89,7 +89,7 @@ class TestGenerateSignature:
         """Test signature generation with default length."""
         _require_radare2()
 
-        result = await cli_tools.generate_signature(str(sample_binary_path), "0x0")
+        result = await signature_tools.generate_signature(str(sample_binary_path), "0x0")
         assert result.status == "success"
         assert result.metadata.get("length") == 32  # default
 
@@ -101,12 +101,12 @@ class TestGenerateSignature:
         _require_radare2()
 
         # Test with length > 1024
-        result = await cli_tools.generate_signature(str(sample_binary_path), "0x0", 2000)
+        result = await signature_tools.generate_signature(str(sample_binary_path), "0x0", 2000)
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"
 
         # Test with negative length
-        result = await cli_tools.generate_signature(str(sample_binary_path), "0x0", -10)
+        result = await signature_tools.generate_signature(str(sample_binary_path), "0x0", -10)
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"
 
@@ -118,7 +118,9 @@ class TestGenerateSignature:
         _require_radare2()
 
         # Test with shell injection attempt
-        result = await cli_tools.generate_signature(str(sample_binary_path), "0x0; rm -rf /", 16)
+        result = await signature_tools.generate_signature(
+            str(sample_binary_path), "0x0; rm -rf /", 16
+        )
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"
 
@@ -129,7 +131,7 @@ class TestGenerateSignature:
         """Test that signature hex bytes are properly formatted."""
         _require_radare2()
 
-        result = await cli_tools.generate_signature(str(sample_binary_path), "0x0", 8)
+        result = await signature_tools.generate_signature(str(sample_binary_path), "0x0", 8)
         assert result.status == "success"
 
         # Check hex_bytes in metadata
@@ -150,7 +152,7 @@ class TestExtractRTTIInfo:
         """Test successful RTTI extraction."""
         _require_radare2()
 
-        result = await cli_tools.extract_rtti_info(str(sample_binary_path))
+        result = await static_analysis.extract_rtti_info(str(sample_binary_path))
         assert result.status == "success"
         assert isinstance(result.data, dict)
         assert "classes" in result.data
@@ -170,7 +172,7 @@ class TestExtractRTTIInfo:
         _require_radare2()
 
         # Simple test binary likely has no RTTI
-        result = await cli_tools.extract_rtti_info(str(sample_binary_path))
+        result = await static_analysis.extract_rtti_info(str(sample_binary_path))
         assert result.status == "success"
         assert result.data["has_rtti"] in [True, False]
         # Should return empty lists for non-C++ binary
@@ -182,7 +184,7 @@ class TestExtractRTTIInfo:
         """Test RTTI extraction on nonexistent file."""
         _require_radare2()
 
-        result = await cli_tools.extract_rtti_info(str(workspace_dir / "nonexistent.bin"))
+        result = await static_analysis.extract_rtti_info(str(workspace_dir / "nonexistent.bin"))
         assert result.status == "error"
         assert result.error_code == "VALIDATION_ERROR"
 
@@ -191,7 +193,7 @@ class TestExtractRTTIInfo:
         """Test that RTTI output has correct structure."""
         _require_radare2()
 
-        result = await cli_tools.extract_rtti_info(str(sample_binary_path))
+        result = await static_analysis.extract_rtti_info(str(sample_binary_path))
         assert result.status == "success"
 
         # Check classes structure
