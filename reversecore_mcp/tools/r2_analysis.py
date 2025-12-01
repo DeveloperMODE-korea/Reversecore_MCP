@@ -18,6 +18,12 @@ from reversecore_mcp.core.metrics import track_metrics
 from reversecore_mcp.core.r2_helpers import (
     build_r2_cmd as _build_r2_cmd,
 )
+
+# Import shared R2 helper functions from core (avoids circular dependencies)
+from reversecore_mcp.core.r2_helpers import (
+    calculate_dynamic_timeout,
+    remove_analysis_commands,
+)
 from reversecore_mcp.core.r2_helpers import (
     escape_mermaid_chars as _escape_mermaid_chars,
 )
@@ -27,11 +33,6 @@ from reversecore_mcp.core.r2_helpers import (
 from reversecore_mcp.core.r2_helpers import (
     parse_json_output as _parse_json_output,
 )
-from reversecore_mcp.core.r2_helpers import (
-    remove_analysis_commands,
-)
-
-# Import shared R2 helper functions from core (avoids circular dependencies)
 from reversecore_mcp.core.r2_helpers import (
     strip_address_prefixes as _strip_address_prefixes,
 )
@@ -103,7 +104,8 @@ async def run_radare2(
         raise
 
 
-from reversecore_mcp.core.plugin import Plugin
+# Plugin import at bottom to avoid circular imports
+from reversecore_mcp.core.plugin import Plugin  # noqa: E402
 
 
 class R2AnalysisPlugin(Plugin):
@@ -125,15 +127,67 @@ class R2AnalysisPlugin(Plugin):
         mcp_server.tool(analyze_xrefs)
 
 
+# Dangerous sink APIs for prioritized path tracing
+_DANGEROUS_SINKS = frozenset(
+    {
+        # Command execution
+        "system",
+        "execve",
+        "execl",
+        "execlp",
+        "execle",
+        "execv",
+        "execvp",
+        "execvpe",
+        "popen",
+        "_popen",
+        "ShellExecute",
+        "ShellExecuteEx",
+        "CreateProcess",
+        "WinExec",
+        "spawn",
+        "fork",
+        # Memory corruption
+        "strcpy",
+        "strcat",
+        "sprintf",
+        "vsprintf",
+        "gets",
+        "scanf",
+        "memcpy",
+        "memmove",
+        "strncpy",
+        # File operations
+        "fopen",
+        "open",
+        "CreateFile",
+        "DeleteFile",
+        "WriteFile",
+        # Network
+        "connect",
+        "send",
+        "recv",
+        "socket",
+        "bind",
+        "listen",
+        # Registry (Windows)
+        "RegSetValue",
+        "RegCreateKey",
+        "RegDeleteKey",
+    }
+)
+
+
 @log_execution(tool_name="trace_execution_path")
 @track_metrics("trace_execution_path")
 @handle_tool_errors
 async def trace_execution_path(
     file_path: str,
     target_function: str,
-    max_depth: int = 3,
+    max_depth: int = 2,
     max_paths: int = 5,
-    timeout: int = DEFAULT_TIMEOUT,
+    timeout: int | None = None,
+    prioritize_sinks: bool = True,
 ) -> ToolResult:
     """
     Trace function calls backwards from a target function (Sink) to find potential execution paths.
@@ -147,17 +201,37 @@ async def trace_execution_path(
     - **Reachability Analysis**: Verify if a vulnerable function is actually called
     - **Taint Analysis Helper**: Provide the path for AI to perform manual taint checking
 
+    **Performance Optimizations (v3.0):**
+    - Reduced default depth (3→2) for faster analysis
+    - Sink-aware pruning: prioritizes paths through dangerous APIs
+    - Dynamic timeout based on file size
+
     Args:
         file_path: Path to the binary file
         target_function: Name or address of the target function (e.g., 'sym.imp.system', '0x401000')
-        max_depth: Maximum depth of backtrace (default: 3)
+        max_depth: Maximum depth of backtrace (default: 2, reduce for speed)
         max_paths: Maximum number of paths to return (default: 5)
-        timeout: Execution timeout in seconds
+        timeout: Execution timeout in seconds (uses dynamic timeout if None)
+        prioritize_sinks: Prioritize paths through dangerous sink APIs (default: True)
 
     Returns:
         ToolResult with a list of execution paths (call chains).
     """
     validated_path = validate_file_path(file_path)
+
+    # Calculate dynamic timeout based on file size
+    effective_timeout = (
+        timeout if timeout else calculate_dynamic_timeout(str(validated_path), base_timeout=30)
+    )
+
+    # Helper to check if a function name is a dangerous sink
+    def is_dangerous_sink(func_name: str) -> bool:
+        """Check if function name matches any dangerous sink API."""
+        if not func_name:
+            return False
+        # Strip common prefixes and check against known sinks
+        clean_name = func_name.replace("sym.imp.", "").replace("sym.", "").replace("_", "")
+        return any(sink in clean_name.lower() for sink in _DANGEROUS_SINKS)
 
     # Helper to get address of a function name
     async def get_address(func_name):
@@ -165,7 +239,7 @@ async def trace_execution_path(
         # This eliminates the overhead of a second subprocess call when the symbol
         # isn't found in the first lookup (common for stripped binaries)
         cmd = _build_r2_cmd(str(validated_path), ["isj", "aflj"], "aaa")
-        out, _ = await execute_subprocess_async(cmd, timeout=30)
+        out, _ = await execute_subprocess_async(cmd, timeout=effective_timeout)
 
         # Parse output: radare2 outputs one JSON per command line
         # We expect 2 lines: first from isj (symbols), second from aflj (functions)
@@ -235,7 +309,7 @@ async def trace_execution_path(
 
         # Get xrefs TO this address
         cmd = _build_r2_cmd(str(validated_path), [f"axtj @ {current_addr}"], "aaa")
-        out, _ = await execute_subprocess_async(cmd, timeout=30)
+        out, _ = await execute_subprocess_async(cmd, timeout=effective_timeout)
 
         try:
             xrefs = _parse_json_output(out)
@@ -247,6 +321,23 @@ async def trace_execution_path(
             if len(current_path) > 1:
                 paths.append(current_path)
             return
+
+        # OPTIMIZATION v3.0: Prioritize xrefs through dangerous sink APIs
+        # This implements "Sink-aware pruning" - explore high-value paths first
+        if prioritize_sinks and len(xrefs) > 1:
+            xrefs = sorted(
+                xrefs,
+                key=lambda x: (
+                    # Priority 1: main/entry functions (complete paths)
+                    -2
+                    if any(k in x.get("fcn_name", "").lower() for k in ["main", "entry"])
+                    # Priority 2: Dangerous sink APIs
+                    else -1
+                    if is_dangerous_sink(x.get("fcn_name", ""))
+                    # Priority 3: Everything else
+                    else 0
+                ),
+            )
 
         for xref in xrefs:
             if len(paths) >= max_paths:
