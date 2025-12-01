@@ -99,6 +99,14 @@ def register_resources(mcp: FastMCP):
             return doc_path.read_text(encoding="utf-8")
         return "Documentation not found."
 
+    @mcp.resource("reversecore://tools")
+    def get_tools_doc() -> str:
+        """Complete documentation for all available tools"""
+        doc_path = _get_resources_path() / "TOOLS.md"
+        if doc_path.exists():
+            return doc_path.read_text(encoding="utf-8")
+        return "Tools documentation not found."
+
     @mcp.resource("reversecore://logs")
     def get_logs() -> str:
         """Application logs (last 100 lines)"""
