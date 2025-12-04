@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 # Use optimized JSON implementation (3-5x faster than standard json)
+from reversecore_mcp.core import json_utils as json
 
 logger = logging.getLogger(__name__)
 
