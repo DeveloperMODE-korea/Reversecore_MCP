@@ -178,7 +178,8 @@ _DANGEROUS_SINKS = frozenset(
 )
 
 # OPTIMIZATION: Pre-define translation table for faster function name cleaning
-_FUNC_NAME_CLEAN_TABLE = str.maketrans({"_": ""})
+# Use empty second argument to delete characters
+_FUNC_NAME_CLEAN_TABLE = str.maketrans("", "", "_")
 
 
 @log_execution(tool_name="trace_execution_path")
