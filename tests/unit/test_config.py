@@ -1,10 +1,18 @@
-"""Unit tests for the lightweight Config loader."""
+"""Unit tests for the pydantic-settings based Config loader."""
 
 from pathlib import Path
 
 import pytest
 
-from reversecore_mcp.core.config import get_config, reset_config
+from reversecore_mcp.core.config import (
+    Config,
+    LogFormat,
+    Settings,
+    TransportMode,
+    get_config,
+    get_settings,
+    reset_config,
+)
 
 
 def _provision_env(monkeypatch, tmp_path):
@@ -39,7 +47,8 @@ class TestConfigDefaults:
         assert config.workspace == workspace
         assert config.read_only_dirs == (read_dir,)
         assert config.log_level == "INFO"
-        assert config.log_file == Path("/tmp/reversecore/app.log")
+        # Log file path depends on platform
+        assert "reversecore" in str(config.log_file).lower()
         assert config.log_format == "human"
         assert config.structured_errors is False
         assert config.rate_limit == 60
@@ -60,10 +69,10 @@ class TestConfigDefaults:
         monkeypatch.setenv("LOG_LEVEL", "debug")
         monkeypatch.setenv("LOG_FILE", str(tmp_path / "app.log"))
         monkeypatch.setenv("LOG_FORMAT", "json")
-        monkeypatch.setenv("STRUCTURED_ERRORS", "true")
-        monkeypatch.setenv("RATE_LIMIT", "120")
-        monkeypatch.setenv("LIEF_MAX_FILE_SIZE", "2048")
-        monkeypatch.setenv("MCP_TRANSPORT", "websocket")
+        monkeypatch.setenv("REVERSECORE_STRUCTURED_ERRORS", "true")
+        monkeypatch.setenv("REVERSECORE_RATE_LIMIT", "120")
+        monkeypatch.setenv("REVERSECORE_LIEF_MAX_FILE_SIZE", "2000000")  # Must meet minimum
+        monkeypatch.setenv("MCP_TRANSPORT", "http")
 
         config = reset_config()
 
@@ -77,8 +86,8 @@ class TestConfigDefaults:
         assert config.log_format == "json"
         assert config.structured_errors is True
         assert config.rate_limit == 120
-        assert config.lief_max_file_size == 2048
-        assert config.mcp_transport == "websocket"
+        assert config.lief_max_file_size == 2000000
+        assert config.mcp_transport == "http"
 
 
 class TestConfigCaching:
@@ -130,7 +139,7 @@ class TestConfigValidation:
         config.validate_paths()  # Should not raise
 
     def test_validate_paths_workspace_missing(self, monkeypatch, tmp_path):
-        """When workspace is missing, it should fall back to cwd."""
+        """When workspace is missing and non-strict mode, config should still be created."""
         workspace = tmp_path / "missing"
         read_dir = tmp_path / "rules"
         read_dir.mkdir()
@@ -138,10 +147,11 @@ class TestConfigValidation:
         monkeypatch.setenv("REVERSECORE_WORKSPACE", str(workspace))
         monkeypatch.setenv("REVERSECORE_READ_DIRS", str(read_dir))
 
-        # With non-strict validation (default), it should fall back to cwd
+        # With non-strict validation (default), config is created
+        # The workspace path is kept as-is even if it doesn't exist
         config = reset_config()
-        # Workspace falls back to cwd when configured path doesn't exist
-        assert config.workspace.exists()
+        # In pydantic-settings, the path is kept as specified
+        assert config.workspace == workspace
 
     def test_validate_paths_workspace_not_directory(self, monkeypatch, tmp_path):
         """When workspace is a file, it should fall back to cwd."""
@@ -200,3 +210,100 @@ class TestConfigValidation:
 
         with pytest.raises(ValueError, match="Workspace directory does not exist"):
             reset_config()
+
+
+class TestPydanticSettings:
+    """Test the pydantic-settings specific functionality."""
+
+    def test_settings_direct_instantiation(self, tmp_path, monkeypatch):
+        """Settings can be instantiated directly with values."""
+        workspace = tmp_path / "ws"
+        workspace.mkdir()
+        monkeypatch.delenv("REVERSECORE_WORKSPACE", raising=False)
+        monkeypatch.delenv("REVERSECORE_READ_DIRS", raising=False)
+
+        settings = Settings(workspace=workspace)
+        assert settings.workspace == workspace
+        assert settings.log_level == "INFO"
+        assert settings.log_format == LogFormat.HUMAN
+        assert settings.mcp_transport == TransportMode.STDIO
+
+    def test_log_format_enum(self, monkeypatch, tmp_path):
+        """LogFormat enum should work correctly."""
+        workspace, _ = _provision_env(monkeypatch, tmp_path)
+        monkeypatch.setenv("LOG_FORMAT", "json")
+        config = reset_config()
+        assert config.log_format == "json"
+        
+        settings = get_settings()
+        assert settings.log_format == LogFormat.JSON
+
+    def test_transport_mode_enum(self, monkeypatch, tmp_path):
+        """TransportMode enum should work correctly."""
+        workspace, _ = _provision_env(monkeypatch, tmp_path)
+        monkeypatch.setenv("MCP_TRANSPORT", "http")
+        config = reset_config()
+        assert config.mcp_transport == "http"
+        
+        settings = get_settings()
+        assert settings.mcp_transport == TransportMode.HTTP
+
+    def test_r2_pool_settings(self, monkeypatch, tmp_path):
+        """R2 pool settings should be configurable."""
+        workspace, _ = _provision_env(monkeypatch, tmp_path)
+        monkeypatch.setenv("REVERSECORE_R2_POOL_SIZE", "5")
+        monkeypatch.setenv("REVERSECORE_R2_POOL_TIMEOUT", "60")
+        
+        config = reset_config()
+        assert config.r2_pool_size == 5
+        assert config.r2_pool_timeout == 60
+
+    def test_get_settings_returns_underlying_settings(self, monkeypatch, tmp_path):
+        """get_settings should return the pydantic Settings instance."""
+        workspace, _ = _provision_env(monkeypatch, tmp_path)
+        reset_config()
+        
+        settings = get_settings()
+        assert isinstance(settings, Settings)
+        assert settings.workspace == workspace
+
+    def test_invalid_log_level_raises_error(self, monkeypatch, tmp_path):
+        """Invalid log level should raise validation error."""
+        workspace, _ = _provision_env(monkeypatch, tmp_path)
+        monkeypatch.setenv("LOG_LEVEL", "INVALID")
+        
+        with pytest.raises(ValueError, match="Invalid log level"):
+            reset_config()
+
+    def test_rate_limit_bounds(self, monkeypatch, tmp_path):
+        """Rate limit should respect bounds."""
+        workspace, _ = _provision_env(monkeypatch, tmp_path)
+        
+        # Valid rate limit
+        monkeypatch.setenv("REVERSECORE_RATE_LIMIT", "500")
+        config = reset_config()
+        assert config.rate_limit == 500
+        
+        # Rate limit below minimum should raise error
+        monkeypatch.setenv("REVERSECORE_RATE_LIMIT", "0")
+        with pytest.raises(ValueError):
+            reset_config()
+
+    def test_config_wrapper_compatibility(self, monkeypatch, tmp_path):
+        """Config wrapper should provide same interface as before."""
+        workspace, read_dir = _provision_env(monkeypatch, tmp_path)
+        config = reset_config()
+        
+        # All properties should be accessible
+        assert isinstance(config.workspace, Path)
+        assert isinstance(config.read_only_dirs, tuple)
+        assert isinstance(config.log_level, str)
+        assert isinstance(config.log_file, Path)
+        assert isinstance(config.log_format, str)
+        assert isinstance(config.structured_errors, bool)
+        assert isinstance(config.rate_limit, int)
+        assert isinstance(config.lief_max_file_size, int)
+        assert isinstance(config.mcp_transport, str)
+        assert isinstance(config.default_tool_timeout, int)
+        assert isinstance(config.r2_pool_size, int)
+        assert isinstance(config.r2_pool_timeout, int)

@@ -7,7 +7,7 @@ from reversecore_mcp.core.exceptions import ExecutionTimeoutError, ValidationErr
 
 
 def test_format_error_plain_without_hint(monkeypatch):
-    monkeypatch.delenv("STRUCTURED_ERRORS", raising=False)
+    monkeypatch.delenv("REVERSECORE_STRUCTURED_ERRORS", raising=False)
     err = ValidationError("Invalid file path", details={"path": "/bad"})
     text = format_error(err, tool_name="run_test")
     assert isinstance(text, str)
@@ -15,7 +15,7 @@ def test_format_error_plain_without_hint(monkeypatch):
 
 
 def test_format_error_plain_with_hint(monkeypatch):
-    monkeypatch.delenv("STRUCTURED_ERRORS", raising=False)
+    monkeypatch.delenv("REVERSECORE_STRUCTURED_ERRORS", raising=False)
     err = ValidationError("Outside workspace", details={"path": "/etc/passwd"})
     hint = get_validation_hint(err)
     text = format_error(err, tool_name="run_test", hint=hint)
@@ -23,7 +23,7 @@ def test_format_error_plain_with_hint(monkeypatch):
 
 
 def test_format_error_structured_json(monkeypatch):
-    monkeypatch.setenv("STRUCTURED_ERRORS", "true")
+    monkeypatch.setenv("REVERSECORE_STRUCTURED_ERRORS", "true")
     # Reload settings to pick up new environment variable
     from reversecore_mcp.core.config import reload_settings
 
@@ -66,7 +66,7 @@ def test_get_validation_hint_invalid_path_error():
 
 def test_format_error_generic_exception(monkeypatch):
     """Test formatting of generic (non-Reversecore) exceptions."""
-    monkeypatch.delenv("STRUCTURED_ERRORS", raising=False)
+    monkeypatch.delenv("REVERSECORE_STRUCTURED_ERRORS", raising=False)
     from reversecore_mcp.core.config import reload_settings
 
     reload_settings()
@@ -79,7 +79,7 @@ def test_format_error_generic_exception(monkeypatch):
 
 def test_format_error_structured_with_hint(monkeypatch):
     """Test structured error formatting with hint."""
-    monkeypatch.setenv("STRUCTURED_ERRORS", "true")
+    monkeypatch.setenv("REVERSECORE_STRUCTURED_ERRORS", "true")
     from reversecore_mcp.core.config import reload_settings
 
     reload_settings()
@@ -92,7 +92,7 @@ def test_format_error_structured_with_hint(monkeypatch):
 
 def test_format_error_with_tool_name_attribute(monkeypatch):
     """Test formatting error that has tool_name attribute."""
-    monkeypatch.delenv("STRUCTURED_ERRORS", raising=False)
+    monkeypatch.delenv("REVERSECORE_STRUCTURED_ERRORS", raising=False)
     from reversecore_mcp.core.config import reload_settings
     from reversecore_mcp.core.exceptions import ToolNotFoundError
 
@@ -105,7 +105,7 @@ def test_format_error_with_tool_name_attribute(monkeypatch):
 
 def test_format_error_with_timeout_attributes(monkeypatch):
     """Test formatting error with timeout attributes."""
-    monkeypatch.setenv("STRUCTURED_ERRORS", "true")
+    monkeypatch.setenv("REVERSECORE_STRUCTURED_ERRORS", "true")
     from reversecore_mcp.core.config import reload_settings
 
     reload_settings()
@@ -119,7 +119,7 @@ def test_format_error_with_timeout_attributes(monkeypatch):
 
 def test_format_error_with_size_attributes(monkeypatch):
     """Test formatting error with size attributes."""
-    monkeypatch.setenv("STRUCTURED_ERRORS", "true")
+    monkeypatch.setenv("REVERSECORE_STRUCTURED_ERRORS", "true")
     from reversecore_mcp.core.config import reload_settings
     from reversecore_mcp.core.exceptions import OutputLimitExceededError
 
@@ -134,7 +134,7 @@ def test_format_error_with_size_attributes(monkeypatch):
 
 def test_format_error_generic_structured(monkeypatch):
     """Test formatting generic exception in structured mode."""
-    monkeypatch.setenv("STRUCTURED_ERRORS", "true")
+    monkeypatch.setenv("REVERSECORE_STRUCTURED_ERRORS", "true")
     from reversecore_mcp.core.config import reload_settings
 
     reload_settings()

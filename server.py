@@ -251,13 +251,76 @@ def main():
         # Add health endpoint
         @app.get("/health")
         async def health():
-            """Health check endpoint."""
+            """Health check endpoint with dependency status."""
+            import platform
+            import sys
+            import time
+
+            health_status = {
+                "status": "healthy",
+                "service": "Reversecore_MCP",
+                "transport": "http",
+                "version": "1.0.0",
+                "timestamp": time.time(),
+                "python_version": sys.version,
+                "platform": platform.system(),
+                "workspace": str(settings.workspace),
+                "workspace_exists": settings.workspace.exists(),
+                "dependencies": {},
+            }
+
+            # Check dependencies
+            deps = health_status["dependencies"]
+
+            # radare2
+            if shutil.which("radare2"):
+                deps["radare2"] = {"status": "available", "path": shutil.which("radare2")}
+            else:
+                deps["radare2"] = {"status": "unavailable"}
+                health_status["status"] = "degraded"
+
+            # Java (for Ghidra)
+            if shutil.which("java"):
+                deps["java"] = {"status": "available", "path": shutil.which("java")}
+            else:
+                deps["java"] = {"status": "unavailable"}
+
+            # Graphviz
+            if shutil.which("dot"):
+                deps["graphviz"] = {"status": "available", "path": shutil.which("dot")}
+            else:
+                deps["graphviz"] = {"status": "unavailable"}
+
+            # YARA
+            if shutil.which("yara"):
+                deps["yara"] = {"status": "available", "path": shutil.which("yara")}
+            else:
+                deps["yara"] = {"status": "unavailable"}
+
+            # binwalk
+            if shutil.which("binwalk"):
+                deps["binwalk"] = {"status": "available", "path": shutil.which("binwalk")}
+            else:
+                deps["binwalk"] = {"status": "unavailable"}
+
+            return JSONResponse(content=health_status)
+
+        # Lightweight liveness probe
+        @app.get("/health/live")
+        async def liveness():
+            """Kubernetes liveness probe endpoint."""
+            return JSONResponse(content={"status": "alive"})
+
+        # Readiness probe
+        @app.get("/health/ready")
+        async def readiness():
+            """Kubernetes readiness probe endpoint."""
+            is_ready = settings.workspace.exists() and shutil.which("radare2") is not None
+            if is_ready:
+                return JSONResponse(content={"status": "ready"})
             return JSONResponse(
-                content={
-                    "status": "healthy",
-                    "service": "Reversecore_MCP",
-                    "transport": "http",
-                }
+                status_code=503,
+                content={"status": "not_ready", "reason": "Dependencies not available"},
             )
 
         # Add metrics endpoint

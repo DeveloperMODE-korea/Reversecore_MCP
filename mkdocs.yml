@@ -1,0 +1,104 @@
+site_name: Reversecore MCP
+site_description: AI-Powered Binary Analysis Platform
+site_author: Reversecore Team
+site_url: https://yourusername.github.io/Reversecore_MCP/
+
+repo_name: yourusername/Reversecore_MCP
+repo_url: https://github.com/yourusername/Reversecore_MCP
+
+theme:
+  name: material
+  language: en
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_category_heading: true
+            members_order: source
+            group_by_category: true
+            show_signature_annotations: true
+            separate_signature: true
+  - git-revision-date-localized:
+      enable_creation_date: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
+  - User Guide:
+      - Overview: user-guide/overview.md
+      - Binary Analysis: user-guide/binary-analysis.md
+      - Decompilation: user-guide/decompilation.md
+      - Threat Detection: user-guide/threat-detection.md
+  - API Reference:
+      - Core:
+          - Config: api/core/config.md
+          - Exceptions: api/core/exceptions.md
+          - Logging: api/core/logging.md
+      - Tools:
+          - CLI Tools: api/tools/cli-tools.md
+          - Lib Tools: api/tools/lib-tools.md
+          - Ghost Trace: api/tools/ghost-trace.md
+          - Neural Decompiler: api/tools/neural-decompiler.md
+          - Trinity Defense: api/tools/trinity-defense.md
+  - Development:
+      - Contributing: development/contributing.md
+      - Testing: development/testing.md
+      - Architecture: development/architecture.md
+  - Changelog: changelog.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yourusername/Reversecore_MCP
+    - icon: fontawesome/brands/docker
+      link: https://ghcr.io/yourusername/reversecore_mcp

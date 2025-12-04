@@ -1,130 +1,318 @@
-"""Lightweight configuration loader for Reversecore_MCP.
+"""Configuration management using pydantic-settings.
 
-This module avoids heavy dependencies and context-based managers by loading
-all configuration once from environment variables. Code can call
-``get_config()`` to access the cached singleton, and tests can use
-``reset_config()`` or build ad-hoc configs for dependency injection.
+This module provides type-safe configuration loading from environment variables
+with automatic validation. Code can call ``get_config()`` to access the cached
+singleton, and tests can use ``reset_config()`` for dependency injection.
+
+Environment Variables:
+    REVERSECORE_WORKSPACE: Path to workspace directory (default: current directory)
+    REVERSECORE_READ_DIRS: Comma-separated list of read-only directories
+    LOG_LEVEL: Logging level (default: INFO)
+    LOG_FILE: Path to log file (default: /tmp/reversecore/app.log)
+    LOG_FORMAT: Log format - "human" or "json" (default: human)
+    STRUCTURED_ERRORS: Enable structured error responses (default: false)
+    RATE_LIMIT: Rate limit per minute (default: 60)
+    LIEF_MAX_FILE_SIZE: Max file size for LIEF parsing (default: 1GB)
+    MCP_TRANSPORT: Transport mode - "stdio" or "http" (default: stdio)
+    DEFAULT_TOOL_TIMEOUT: Default timeout in seconds (default: 120)
+    R2_POOL_SIZE: Radare2 connection pool size (default: 3)
+    R2_POOL_TIMEOUT: Radare2 pool connection timeout (default: 30)
+    REVERSECORE_STRICT_PATHS: Strict path validation mode (default: false)
 """
 
 from __future__ import annotations
 
-import os
-from dataclasses import dataclass
+import logging
+from enum import Enum
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
-def _parse_bool(value: str | None, default: bool) -> bool:
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def _parse_int(value: str | None, default: int) -> int:
-    try:
-        return int(value) if value is not None else default
-    except (TypeError, ValueError):
-        return default
+class LogFormat(str, Enum):
+    """Supported log formats."""
+
+    HUMAN = "human"
+    JSON = "json"
 
 
-def _split_paths(raw: str | None) -> tuple[Path, ...]:
-    if not raw:
-        return tuple()
-    parts = [segment.strip() for segment in raw.split(",") if segment.strip()]
-    return tuple(Path(segment).expanduser().resolve() for segment in parts)
+class TransportMode(str, Enum):
+    """Supported MCP transport modes."""
+
+    STDIO = "stdio"
+    HTTP = "http"
 
 
-@dataclass(frozen=True)
+class Settings(BaseSettings):
+    """Application settings with environment variable support.
+
+    All settings are loaded from environment variables with automatic
+    type conversion and validation.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="REVERSECORE_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    # Workspace configuration
+    workspace: Path = Field(
+        default_factory=Path.cwd,
+        description="Path to workspace directory for file operations",
+    )
+    read_dirs: str = Field(
+        default="",
+        alias="REVERSECORE_READ_DIRS",
+        description="Comma-separated list of read-only directories",
+    )
+    strict_paths: bool = Field(
+        default=False,
+        description="Enable strict path validation (raise errors for missing paths)",
+    )
+
+    # Logging configuration
+    log_level: str = Field(
+        default="INFO",
+        alias="LOG_LEVEL",
+        description="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL",
+    )
+    log_file: Path = Field(
+        default=Path("/tmp/reversecore/app.log"),
+        alias="LOG_FILE",
+        description="Path to log file",
+    )
+    log_format: LogFormat = Field(
+        default=LogFormat.HUMAN,
+        alias="LOG_FORMAT",
+        description="Log format: 'human' for readable, 'json' for structured",
+    )
+
+    # Error handling
+    structured_errors: bool = Field(
+        default=False,
+        description="Enable structured error responses with error codes",
+    )
+
+    # Rate limiting
+    rate_limit: int = Field(
+        default=60,
+        ge=1,
+        le=1000,
+        description="Rate limit (requests per minute)",
+    )
+
+    # File size limits
+    lief_max_file_size: int = Field(
+        default=1_000_000_000,
+        ge=1_000_000,
+        description="Maximum file size for LIEF parsing (bytes)",
+    )
+
+    # Transport configuration
+    mcp_transport: TransportMode = Field(
+        default=TransportMode.STDIO,
+        alias="MCP_TRANSPORT",
+        description="MCP transport mode: 'stdio' or 'http'",
+    )
+
+    # Timeout configuration
+    default_tool_timeout: int = Field(
+        default=120,
+        ge=10,
+        le=3600,
+        alias="DEFAULT_TOOL_TIMEOUT",
+        description="Default timeout for tool execution (seconds)",
+    )
+
+    # R2 Pool configuration
+    r2_pool_size: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="Number of radare2 connections in pool",
+    )
+    r2_pool_timeout: int = Field(
+        default=30,
+        ge=5,
+        le=300,
+        description="Timeout for acquiring radare2 connection from pool",
+    )
+
+    @field_validator("log_level")
+    @classmethod
+    def validate_log_level(cls, v: str) -> str:
+        """Normalize and validate log level."""
+        v = v.upper()
+        valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if v not in valid_levels:
+            raise ValueError(f"Invalid log level: {v}. Must be one of {valid_levels}")
+        return v
+
+    @field_validator("workspace", mode="before")
+    @classmethod
+    def expand_workspace_path(cls, v: str | Path | None) -> Path:
+        """Expand and resolve workspace path."""
+        if v is None or v == "":
+            return Path.cwd()
+        path = Path(v).expanduser().resolve()
+        return path
+
+    @field_validator("log_file", mode="before")
+    @classmethod
+    def expand_log_file_path(cls, v: str | Path) -> Path:
+        """Expand and resolve log file path."""
+        return Path(v).expanduser().resolve()
+
+    @model_validator(mode="after")
+    def validate_workspace_exists(self) -> "Settings":
+        """Validate workspace directory exists."""
+        if self.strict_paths:
+            if not self.workspace.exists():
+                raise ValueError(f"Workspace directory does not exist: {self.workspace}")
+            if not self.workspace.is_dir():
+                raise ValueError(f"Workspace path is not a directory: {self.workspace}")
+        return self
+
+    @property
+    def read_only_dirs(self) -> tuple[Path, ...]:
+        """Parse and return read-only directories."""
+        if not self.read_dirs:
+            return tuple()
+        parts = [s.strip() for s in self.read_dirs.split(",") if s.strip()]
+        dirs = []
+        for part in parts:
+            path = Path(part).expanduser().resolve()
+            if path.exists() and path.is_dir():
+                dirs.append(path)
+        return tuple(dirs)
+
+
+# =============================================================================
+# Legacy Config Compatibility Layer
+# =============================================================================
+# The following provides backward compatibility with the existing codebase
+# that uses the Config dataclass interface.
+
+
 class Config:
-    """Immutable snapshot of runtime configuration."""
+    """Wrapper class for backward compatibility with existing code.
 
-    workspace: Path
-    read_only_dirs: tuple[Path, ...]
-    log_level: str
-    log_file: Path
-    log_format: str
-    structured_errors: bool
-    rate_limit: int
-    lief_max_file_size: int
-    mcp_transport: str
-    default_tool_timeout: int
+    This class wraps the pydantic Settings model to maintain the same
+    interface as the previous dataclass-based Config.
+    """
+
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        *,
+        workspace: Path | str | None = None,
+        read_only_dirs: tuple[Path, ...] | None = None,
+        log_level: str | None = None,
+        log_file: Path | str | None = None,
+        log_format: str | None = None,
+        structured_errors: bool | None = None,
+        rate_limit: int | None = None,
+        lief_max_file_size: int | None = None,
+        mcp_transport: str | None = None,
+        default_tool_timeout: int | None = None,
+    ):
+        """Initialize Config with optional Settings instance or individual values.
+
+        For backward compatibility, individual values can be passed directly.
+        """
+        if settings is not None:
+            self._settings = settings
+        else:
+            # Build settings from individual values if provided
+            env_overrides = {}
+            if workspace is not None:
+                env_overrides["workspace"] = Path(workspace)
+            if log_level is not None:
+                env_overrides["log_level"] = log_level
+            if log_file is not None:
+                env_overrides["log_file"] = Path(log_file)
+            if log_format is not None:
+                env_overrides["log_format"] = LogFormat(log_format.lower())
+            if structured_errors is not None:
+                env_overrides["structured_errors"] = structured_errors
+            if rate_limit is not None:
+                env_overrides["rate_limit"] = rate_limit
+            if lief_max_file_size is not None:
+                env_overrides["lief_max_file_size"] = lief_max_file_size
+            if mcp_transport is not None:
+                env_overrides["mcp_transport"] = TransportMode(mcp_transport.lower())
+            if default_tool_timeout is not None:
+                env_overrides["default_tool_timeout"] = default_tool_timeout
+
+            if env_overrides:
+                self._settings = Settings(**env_overrides)
+            else:
+                self._settings = Settings()
+
+        # Store read_only_dirs if explicitly provided (for test overrides)
+        self._read_only_dirs_override = read_only_dirs
+
+    @property
+    def workspace(self) -> Path:
+        return self._settings.workspace
+
+    @property
+    def read_only_dirs(self) -> tuple[Path, ...]:
+        if self._read_only_dirs_override is not None:
+            return self._read_only_dirs_override
+        return self._settings.read_only_dirs
+
+    @property
+    def log_level(self) -> str:
+        return self._settings.log_level
+
+    @property
+    def log_file(self) -> Path:
+        return self._settings.log_file
+
+    @property
+    def log_format(self) -> str:
+        return self._settings.log_format.value
+
+    @property
+    def structured_errors(self) -> bool:
+        return self._settings.structured_errors
+
+    @property
+    def rate_limit(self) -> int:
+        return self._settings.rate_limit
+
+    @property
+    def lief_max_file_size(self) -> int:
+        return self._settings.lief_max_file_size
+
+    @property
+    def mcp_transport(self) -> str:
+        return self._settings.mcp_transport.value
+
+    @property
+    def default_tool_timeout(self) -> int:
+        return self._settings.default_tool_timeout
+
+    @property
+    def r2_pool_size(self) -> int:
+        return self._settings.r2_pool_size
+
+    @property
+    def r2_pool_timeout(self) -> int:
+        return self._settings.r2_pool_timeout
 
     @classmethod
-    def from_env(cls) -> Config:
-        """Build a configuration object from environment variables."""
-        strict_validation = _parse_bool(os.getenv("REVERSECORE_STRICT_PATHS"), default=False)
-
-        # Determine workspace: use env var, fallback to current directory if path doesn't exist
-        workspace_env = os.getenv("REVERSECORE_WORKSPACE", "")
-        if workspace_env:
-            workspace = Path(workspace_env).expanduser().resolve()
-        else:
-            # No env var set: use current working directory as default
-            workspace = Path.cwd()
-
-        # If configured workspace doesn't exist or isn't a directory, handle based on strict mode
-        if not workspace.exists() or not workspace.is_dir():
-            if strict_validation:
-                if not workspace.exists():
-                    raise ValueError(f"Workspace directory does not exist: {workspace}")
-                else:
-                    raise ValueError(f"Workspace path is not a directory: {workspace}")
-            # Non-strict: fall back to cwd
-            workspace = Path.cwd()
-
-        # Parse read directories, filtering out non-existent/non-directory paths
-        read_dirs_env = os.getenv("REVERSECORE_READ_DIRS", "")
-        if read_dirs_env:
-            all_read_dirs = _split_paths(read_dirs_env)
-            # Filter to only existing directories (graceful degradation)
-            read_dirs = tuple(d for d in all_read_dirs if d.exists() and d.is_dir())
-        else:
-            read_dirs = tuple()
-
-        log_level = os.getenv("LOG_LEVEL", "INFO").upper()
-        log_file = Path(os.getenv("LOG_FILE", "/tmp/reversecore/app.log")).expanduser()
-        log_format = os.getenv("LOG_FORMAT", "human").lower()
-        structured_errors = _parse_bool(os.getenv("STRUCTURED_ERRORS"), default=False)
-        rate_limit = _parse_int(os.getenv("RATE_LIMIT"), default=60)
-        lief_max_file_size = _parse_int(
-            os.getenv("LIEF_MAX_FILE_SIZE"),
-            default=1_000_000_000,
-        )
-        mcp_transport = os.getenv("MCP_TRANSPORT", "stdio").lower()
-        default_tool_timeout = _parse_int(
-            os.getenv("DEFAULT_TOOL_TIMEOUT"),
-            default=120,
-        )
-
-        config = cls(
-            workspace=workspace,
-            read_only_dirs=read_dirs,
-            log_level=log_level,
-            log_file=log_file,
-            log_format=log_format,
-            structured_errors=structured_errors,
-            rate_limit=rate_limit,
-            lief_max_file_size=lief_max_file_size,
-            mcp_transport=mcp_transport,
-            default_tool_timeout=default_tool_timeout,
-        )
-
-        # Validation is handled above during path resolution
-        # validate_paths() can still be called manually for additional checks
-        return config
+    def from_env(cls) -> "Config":
+        """Build a Config instance from environment variables."""
+        return cls(Settings())
 
     def validate_paths(self, strict: bool = True) -> None:
-        """Validate that configured directories exist and are directories.
-
-        Args:
-            strict: If True, raise ValueError for missing directories.
-                   If False, only log warnings (useful for test environments).
-        """
-        import logging
-
+        """Validate that configured directories exist and are directories."""
         logger = logging.getLogger(__name__)
 
         if not self.workspace.exists():
@@ -151,6 +339,10 @@ class Config:
                 logger.warning(msg)
 
 
+# =============================================================================
+# Module-level config management
+# =============================================================================
+
 _CONFIG: Config | None = None
 
 
@@ -162,16 +354,20 @@ def get_config() -> Config:
     return _CONFIG
 
 
+def get_settings() -> Settings:
+    """Return the underlying pydantic Settings instance."""
+    return get_config()._settings
+
+
 def reset_config() -> Config:
     """Reload configuration from the current environment (primarily for tests)."""
     global _CONFIG
     _CONFIG = Config.from_env()
-    try:  # Avoid hard dependency to prevent circular imports at module load
+    try:
         from reversecore_mcp.core import security
 
         security.refresh_workspace_config()
     except Exception:
-        # Security module may not be initialized yet (e.g., during partial imports)
         pass
     return _CONFIG
 

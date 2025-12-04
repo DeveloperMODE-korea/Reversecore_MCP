@@ -131,19 +131,21 @@ def test_json_formatter_with_extra_fields(monkeypatch):
         exc_info=None,
     )
 
-    # Add extra attributes
-    record.tool_name = "test_tool"
-    record.file_name = "test.bin"
-    record.execution_time_ms = 123
-    record.error_code = "E001"
+    # Add extra attributes with ctx_ prefix (new format)
+    record.ctx_tool_name = "test_tool"
+    record.ctx_file_name = "test.bin"
+    record.ctx_execution_time_ms = 123
+    record.ctx_error_code = "E001"
 
     result = formatter.format(record)
     data = json.loads(result)
 
-    assert data["tool_name"] == "test_tool"
-    assert data["file_name"] == "test.bin"
-    assert data["execution_time_ms"] == 123
-    assert data["error_code"] == "E001"
+    # Check context contains the fields (without ctx_ prefix)
+    assert "context" in data
+    assert data["context"]["tool_name"] == "test_tool"
+    assert data["context"]["file_name"] == "test.bin"
+    assert data["context"]["execution_time_ms"] == 123
+    assert data["context"]["error_code"] == "E001"
 
 
 def test_json_formatter_with_exception(monkeypatch):
@@ -175,8 +177,9 @@ def test_json_formatter_with_exception(monkeypatch):
         data = json.loads(result)
 
         assert "exception" in data
-        assert "ValueError" in data["exception"]
-
+        # Exception is now a dict with type, message, traceback
+        assert data["exception"]["type"] == "ValueError"
+        assert "Test exception" in data["exception"]["message"]
 
 def test_get_logger_with_different_names():
     """Test get_logger returns loggers with correct names."""
