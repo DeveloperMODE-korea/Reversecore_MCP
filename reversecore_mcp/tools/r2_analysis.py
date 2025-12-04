@@ -39,7 +39,10 @@ from reversecore_mcp.core.r2_helpers import (
 from reversecore_mcp.core.resilience import circuit_breaker
 from reversecore_mcp.core.result import ToolResult, failure, success
 from reversecore_mcp.core.security import validate_file_path
-from reversecore_mcp.core.validators import validate_tool_parameters
+from reversecore_mcp.core.validators import (
+    _ADDRESS_PATTERN,  # OPTIMIZATION: Import pre-compiled pattern instead of duplicating
+    validate_tool_parameters,
+)
 
 # Load default timeout from configuration
 DEFAULT_TIMEOUT = get_config().default_tool_timeout
@@ -691,9 +694,8 @@ async def analyze_xrefs(
         )
 
     # 2. Validate address format
-    # OPTIMIZATION: Use efficient regex substitution instead of chained replace
-    if not re.match(
-        r"^[a-zA-Z0-9_.]+$",
+    # OPTIMIZATION: Use pre-compiled pattern from validators module
+    if not _ADDRESS_PATTERN.match(
         _strip_address_prefixes(address),
     ):
         return failure(
@@ -759,7 +761,7 @@ async def analyze_xrefs(
             # Robust JSON extraction from line
             try:
                 refs = _parse_json_output(line)
-                if isinstance(refs, list) and len(refs) > 0:
+                if isinstance(refs, list) and refs:  # OPTIMIZATION: Direct bool check instead of len() comparison
                     # Determine if this is "to" or "from" based on field names
                     first_ref = refs[0]
                     if "from" in first_ref:

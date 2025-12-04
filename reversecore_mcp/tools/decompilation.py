@@ -931,7 +931,7 @@ async def recover_structures(
 
             # Add hint if no structures found
             hint = None
-            if len(non_empty_structures) == 0:
+            if not non_empty_structures:  # OPTIMIZATION: Direct bool check instead of len() comparison
                 hint = "No structures found. Try: 1) fast_mode=False for deeper analysis, 2) use_ghidra=True for C++ structures, 3) analyze a function that uses structures (not main/entry0)"
 
             return success(
