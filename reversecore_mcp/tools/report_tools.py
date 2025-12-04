@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class TimezonePreset(Enum):
-    """자주 사용되는 타임존 프리셋"""
+    """Frequently used timezone presets"""
     UTC = "UTC"
     KST = "Asia/Seoul"          # UTC+9
     JST = "Asia/Tokyo"          # UTC+9
@@ -42,7 +42,7 @@ class TimezonePreset(Enum):
     GMT = "Europe/London"       # UTC+0/+1
 
 
-# 간단한 UTC 오프셋 매핑 (pytz 없이 동작)
+# Simple UTC offset mapping (works without pytz)
 TIMEZONE_OFFSETS: Dict[str, int] = {
     "UTC": 0,
     "Asia/Seoul": 9,
@@ -54,7 +54,7 @@ TIMEZONE_OFFSETS: Dict[str, int] = {
     "Europe/London": 0,
 }
 
-# 타임존 약어 매핑
+# Timezone abbreviation mapping
 TIMEZONE_ABBRS: Dict[str, str] = {
     "UTC": "UTC",
     "Asia/Seoul": "KST",
@@ -69,20 +69,20 @@ TIMEZONE_ABBRS: Dict[str, str] = {
 
 @dataclass
 class AnalysisSession:
-    """분석 세션 정보를 추적하는 데이터 클래스"""
+    """Data class for tracking analysis session information"""
     session_id: str
     sample_path: Optional[str] = None
     sample_name: Optional[str] = None
     analyst: str = "Security Researcher"
     
-    # 타임스탬프 (UTC 기준 저장)
+    # Timestamps (stored in UTC)
     started_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     
-    # 세션 상태
+    # Session status
     status: str = "initialized"  # initialized, in_progress, completed, aborted
     
-    # 분석 중 수집된 데이터
+    # Data collected during analysis
     findings: Dict[str, Any] = field(default_factory=dict)
     iocs: Dict[str, List[str]] = field(default_factory=lambda: {
         "hashes": [],
@@ -97,30 +97,30 @@ class AnalysisSession:
     mitre_techniques: List[Dict[str, str]] = field(default_factory=list)
     notes: List[Dict[str, str]] = field(default_factory=list)
     
-    # 추가 메타데이터
+    # Additional metadata
     tags: List[str] = field(default_factory=list)
     severity: str = "medium"  # low, medium, high, critical
     malware_family: Optional[str] = None
     
     def start(self):
-        """세션 시작"""
+        """Start session"""
         self.started_at = datetime.now(timezone.utc)
         self.status = "in_progress"
     
     def end(self, status: str = "completed"):
-        """세션 종료"""
+        """End session"""
         self.ended_at = datetime.now(timezone.utc)
         self.status = status
     
     def get_duration(self) -> Optional[timedelta]:
-        """분석 소요 시간 계산"""
+        """Calculate analysis duration"""
         if not self.started_at:
             return None
         end = self.ended_at or datetime.now(timezone.utc)
         return end - self.started_at
     
     def get_duration_str(self) -> str:
-        """사람이 읽기 쉬운 소요 시간"""
+        """Human-readable duration string"""
         duration = self.get_duration()
         if duration is None:
             return "N/A"
@@ -139,14 +139,14 @@ class AnalysisSession:
         return " ".join(parts)
     
     def add_ioc(self, ioc_type: str, value: str) -> bool:
-        """IOC 추가"""
+        """Add IOC"""
         if ioc_type in self.iocs and value not in self.iocs[ioc_type]:
             self.iocs[ioc_type].append(value)
             return True
         return False
     
     def add_note(self, note: str, category: str = "general"):
-        """분석 노트 추가"""
+        """Add analysis note"""
         timestamp = datetime.now(timezone.utc).isoformat()
         self.notes.append({
             "timestamp": timestamp,
@@ -155,20 +155,20 @@ class AnalysisSession:
         })
     
     def add_mitre(self, technique_id: str, technique_name: str, tactic: str):
-        """MITRE ATT&CK 기법 추가"""
+        """Add MITRE ATT&CK technique"""
         entry = {"id": technique_id, "name": technique_name, "tactic": tactic}
         if entry not in self.mitre_techniques:
             self.mitre_techniques.append(entry)
     
     def add_tag(self, tag: str):
-        """태그 추가"""
+        """Add tag"""
         if tag not in self.tags:
             self.tags.append(tag)
     
     def to_dict(self) -> dict:
-        """직렬화"""
+        """Serialize to dictionary"""
         data = asdict(self)
-        # datetime 객체 ISO 포맷으로 변환
+        # Convert datetime objects to ISO format
         if self.started_at:
             data["started_at"] = self.started_at.isoformat()
         if self.ended_at:
@@ -179,7 +179,7 @@ class AnalysisSession:
 
 @dataclass
 class EmailConfig:
-    """이메일 설정"""
+    """Email configuration"""
     smtp_server: str = ""
     smtp_port: int = 587
     username: str = ""
@@ -190,10 +190,10 @@ class EmailConfig:
     
     @classmethod
     def from_env(cls) -> "EmailConfig":
-        """환경변수에서 이메일 설정 로드"""
+        """Load email configuration from environment variables"""
         smtp_server = os.getenv("REPORT_SMTP_SERVER", "")
         
-        # SMTP 서버가 설정되지 않으면 비활성화 상태로 반환
+        # Return disabled state if SMTP server is not configured
         if not smtp_server:
             logger.info("📧 Email not configured (REPORT_SMTP_SERVER not set)")
             return cls()
@@ -212,12 +212,12 @@ class EmailConfig:
     
     @property
     def is_configured(self) -> bool:
-        """이메일이 설정되었는지 확인"""
+        """Check if email is configured"""
         return bool(self.smtp_server and self.username)
 
 
 def _load_quick_contacts_from_env() -> Dict[str, Dict[str, str]]:
-    """환경변수에서 빠른 연락처 로드
+    """Load quick contacts from environment variables
     
     Format: REPORT_QUICK_CONTACTS=name1:email1:role1,name2:email2:role2
     """
@@ -244,7 +244,7 @@ def _load_quick_contacts_from_env() -> Dict[str, Dict[str, str]]:
 
 class ReportTools:
     """
-    악성코드 분석 리포트 생성 도구
+    Malware Analysis Report Generation Tools
     
     Features:
     - OS-level accurate timestamps
@@ -269,14 +269,14 @@ class ReportTools:
         self.default_timezone = default_timezone
         self.timezone_offset = TIMEZONE_OFFSETS.get(default_timezone, 0)
         
-        # 활성 세션 관리
+        # Active session management
         self.sessions: Dict[str, AnalysisSession] = {}
         self.current_session_id: Optional[str] = None
         
-        # 이메일 설정
+        # Email configuration
         self.email_config = email_config or EmailConfig()
         
-        # 빠른 연락처 목록
+        # Quick contacts list
         self.quick_contacts: Dict[str, Dict[str, str]] = {}
     
     # =========================================================================
@@ -285,10 +285,10 @@ class ReportTools:
     
     def set_timezone(self, tz: str) -> dict:
         """
-        기본 타임존을 설정합니다.
+        Set default timezone.
         
         Args:
-            tz: 타임존 이름 (UTC, Asia/Seoul, America/New_York, etc.)
+            tz: Timezone name (UTC, Asia/Seoul, America/New_York, etc.)
         """
         if tz not in TIMEZONE_OFFSETS:
             return {
@@ -309,7 +309,7 @@ class ReportTools:
         }
     
     def get_timezone_info(self) -> dict:
-        """현재 타임존 설정 정보 반환"""
+        """Return current timezone configuration info"""
         return {
             "current_timezone": self.default_timezone,
             "utc_offset": self.timezone_offset,
@@ -324,13 +324,13 @@ class ReportTools:
         }
     
     def _get_local_time(self) -> datetime:
-        """설정된 타임존의 현재 시간"""
+        """Get current time in configured timezone"""
         utc_now = datetime.now(timezone.utc)
         local_tz = timezone(timedelta(hours=self.timezone_offset))
         return utc_now.astimezone(local_tz)
     
     def _format_time(self, dt: datetime, include_tz: bool = True) -> str:
-        """datetime을 설정된 타임존으로 포맷"""
+        """Format datetime to configured timezone"""
         local_tz = timezone(timedelta(hours=self.timezone_offset))
         local_dt = dt.astimezone(local_tz)
         
@@ -345,54 +345,56 @@ class ReportTools:
     
     def get_timestamp_data(self) -> dict:
         """
-        OS 레벨에서 정확한 타임스탬프 데이터 생성
-        AI가 날짜를 추측하지 않도록 서버에서 직접 제공
+        Generate accurate timestamp data at OS level.
+        Provided directly from server to prevent AI from guessing dates.
         """
         utc_now = datetime.now(timezone.utc)
         local_now = self._get_local_time()
         abbr = TIMEZONE_ABBRS.get(self.default_timezone, "")
         
         return {
-            # Report ID 생성용
+            # For Report ID generation
             "report_id": f"MAR-{local_now.strftime('%Y%m%d-%H%M%S')}",
             
-            # 날짜 포맷들
+            # Date formats (ISO, localized)
             "date": local_now.strftime("%Y-%m-%d"),
-            "date_kr": local_now.strftime("%Y년 %m월 %d일"),
-            "date_us": local_now.strftime("%B %d, %Y"),
+            "date_long": local_now.strftime("%B %d, %Y"),  # December 05, 2025
+            "date_short": local_now.strftime("%d %b %Y"),  # 05 Dec 2025
+            "date_eu": local_now.strftime("%d/%m/%Y"),     # 05/12/2025
+            "date_us": local_now.strftime("%m/%d/%Y"),     # 12/05/2025
             
-            # 시간 포맷들
+            # Time formats
             "time": local_now.strftime("%H:%M:%S"),
+            "time_12h": local_now.strftime("%I:%M:%S %p"),  # 02:30:45 PM
             "datetime": local_now.strftime("%Y-%m-%d %H:%M:%S"),
             "datetime_full": self._format_time(utc_now),
             "datetime_iso": local_now.isoformat(),
             
-            # UTC 기준
+            # UTC based
             "datetime_utc": utc_now.strftime("%Y-%m-%d %H:%M:%S UTC"),
             "timestamp_unix": int(utc_now.timestamp()),
             
-            # 개별 필드
+            # Individual fields
             "year": local_now.strftime("%Y"),
             "month": local_now.strftime("%m"),
-            "month_name": local_now.strftime("%B"),
-            "month_name_kr": ["1월", "2월", "3월", "4월", "5월", "6월", 
-                              "7월", "8월", "9월", "10월", "11월", "12월"][local_now.month - 1],
+            "month_name": local_now.strftime("%B"),        # December
+            "month_name_short": local_now.strftime("%b"),  # Dec
             "day": local_now.strftime("%d"),
-            "weekday": local_now.strftime("%A"),
-            "weekday_kr": ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"][local_now.weekday()],
+            "weekday": local_now.strftime("%A"),           # Thursday
+            "weekday_short": local_now.strftime("%a"),     # Thu
             
-            # 타임존 정보
+            # Timezone info
             "timezone": self.default_timezone,
             "timezone_abbr": abbr,
             "timezone_offset": f"UTC{'+' if self.timezone_offset >= 0 else ''}{self.timezone_offset}",
             
-            # 시스템 정보
+            # System info
             "hostname": platform.node(),
             "platform": platform.system(),
         }
     
     async def get_current_time(self) -> dict:
-        """현재 시스템 시간 정보를 반환 (MCP Tool용)"""
+        """Return current system time info (for MCP Tool)"""
         return self.get_timestamp_data()
     
     # =========================================================================
@@ -408,17 +410,17 @@ class ReportTools:
         tags: Optional[List[str]] = None
     ) -> dict:
         """
-        새 분석 세션을 시작합니다.
+        Start a new analysis session.
         
         Args:
-            sample_path: 분석할 샘플 경로
-            analyst: 분석가 이름
-            severity: 심각도 (low, medium, high, critical)
-            malware_family: 악성코드 패밀리 이름
-            tags: 태그 목록
+            sample_path: Path to the sample file
+            analyst: Analyst name
+            severity: Severity level (low, medium, high, critical)
+            malware_family: Malware family name
+            tags: Tag list
             
         Returns:
-            세션 정보
+            Session information
         """
         session_id = f"SES-{uuid.uuid4().hex[:8].upper()}"
         
@@ -437,12 +439,12 @@ class ReportTools:
         
         session.start()
         
-        # 샘플 해시 자동 계산
+        # Auto-calculate sample hashes
         if sample_path:
             sample_info = await self._extract_sample_info(sample_path)
             session.findings["sample_info"] = sample_info
             
-            # 해시를 IOC에 자동 추가
+            # Auto-add hashes to IOC
             for hash_type in ["md5", "sha1", "sha256"]:
                 if hash_type in sample_info:
                     session.add_ioc("hashes", f"{hash_type.upper()}: {sample_info[hash_type]}")
@@ -469,12 +471,12 @@ class ReportTools:
         summary: Optional[str] = None
     ) -> dict:
         """
-        분석 세션을 종료합니다.
+        End an analysis session.
         
         Args:
-            session_id: 세션 ID (없으면 현재 세션)
-            status: 종료 상태 (completed, aborted)
-            summary: 분석 요약
+            session_id: Session ID (uses current session if not provided)
+            status: End status (completed, aborted)
+            summary: Analysis summary
         """
         sid = session_id or self.current_session_id
         
@@ -508,7 +510,7 @@ class ReportTools:
         return result
     
     async def get_session_info(self, session_id: Optional[str] = None) -> dict:
-        """세션 상태 조회"""
+        """Query session status"""
         sid = session_id or self.current_session_id
         
         if not sid or sid not in self.sessions:
@@ -537,7 +539,7 @@ class ReportTools:
         value: str,
         session_id: Optional[str] = None
     ) -> dict:
-        """세션에 IOC 추가"""
+        """Add IOC to session"""
         sid = session_id or self.current_session_id
         
         if not sid or sid not in self.sessions:
@@ -569,7 +571,7 @@ class ReportTools:
         category: str = "general",
         session_id: Optional[str] = None
     ) -> dict:
-        """세션에 분석 노트 추가"""
+        """Add analysis note to session"""
         sid = session_id or self.current_session_id
         
         if not sid or sid not in self.sessions:
@@ -593,7 +595,7 @@ class ReportTools:
         tactic: str,
         session_id: Optional[str] = None
     ) -> dict:
-        """세션에 MITRE ATT&CK 기법 추가"""
+        """Add MITRE ATT&CK technique to session"""
         sid = session_id or self.current_session_id
         
         if not sid or sid not in self.sessions:
@@ -614,7 +616,7 @@ class ReportTools:
         tag: str,
         session_id: Optional[str] = None
     ) -> dict:
-        """세션에 태그 추가"""
+        """Add tag to session"""
         sid = session_id or self.current_session_id
         
         if not sid or sid not in self.sessions:
@@ -634,7 +636,7 @@ class ReportTools:
         severity: str,
         session_id: Optional[str] = None
     ) -> dict:
-        """세션 심각도 설정"""
+        """Set session severity"""
         sid = session_id or self.current_session_id
         
         if not sid or sid not in self.sessions:
@@ -658,7 +660,7 @@ class ReportTools:
         }
     
     async def list_sessions(self) -> dict:
-        """모든 세션 목록 조회"""
+        """List all sessions"""
         sessions_list = []
         
         for sid, session in self.sessions.items():
@@ -695,8 +697,8 @@ class ReportTools:
         output_format: str = "markdown"
     ) -> dict:
         """
-        분석 리포트를 생성합니다.
-        세션이 있으면 세션 데이터를 자동으로 포함합니다.
+        Generate an analysis report.
+        If a session exists, session data is automatically included.
         """
         # 타임스탬프 생성 (서버 시간 기준)
         ts = self.get_timestamp_data()
@@ -713,11 +715,13 @@ class ReportTools:
         
         template = template_path.read_text(encoding='utf-8')
         
-        # 기본 필드
+        # Basic fields
         fields = {
             "REPORT_ID": ts["report_id"],
             "DATE": ts["date"],
-            "DATE_KR": ts["date_kr"],
+            "DATE_LONG": ts["date_long"],
+            "DATE_SHORT": ts["date_short"],
+            "DATE_EU": ts["date_eu"],
             "DATE_US": ts["date_us"],
             "DATETIME": ts["datetime"],
             "DATETIME_FULL": ts["datetime_full"],
@@ -726,10 +730,12 @@ class ReportTools:
             "YEAR": ts["year"],
             "MONTH": ts["month"],
             "MONTH_NAME": ts["month_name"],
-            "MONTH_NAME_KR": ts["month_name_kr"],
+            "MONTH_NAME_SHORT": ts["month_name_short"],
             "DAY": ts["day"],
             "WEEKDAY": ts["weekday"],
-            "WEEKDAY_KR": ts["weekday_kr"],
+            "WEEKDAY_SHORT": ts["weekday_short"],
+            "TIME": ts["time"],
+            "TIME_12H": ts["time_12h"],
             "TIMEZONE": ts["timezone"],
             "TIMEZONE_ABBR": ts["timezone_abbr"],
             "ANALYST": analyst,
@@ -738,7 +744,7 @@ class ReportTools:
             "HOSTNAME": ts["hostname"],
         }
         
-        # 세션 데이터 통합
+        # Merge session data
         sid = session_id or self.current_session_id
         session = self.sessions.get(sid) if sid else None
         
@@ -832,7 +838,7 @@ class ReportTools:
         }
     
     async def list_templates(self) -> dict:
-        """사용 가능한 템플릿 목록"""
+        """List available templates"""
         templates = []
         
         for f in self.template_dir.glob("*.md"):
@@ -856,7 +862,7 @@ class ReportTools:
         }
     
     async def get_report(self, report_id: str) -> dict:
-        """생성된 리포트 조회"""
+        """Retrieve a generated report"""
         report_path = self.output_dir / f"{report_id}.md"
         
         if not report_path.exists():
@@ -879,7 +885,7 @@ class ReportTools:
         }
     
     async def list_reports(self) -> dict:
-        """생성된 리포트 목록"""
+        """List generated reports"""
         reports = []
         
         for f in self.output_dir.glob("*.md"):
@@ -905,7 +911,7 @@ class ReportTools:
     # =========================================================================
     
     async def get_email_status(self) -> dict:
-        """이메일 설정 상태 확인"""
+        """Check email configuration status"""
         return {
             "configured": self.email_config.is_configured,
             "smtp_server": self.email_config.smtp_server or "(not set)",
@@ -926,7 +932,7 @@ class ReportTools:
         use_tls: bool = True,
         sender_name: str = "Reversecore_MCP"
     ) -> dict:
-        """이메일 설정 구성 (런타임 설정, 환경변수보다 우선)"""
+        """Configure email settings (runtime override, takes precedence over env vars)"""
         self.email_config = EmailConfig(
             smtp_server=smtp_server,
             smtp_port=smtp_port,
@@ -952,7 +958,7 @@ class ReportTools:
         email: str,
         role: str = "Security Analyst"
     ) -> dict:
-        """빠른 연락처 추가"""
+        """Add quick contact"""
         self.quick_contacts[name] = {
             "email": email,
             "role": role
@@ -965,7 +971,7 @@ class ReportTools:
         }
     
     async def list_quick_contacts(self) -> dict:
-        """빠른 연락처 목록"""
+        """List quick contacts"""
         return {
             "total": len(self.quick_contacts),
             "contacts": [
@@ -983,14 +989,14 @@ class ReportTools:
         include_attachment: bool = True
     ) -> dict:
         """
-        리포트를 이메일로 전송합니다.
+        Send a report via email.
         
         Args:
-            report_id: 전송할 리포트 ID
-            recipients: 수신자 이메일 목록
-            subject: 이메일 제목 (기본값: 자동 생성)
-            message: 이메일 본문
-            include_attachment: 리포트 파일 첨부 여부
+            report_id: Report ID to send
+            recipients: List of recipient email addresses
+            subject: Email subject (auto-generated by default)
+            message: Email body
+            include_attachment: Whether to attach the report file
         """
         # 리포트 확인
         report_path = self.output_dir / f"{report_id}.md"
@@ -1104,7 +1110,7 @@ class ReportTools:
     # =========================================================================
     
     async def _extract_sample_info(self, sample_path: str) -> dict:
-        """샘플 파일에서 메타데이터 추출"""
+        """Extract metadata from sample file"""
         path = Path(sample_path)
         
         if not path.exists():
@@ -1135,7 +1141,7 @@ class ReportTools:
     
     @staticmethod
     def _identify_file_type(data: bytes) -> str:
-        """파일 타입 식별"""
+        """Identify file type"""
         if len(data) < 4:
             return "Unknown (too small)"
         
@@ -1172,7 +1178,7 @@ class ReportTools:
     
     @staticmethod
     def _human_readable_size(size: int) -> str:
-        """바이트를 읽기 쉬운 형식으로"""
+        """Convert bytes to human-readable format"""
         for unit in ['B', 'KB', 'MB', 'GB']:
             if size < 1024:
                 return f"{size:,.1f} {unit}"
@@ -1181,7 +1187,7 @@ class ReportTools:
     
     @staticmethod
     def _get_severity_emoji(severity: str) -> str:
-        """심각도 이모지"""
+        """Get severity emoji"""
         emojis = {
             "low": "🟢",
             "medium": "🟡",
@@ -1191,7 +1197,7 @@ class ReportTools:
         return emojis.get(severity.lower(), "⚪")
     
     def _format_iocs_yaml(self, iocs: Dict[str, List[str]]) -> str:
-        """IOC를 YAML 형식으로 포맷"""
+        """Format IOCs in YAML format"""
         lines = []
         for ioc_type, values in iocs.items():
             if values:
@@ -1201,7 +1207,7 @@ class ReportTools:
         return "\n".join(lines) if lines else "# No IOCs collected"
     
     def _format_iocs_markdown(self, iocs: Dict[str, List[str]]) -> str:
-        """IOC를 마크다운 형식으로 포맷"""
+        """Format IOCs in Markdown format"""
         lines = []
         for ioc_type, values in iocs.items():
             if values:
@@ -1212,7 +1218,7 @@ class ReportTools:
         return "\n".join(lines) if lines else "_No IOCs collected._"
     
     def _format_mitre_table(self, techniques: List[Dict[str, str]]) -> str:
-        """MITRE 기법을 마크다운 테이블로"""
+        """Format MITRE techniques as Markdown table"""
         if not techniques:
             return "| - | - | - |"
         
@@ -1222,7 +1228,7 @@ class ReportTools:
         return "\n".join(lines)
     
     def _format_notes(self, notes: List[Dict[str, str]]) -> str:
-        """분석 노트 포맷"""
+        """Format analysis notes"""
         if not notes:
             return "_No notes recorded._"
         

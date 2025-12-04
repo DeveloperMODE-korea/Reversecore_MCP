@@ -80,7 +80,7 @@ def register_resources(mcp: FastMCP):
     """Register MCP resources for AI agents."""
 
     # ============================================================================
-    # 정적 리소스 (Static Resources)
+    # Static Resources
     # ============================================================================
 
     @mcp.resource("reversecore://guide")
@@ -124,7 +124,7 @@ def register_resources(mcp: FastMCP):
         return "No logs found."
 
     # ============================================================================
-    # 동적 리소스 (Dynamic Resources) - Binary Virtual File System
+    # Dynamic Resources - Binary Virtual File System
     # ============================================================================
 
     @mcp.resource("reversecore://{filename}/strings")

@@ -115,11 +115,18 @@ class TestTimestampGeneration:
         # Check required fields exist
         assert "report_id" in ts
         assert "date" in ts
-        assert "date_kr" in ts
+        assert "date_long" in ts
+        assert "date_short" in ts
+        assert "date_eu" in ts
+        assert "date_us" in ts
         assert "datetime_full" in ts
         assert "datetime_utc" in ts
         assert "timestamp_unix" in ts
         assert "timezone" in ts
+        assert "weekday" in ts
+        assert "weekday_short" in ts
+        assert "month_name" in ts
+        assert "month_name_short" in ts
         
         # Check report_id format
         assert ts["report_id"].startswith("MAR-")

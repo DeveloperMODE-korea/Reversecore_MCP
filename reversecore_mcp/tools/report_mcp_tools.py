@@ -12,18 +12,18 @@ from .report_tools import ReportTools, get_report_tools
 
 def register_report_tools(mcp_server, template_dir: Optional[Path] = None, output_dir: Optional[Path] = None):
     """
-    MCP 서버에 리포트 도구들을 등록합니다.
+    Register report tools with the MCP server.
     
     Args:
-        mcp_server: FastMCP 서버 인스턴스
-        template_dir: 템플릿 디렉토리 경로
-        output_dir: 출력 디렉토리 경로
+        mcp_server: FastMCP server instance
+        template_dir: Template directory path
+        output_dir: Output directory path
     
     Returns:
-        ReportTools 인스턴스
+        ReportTools instance
     """
     
-    # ReportTools 인스턴스 초기화
+    # Initialize ReportTools instance
     report_tools = get_report_tools(
         template_dir=template_dir or Path("templates/reports"),
         output_dir=output_dir or Path("reports"),
@@ -51,7 +51,10 @@ def register_report_tools(mcp_server, template_dir: Optional[Path] = None, outpu
             {
               "report_id": "MAR-20251205-143052",
               "date": "2025-12-05",
-              "date_kr": "2025년 12월 05일",
+              "date_long": "December 05, 2025",
+              "date_eu": "05/12/2025",
+              "weekday": "Friday",
+              "weekday_short": "Fri",
               "datetime_full": "2025-12-05 14:30:52 (KST)",
               "timestamp_unix": 1733376652,
               "timezone": "Asia/Seoul"

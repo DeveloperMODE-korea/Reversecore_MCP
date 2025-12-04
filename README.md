@@ -26,7 +26,7 @@ Ghidra is required for advanced decompilation features.
 .\scripts\install-ghidra.ps1
 
 # With custom version/path
-.\scripts\install-ghidra.ps1 -Version "11.4.3" -InstallDir "F:\Tools"
+.\scripts\install-ghidra.ps1 -Version "11.4.3" -InstallDir "C:\Tools"
 ```
 
 ```bash
@@ -177,7 +177,7 @@ Transforms raw decompiled code into human-readable format:
 - Structure inference from pointer arithmetic
 - Smart annotation with explanatory comments
 
-### 🎮 Game Security Analysis (NEW!)
+### 🎮 Game Security Analysis
 
 Specialized tools for game client reverse engineering:
 
@@ -185,6 +185,27 @@ Specialized tools for game client reverse engineering:
 - **Anti-Cheat Profiler**: Identifies GameGuard, XIGNCODE, EAC, VAC patterns
 - **Protocol Analyzer**: Korean MMO protocol pattern detection (CS_/SC_, MSG_/PKT_)
 - **Function Pattern Matching**: Speed multiplier, coordinate manipulation, health modification detection
+
+### 📝 Report Generation Tools (NEW!)
+
+Professional malware analysis report generation with accurate timestamps:
+
+- **Session Tracking**: Start/end analysis sessions with automatic duration calculation
+- **IOC Collection**: Collect and organize indicators during analysis (hashes, IPs, domains, URLs)
+- **MITRE ATT&CK Mapping**: Document techniques with proper framework references
+- **Multiple Templates**: Full analysis, quick triage, IOC summary, executive brief
+- **Email Delivery**: Send reports directly to security teams (SMTP support)
+- **Timezone Support**: UTC, KST, EST, PST, CET and more
+
+```
+# Example workflow
+get_system_time()                    # Accurate server timestamp
+start_analysis_session(sample_path="malware.exe")
+add_session_ioc("ips", "192.168.1.100")
+add_session_mitre("T1059.001", "PowerShell", "Execution")
+end_analysis_session(summary="Ransomware variant detected")
+create_analysis_report(template_type="full_analysis")
+```
 
 ### ⚡ Performance Optimizations (v3.0)
 
@@ -205,6 +226,7 @@ Specialized tools for game client reverse engineering:
 | **Binary Parsing** | \`parse_binary_with_lief\`, \`extract_iocs\` |
 | **Diffing** | \`diff_binaries\`, \`match_libraries\` |
 | **Game Analysis** | \`find_cheat_points\`, \`analyze_game_protocol\` |
+| **Reporting** | \`get_system_time\`, \`start_analysis_session\`, \`create_analysis_report\` |
 
 ## 📊 Analysis Workflow
 
@@ -218,6 +240,7 @@ Specialized tools for game client reverse engineering:
 - \`basic_analysis_mode\` - Quick triage
 - \`game_analysis_mode\` - Game client analysis with **cheat detection heuristics**
 - \`firmware_analysis_mode\` - IoT/Firmware analysis
+- \`report_generation_mode\` - Professional report generation workflow **(NEW!)**
 
 > 💡 **AI Reasoning Enhancement**: Prompts use expert persona priming, Chain-of-Thought checkpoints, and structured reasoning to maximize AI analysis capabilities.
 
