@@ -761,7 +761,7 @@ async def analyze_xrefs(
             # Robust JSON extraction from line
             try:
                 refs = _parse_json_output(line)
-                if isinstance(refs, list) and len(refs) > 0:
+                if isinstance(refs, list) and refs:  # OPTIMIZATION: Direct bool check instead of len() comparison
                     # Determine if this is "to" or "from" based on field names
                     first_ref = refs[0]
                     if "from" in first_ref:
