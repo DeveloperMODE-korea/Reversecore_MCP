@@ -17,21 +17,44 @@ An enterprise-grade MCP (Model Context Protocol) server for AI-powered reverse e
 
 ### Ghidra (Required for Decompilation)
 
-Ghidra is required for advanced decompilation features. Download and install:
+Ghidra is required for advanced decompilation features.
 
-1. **Download**: [https://ghidra-sre.org/](https://ghidra-sre.org/)
-2. **Extract** to a directory (e.g., `F:\Tools\ghidra_11.4.2_PUBLIC` on Windows)
+**Option 1: Automatic Installation (Recommended)**
+
+```powershell
+# Windows (PowerShell - Run as Administrator)
+.\scripts\install-ghidra.ps1
+
+# With custom version/path
+.\scripts\install-ghidra.ps1 -Version "11.4.3" -InstallDir "F:\Tools"
+```
+
+```bash
+# Linux/macOS
+chmod +x ./scripts/install-ghidra.sh
+./scripts/install-ghidra.sh
+
+# With custom version/path
+./scripts/install-ghidra.sh -v 11.4.3 -d /opt
+```
+
+**Option 2: Manual Installation**
+
+1. **Download**: [Ghidra 11.4.3](https://github.com/NationalSecurityAgency/ghidra/releases/tag/Ghidra_11.4.3_build)
+2. **Extract** to a directory:
+   - Windows: `F:\Tools\ghidra_11.4.3_PUBLIC_YYYYMMDD`
+   - Linux/macOS: `/opt/ghidra_11.4.3_PUBLIC_YYYYMMDD`
 3. **Set environment variable**:
    ```bash
    # Linux/macOS
-   export GHIDRA_INSTALL_DIR=/opt/ghidra
+   export GHIDRA_INSTALL_DIR=/opt/ghidra_11.4.3_PUBLIC_YYYYMMDD
    
    # Windows (PowerShell)
-   $env:GHIDRA_INSTALL_DIR="F:\Tools\ghidra_11.4.2_PUBLIC"
+   $env:GHIDRA_INSTALL_DIR="F:\Tools\ghidra_11.4.3_PUBLIC_YYYYMMDD"
    ```
    Or add to `.env` file (copy from `.env.example`)
 
-> ⚠️ **Note**: JDK 17+ is required for Ghidra. Ghidra will prompt you to install it if missing.
+> ⚠️ **Note**: JDK 17+ is required for Ghidra. Download from [Adoptium](https://adoptium.net/) if needed.
 
 ## 🚀 Quick Start
 
