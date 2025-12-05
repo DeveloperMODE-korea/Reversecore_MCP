@@ -18,6 +18,10 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 from typing import Any
+import uuid
+import os
+import shutil
+from datetime import datetime
 
 import r2pipe
 from fastmcp import FastMCP
@@ -169,26 +173,38 @@ def _sanitize_for_r2_cmd(value: str) -> str:
 
 class R2Session:
     """
-    Manages a radare2 session for a binary file.
-
-    Handles opening, closing, and command execution with proper cleanup.
-    All commands are validated before execution for security.
+    Manages a radare2 session with enhanced state tracking and diagnostics.
     """
 
     def __init__(self, file_path: str | None = None):
+        self.session_id = str(uuid.uuid4())
         self.file_path = file_path
         self._r2: r2pipe.open_sync | None = None
         self._analyzed = False
+        self.created_at = datetime.now()
+        self.status = "initialized"  # initialized, active, error, closed
+        self.last_error = None
+        self.retry_count = 0
 
     def open(self, file_path: str) -> bool:
         """Open a binary file with radare2."""
         try:
             self.close()
+            # Verify file exists strictly before passing to r2
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File not found: {file_path}")
+                
             self._r2 = r2pipe.open(file_path)
+            if not self._r2:
+                raise RuntimeError("r2pipe.open returned None")
+                
             self.file_path = file_path
+            self.status = "active"
             return True
         except Exception as e:
-            logger.error(f"Failed to open file: {e}")
+            self.status = "error"
+            self.last_error = str(e)
+            logger.error(f"Failed to open file {file_path}: {e}")
             return False
 
     def close(self) -> None:
@@ -199,7 +215,7 @@ class R2Session:
             except Exception:
                 pass
             self._r2 = None
-            self.file_path = None
+            self.status = "closed"
             self._analyzed = False
 
     def cmd(self, command: str) -> str:
@@ -210,6 +226,7 @@ class R2Session:
             result = self._r2.cmd(command)
             return result if result else ""
         except Exception as e:
+            self.last_error = str(e)
             logger.error(f"R2 command failed: {e}")
             return f"Error: {e}"
 
@@ -220,6 +237,7 @@ class R2Session:
         try:
             return self._r2.cmdj(command)
         except Exception as e:
+            self.last_error = str(e)
             logger.error(f"R2 JSON command failed: {e}")
             return None
 
@@ -242,7 +260,7 @@ class R2Session:
 
     @property
     def is_open(self) -> bool:
-        return self._r2 is not None
+        return self._r2 is not None and self.status == "active"
 
 
 @lru_cache(maxsize=64)
@@ -321,40 +339,68 @@ class Radare2ToolsPlugin(Plugin):
     description = "Radare2 binary analysis tools (r2mcp compatible)"
 
     def __init__(self):
-        self._sessions: dict[str, R2Session] = {}
+        self._sessions: dict[str, R2Session] = {} # session_id -> Session
+        self._file_to_session: dict[str, str] = {} # file_path -> session_id
+
+    def _diagnose_error(self, file_path: str, error: Exception) -> dict[str, Any]:
+        """Diagnose why r2 failed to open a file."""
+        diagnosis = {
+            "error": str(error),
+            "file_exists": os.path.exists(file_path),
+            "is_file": os.path.isfile(file_path) if os.path.exists(file_path) else False,
+            "permissions": oct(os.stat(file_path).st_mode)[-3:] if os.path.exists(file_path) else "N/A",
+            "file_size": os.path.getsize(file_path) if os.path.exists(file_path) else 0,
+            "r2_available": shutil.which("radare2") is not None,
+            "hints": []
+        }
+        
+        if not diagnosis["file_exists"]:
+            diagnosis["hints"].append("Check if the file path is correct (relative to /app/workspace?)")
+        elif not diagnosis["is_file"]:
+             diagnosis["hints"].append("Path exists but is not a file (directory?)")
+        elif diagnosis["file_size"] == 0:
+             diagnosis["hints"].append("File is empty (0 bytes)")
+        
+        return diagnosis
 
     def _get_or_create_session(self, file_path: str, auto_analyze: bool = False) -> R2Session:
         """
-        Get existing session or create new one for the file.
-
-        Args:
-            file_path: Path to the binary file
-            auto_analyze: If True, run analysis on new sessions (default: False for lazy loading)
-
-        Returns:
-            R2Session instance
+        Get existing session or create new one with strict validation.
         """
-        # Validate and normalize path first
-        # This handles host paths (e.g. /Users/...) by converting to workspace paths
+        # 1. Normalize Path
         try:
             validated_path = validate_file_path(file_path)
             file_path = str(validated_path)
-        except ValidationError as e:
-            logger.error(f"Invalid file path in get_or_create_session: {e}")
-            # Identify file path for error reporting (best effort)
-            pass
+        except ValidationError:
+            # If validation fails, we can't proceed safely
+            # Return a dummy session that is not open, caller will handle is_open check
+            return R2Session(file_path)
 
-        if file_path in self._sessions:
-            session = self._sessions[file_path]
-            if session.is_open:
-                return session
+        # 2. Check existing session
+        if file_path in self._file_to_session:
+            sid = self._file_to_session[file_path]
+            if sid in self._sessions:
+                session = self._sessions[sid]
+                if session.is_open:
+                    return session
+                else:
+                    # Clean up dead session
+                    del self._sessions[sid]
+                    del self._file_to_session[file_path]
 
-        session = R2Session()
+        # 3. Create new session
+        session = R2Session(file_path)
         if session.open(file_path):
-            self._sessions[file_path] = session
-            # Only analyze if explicitly requested (lazy loading)
+            self._sessions[session.session_id] = session
+            self._file_to_session[file_path] = session.session_id
+            
             if auto_analyze:
                 session.analyze(1)
+            return session
+            
+        # 4. Open failed - Log diagnosis
+        # Note: We don't return diagnosis here as return type is R2Session
+        # The caller (Radare2_open_file) should handle the error diagnosis
         return session
 
     def _ensure_analyzed(self, session: R2Session, level: int = 1) -> None:
@@ -386,22 +432,37 @@ class Radare2ToolsPlugin(Plugin):
                 file_path: Absolute path to the binary file to analyze
 
             Returns:
-                Status of the file opening operation
+                Status of the file opening operation, including session_id
             """
             # Validate path using project security module
             try:
                 validated_path = validate_file_path(file_path)
+                abs_path = str(validated_path)
             except ValidationError as e:
-                return {"status": "error", "message": str(e)}
+                return {"status": "error", "message": str(e), "error_code": "INVALID_PATH"}
 
-            session = self._get_or_create_session(str(validated_path))
+            session = self._get_or_create_session(abs_path)
+            
             if session.is_open:
                 return {
                     "status": "success",
                     "message": "File opened successfully",
-                    "file_path": str(validated_path),
+                    "file_path": abs_path,
+                    "session_id": session.session_id,
+                    "file_size": os.path.getsize(abs_path) if os.path.exists(abs_path) else 0,
+                    "status_code": "OPENED"
                 }
-            return {"status": "error", "message": "Failed to open file"}
+            
+            # Diagnose failure
+            diagnosis = self._diagnose_error(abs_path, Exception(session.last_error or "Unknown error"))
+            return {
+                "status": "error", 
+                "message": f"Failed to open file: {session.last_error}",
+                "error_code": "R2_OPEN_FAILED",
+                "diagnosis": diagnosis,
+                "hints": diagnosis["hints"],
+                "attempts": 1
+            }
 
         @mcp.tool()
         async def Radare2_close_file(file_path: str) -> dict[str, Any]:
@@ -414,11 +475,22 @@ class Radare2ToolsPlugin(Plugin):
             Returns:
                 Status of the close operation
             """
-            if file_path in self._sessions:
-                self._sessions[file_path].close()
-                del self._sessions[file_path]
-                return {"status": "success", "message": "File closed successfully"}
-            return {"status": "success", "message": "File was not open"}
+            try:
+                validated_path = validate_file_path(file_path)
+                abs_path = str(validated_path)
+                
+                # Check mapping
+                if abs_path in self._file_to_session:
+                    sid = self._file_to_session[abs_path]
+                    if sid in self._sessions:
+                        self._sessions[sid].close()
+                        del self._sessions[sid]
+                    del self._file_to_session[abs_path]
+                    return {"status": "success", "message": "File closed successfully", "session_id": sid}
+                
+                return {"status": "success", "message": "File was not open (no active session)"}
+            except ValidationError as e:
+                return {"status": "error", "message": str(e)}
 
         # =====================================================================
         # Analysis Tools
