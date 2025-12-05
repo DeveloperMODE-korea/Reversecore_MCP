@@ -591,150 +591,182 @@ def register_report_tools(mcp_server, template_dir: Path | None = None, output_d
         tags: str = "malware"
     ) -> str:
         """
-        Generate a standardized JSON report for malware submission.
+        Generate a standardized JSON report adhering to the requested schema.
         
-        Collects comprehensive file analysis data adhering to the submission schema:
-        - File Metadata (Hashes, Size, Type, Timestamp)
-        - Sections & Imports (via LIEF)
-        - Strings (Truncated preview + Full count)
-        - IOCs (IPs, Domains, Bitcoin, Hashes from strings)
+        Schema Summary:
+        - filename, file_type, size_bytes, collected_at (ISO8601)
+        - sha256 (calculated)
+        - lief: { entry_point_rva, sections: [{name, va, raw_offset, raw_size, entropy}] }
+        - imports: ["func1", "func2", ...]
+        - strings: { truncated, count, preview, path }
+        - iocs: { ips, domains, emails, bitcoin, hashes }
+        - tool_errors: [{ tool, error_message }]
         
         Args:
-            file_path: Path to the malware sample (must be in workspace)
-            analyst_name: Name of the analyst
+            file_path: Path to the malware sample
+            analyst_name: Analyst name
             tags: Comma-separated tags
-            
-        Returns:
-            JSON result with report path and summary
         """
         import hashlib
         import os
         from datetime import datetime, timezone
         from reversecore_mcp.core.security import validate_file_path
         
-        # 1. File Validation & Metadata
         try:
             validated_path = validate_file_path(file_path)
             file_path_str = str(validated_path)
             
-            # Basic stats
+            # Basic Stats & Hashes
             stat = validated_path.stat()
             file_size = stat.st_size
             
-            # Calculate Hashes
-            hashes = {"md5": hashlib.md5(), "sha1": hashlib.sha1(), "sha256": hashlib.sha256()}
+            hashes = {"sha256": hashlib.sha256()}
             with open(validated_path, "rb") as f:
                 while chunk := f.read(8192):
-                    for h in hashes.values():
-                        h.update(chunk)
+                    hashes["sha256"].update(chunk)
             
-            file_hashes = {k: v.hexdigest() for k, v in hashes.items()}
+            sha256_hash = hashes["sha256"].hexdigest()
             
-            # 2. Tool Integration
+            # Initial Report Structure
             report_data = {
                 "filename": validated_path.name,
-                "sha256": file_hashes["sha256"],
-                "md5": file_hashes["md5"],
-                "sha1": file_hashes["sha1"],
-                "size": file_size,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "analyst": analyst_name,
-                "tags": [t.strip() for t in tags.split(",") if t.strip()],
-                "file_type": "unknown", # Will be updated by tools
-                "sections": [],
+                "sha256": sha256_hash,
+                "file_type": "unknown",
+                "size_bytes": file_size,
+                "collected_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "analyst_hypothesis": { # Placeholder for analyst
+                    "family": "unknown",
+                    "confidence": "low"
+                },
+                "lief": {},
                 "imports": [],
-                "strings_truncated": True,
-                "strings_preview": [],
-                "strings_count": 0,
-                "iocs": {},
-                "logs": []
+                "strings": {},
+                "iocs": { "ips": [], "domains": [], "emails": [], "bitcoin": [], "hashes": [] },
+                "binwalk": { "extracted_paths": [], "notes": "Not executed" },
+                "tool_errors": []
             }
 
-            # LIEF Analysis (Sections, Imports, Type)
+            # 1. LIEF Analysis
             try:
                 from reversecore_mcp.tools.lief_tools import parse_binary_with_lief
                 lief_result = parse_binary_with_lief(file_path_str, format="json")
                 if lief_result.status == "success":
                     data = lief_result.data
                     report_data["file_type"] = data.get("format", "unknown")
-                    report_data["sections"] = data.get("sections", [])
                     
-                    # Flatten imports for schema compatibility
-                    imports_raw = data.get("imports", [])
-                    # Simplification: List of objects with dll name and functions
-                    report_data["imports"] = imports_raw
+                    # Structure LIEF data
+                    lief_section_data = []
+                    for sec in data.get("sections", []):
+                        # Map fields: virtual_address -> va, size -> raw_size (approx)
+                        lief_section_data.append({
+                            "name": sec.get("name", ""),
+                            "va": sec.get("virtual_address", "0x0"),
+                            "raw_offset": 0, # LIEF tool output might need update to provide raw_offset
+                            "raw_size": sec.get("size", 0),
+                            "entropy": sec.get("entropy", 0.0)
+                        })
                     
-                    if "entry_point" in data:
-                        report_data["entry_point"] = data["entry_point"]
+                    report_data["lief"] = {
+                        "entry_point_rva": data.get("entry_point", ""),
+                        "sections": lief_section_data
+                    }
+                    
+                    # Imports flattening: ["Function", "Function"]
+                    imports_flat = []
+                    raw_imports = data.get("imports", []) # List of {name: DLL, functions: []}
+                    for imp in raw_imports:
+                        for func in imp.get("functions", []):
+                            imports_flat.append(func)
+                    
+                    # Filter imports to avoid noise if too many
+                    report_data["imports"] = imports_flat[:500] 
+                    if len(imports_flat) > 500:
+                        report_data["tool_errors"].append({
+                            "tool": "lief", 
+                            "call": "imports", 
+                            "error_message": "Too many imports, truncated to 500",
+                            "hint": "Check full analysis for complete list"
+                        })
+
                 else:
-                    report_data["logs"].append({
+                    report_data["tool_errors"].append({
                         "tool": "lief",
+                        "call": "parse_binary",
                         "error_message": lief_result.error_message
                     })
             except Exception as e:
-                report_data["logs"].append({"tool": "lief", "error_message": str(e)})
+                report_data["tool_errors"].append({"tool": "lief", "call": "execution", "error_message": str(e)})
 
-            # String Extraction
-            all_strings_content = ""
+            # 2. Strings Analysis (Separate File)
             try:
                 from reversecore_mcp.tools.static_analysis import run_strings
-                # Request limited size for preview, but enough for IOCs
-                strings_result = await run_strings(file_path_str, min_length=4, max_output_size=1024*1024) # 1MB limit for memory safety
+                strings_result = await run_strings(file_path_str, min_length=4)
                 
                 if strings_result.status == "success":
-                    all_strings_content = strings_result.content if isinstance(strings_result.content, str) else str(strings_result.data)
-                    string_lines = all_strings_content.splitlines()
-                    report_data["strings_count"] = len(string_lines)
-                    report_data["strings_preview"] = string_lines[:500] # First 500 strings
+                    content = strings_result.content if isinstance(strings_result.content, str) else str(strings_result.data)
+                    lines = content.splitlines()
+                    
+                    # Save to external file
+                    strings_filename = f"{validated_path.name}_strings.txt"
+                    strings_path = validated_path.parent / strings_filename
+                    with open(strings_path, "w", encoding="utf-8") as f:
+                        f.write(content)
+                        
+                    report_data["strings"] = {
+                        "truncated": len(lines) > 100,
+                        "count": len(lines),
+                        "preview": lines[:100],
+                        "path": strings_filename
+                    }
                 else:
-                    report_data["logs"].append({
+                    report_data["tool_errors"].append({
                         "tool": "strings",
+                        "call": "run_strings",
                         "error_message": strings_result.error_message
                     })
             except Exception as e:
-                report_data["logs"].append({"tool": "strings", "error_message": str(e)})
+                 report_data["tool_errors"].append({"tool": "strings", "call": "execution", "error_message": str(e)})
 
-            # IOC Extraction (using strings content)
+            # 3. IOCs
             try:
                 from reversecore_mcp.tools.ioc_tools import extract_iocs
-                # We can't pass raw content to extract_iocs as it expects file path.
-                # However, extract_iocs runs strings internally if file is binary.
-                # So we just run extract_iocs on the file.
                 ioc_result = extract_iocs(file_path_str)
-                
                 if ioc_result.status == "success":
-                    report_data["iocs"] = ioc_result.data
-                else:
-                     report_data["logs"].append({
-                        "tool": "extract_iocs",
-                        "error_message": ioc_result.error_message
-                    })
+                    # Map IOC tool output to schema
+                    iocs_data = ioc_result.data
+                    report_data["iocs"] = {
+                        "ips": iocs_data.get("ipv4", []),
+                        "domains": iocs_data.get("domains", []),
+                        "emails": iocs_data.get("emails", []),
+                        "bitcoin": iocs_data.get("bitcoin", []),
+                        "hashes": iocs_data.get("md5", []) + iocs_data.get("sha1", []) + iocs_data.get("sha256", [])
+                    }
             except Exception as e:
-                report_data["logs"].append({"tool": "extract_iocs", "error_message": str(e)})
+                 report_data["tool_errors"].append({"tool": "extract_iocs", "call": "execution", "error_message": str(e)})
 
-            # 3. Save Report
-            output_filename = f"{validated_path.stem}_submission.json"
-            # Use the output directory from report_tools if available, otherwise workspace
-            save_path = validated_path.parent / output_filename
+            # Save Final JSON
+            json_filename = f"{validated_path.name}_submission.json"
+            json_path = validated_path.parent / json_filename
             
-            with open(save_path, "w", encoding="utf-8") as f:
+            with open(json_path, "w", encoding="utf-8") as f:
                 f.write(json.dumps(report_data, indent=2, ensure_ascii=False))
-                
+
             return json.dumps({
-                "status": "success",
-                "message": f"Submission JSON generated: {save_path.name}",
-                "report_path": str(save_path),
+                "status": "success", 
+                "report_path": str(json_path),
                 "summary": {
                     "filename": report_data["filename"],
-                    "hashes": file_hashes,
-                    "iocs_found": sum(len(v) for v in report_data.get("iocs", {}).values() if isinstance(v, list))
+                    "collected_at": report_data["collected_at"],
+                    "size_bytes": report_data["size_bytes"]
                 }
             }, indent=2)
 
         except Exception as e:
+            import traceback
             return json.dumps({
                 "status": "error",
-                "message": f"Failed to generate submission: {str(e)}"
+                "message": f"Critical failure: {str(e)}",
+                "traceback": traceback.format_exc()
             })
 
     return report_tools
