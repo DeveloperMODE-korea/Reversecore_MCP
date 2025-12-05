@@ -19,6 +19,16 @@ _IOC_URL_PATTERN = re.compile(
 )
 _IOC_EMAIL_PATTERN = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
 _IOC_BITCOIN_PATTERN = re.compile(r"\b[13][a-km-zA-HJ-NP-Z1-9]{25,34}\b")
+_IOC_MD5_PATTERN = re.compile(r"\b[0-9a-fA-F]{32}\b")
+_IOC_SHA1_PATTERN = re.compile(r"\b[0-9a-fA-F]{40}\b")
+_IOC_SHA256_PATTERN = re.compile(r"\b[0-9a-fA-F]{64}\b")
+_IOC_CVE_PATTERN = re.compile(r"\bCVE-\d{4}-\d{4,7}\b")
+_IOC_MAC_PATTERN = re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})\b")
+# Regex for common Registry hives (HKEY_...)
+_IOC_REGISTRY_PATTERN = re.compile(
+    r"\b(?:HKEY_LOCAL_MACHINE|HKEY_CURRENT_USER|HKEY_CLASSES_ROOT|HKEY_USERS|HKEY_CURRENT_CONFIG|HKLM|HKCU|HKCR|HKU|HKCC)\\[\w\\_-]+\b",
+    re.IGNORECASE,
+)
 
 
 @log_execution(tool_name="extract_iocs")
@@ -30,6 +40,8 @@ def extract_iocs(
     extract_urls: bool = True,
     extract_emails: bool = True,
     extract_bitcoin: bool = True,
+    extract_hashes: bool = True,
+    extract_others: bool = True,  # CVE, Registry, MAC
     limit: int = 100,
 ) -> ToolResult:
     """
@@ -45,6 +57,8 @@ def extract_iocs(
         extract_urls: Whether to extract URLs (default: True)
         extract_emails: Whether to extract email addresses (default: True)
         extract_bitcoin: Whether to extract Bitcoin addresses (default: True)
+        extract_hashes: Whether to extract MD5/SHA1/SHA256 hashes (default: True)
+        extract_others: Whether to extract CVEs, Registry keys, MAC addresses (default: True)
         limit: Maximum number of IOCs to return per category (default: 100)
 
     Returns:
@@ -134,13 +148,57 @@ def extract_iocs(
         iocs["emails"] = emails
         total_count += len(emails)
 
-    # Bitcoin Regex - use pre-compiled pattern
+    # Bitcoin Regex
     if extract_bitcoin:
         bitcoin_addresses = list(set(_IOC_BITCOIN_PATTERN.findall(text)))
         if len(bitcoin_addresses) > limit:
             bitcoin_addresses = bitcoin_addresses[:limit]
         iocs["bitcoin_addresses"] = bitcoin_addresses
         total_count += len(bitcoin_addresses)
+
+    # Hashes (MD5, SHA1, SHA256)
+    if extract_hashes:
+        # MD5
+        md5s = list(set(_IOC_MD5_PATTERN.findall(text)))
+        if len(md5s) > limit:
+            md5s = md5s[:limit]
+        iocs["md5"] = md5s
+        
+        # SHA1
+        sha1s = list(set(_IOC_SHA1_PATTERN.findall(text)))
+        if len(sha1s) > limit:
+            sha1s = sha1s[:limit]
+        iocs["sha1"] = sha1s
+
+        # SHA256
+        sha256s = list(set(_IOC_SHA256_PATTERN.findall(text)))
+        if len(sha256s) > limit:
+            sha256s = sha256s[:limit]
+        iocs["sha256"] = sha256s
+        
+        total_count += len(md5s) + len(sha1s) + len(sha256s)
+
+    # Other IOCs (CVE, Registry, MAC)
+    if extract_others:
+        # CVE
+        cves = list(set(_IOC_CVE_PATTERN.findall(text)))
+        if len(cves) > limit:
+            cves = cves[:limit]
+        iocs["cves"] = cves
+
+        # Registry Keys
+        registry_keys = list(set(_IOC_REGISTRY_PATTERN.findall(text)))
+        if len(registry_keys) > limit:
+            registry_keys = registry_keys[:limit]
+        iocs["registry_keys"] = registry_keys
+
+        # MAC Addresses
+        macs = list(set(_IOC_MAC_PATTERN.findall(text)))
+        if len(macs) > limit:
+            macs = macs[:limit]
+        iocs["mac_addresses"] = macs
+
+        total_count += len(cves) + len(registry_keys) + len(macs)
 
     return success(
         iocs,
