@@ -192,24 +192,38 @@ docker build -f Dockerfile -t reversecore-mcp:latest .
 - **프로토콜 분석기**: 한국 MMO 프로토콜 패턴 탐지 (CS_/SC_, MSG_/PKT_)
 - **함수 패턴 매칭**: 속도 배수, 좌표 조작, 체력 수정 탐지
 
+### 📈 서버 상태 및 모니터링 (신규!)
+
+엔터프라이즈 환경을 위한 내장 관측 가능성 도구:
+
+- **헬스 체크**: 가동 시간, 메모리 사용량, 운영 상태 모니터링 (`get_server_health`)
+- **성능 메트릭**: 도구 실행 시간, 오류율, 호출 횟수 추적 (`get_tool_metrics`)
+- **자동 복구**: 일시적 장애에 대응하는 지수 백오프(exponential backoff) 기반 자동 재시도 메커니즘
+
 ### 📝 리포트 생성 도구 (신규!)
 
 정확한 타임스탬프를 포함한 전문적인 악성코드 분석 리포트 생성:
 
+- **원샷 제출(One-Shot Submission)**: 단일 명령으로 표준화된 JSON 리포트 자동 생성 (`generate_malware_submission`)
 - **세션 추적**: 분석 세션 시작/종료 및 자동 소요 시간 계산
 - **IOC 수집**: 분석 중 지표 수집 및 정리 (해시, IP, 도메인, URL)
 - **MITRE ATT&CK 매핑**: 프레임워크 참조와 함께 기법 문서화
-- **다양한 템플릿**: 전체 분석, 빠른 분류, IOC 요약, 경영진 브리핑
 - **이메일 전송**: 보안 팀에 리포트 직접 전송 (SMTP 지원)
-- **시간대 지원**: UTC, KST, EST, PST, CET 등
 
-```
-# 워크플로우 예시
-get_system_time()                    # 정확한 서버 타임스탬프
+```python
+# 예시 1: 원샷 JSON 제출
+generate_malware_submission(
+    file_path="wannacry.exe",
+    analyst_name="Hunter",
+    tags="ransomware,critical"
+)
+
+# 예시 2: 대화형 세션
+get_system_time()                    
 start_analysis_session(sample_path="malware.exe")
 add_session_ioc("ips", "192.168.1.100")
 add_session_mitre("T1059.001", "PowerShell", "Execution")
-end_analysis_session(summary="랜섬웨어 변종 탐지")
+end_analysis_session(summary="랜섬웨어 탐지")
 create_analysis_report(template_type="full_analysis")
 ```
 

@@ -204,24 +204,38 @@ Specialized tools for game client reverse engineering:
 - **Protocol Analyzer**: Korean MMO protocol pattern detection (CS_/SC_, MSG_/PKT_)
 - **Function Pattern Matching**: Speed multiplier, coordinate manipulation, health modification detection
 
-### 📝 Report Generation Tools (NEW!)
+### � Server Health & Monitoring (NEW!)
+
+Built-in observability tools for enterprise environments:
+
+- **Health Check**: Monitor uptime, memory usage, and operational status (`get_server_health`)
+- **Performance Metrics**: Track tool execution times, error rates, and call counts (`get_tool_metrics`)
+- **Auto-Recovery**: Automatic retry mechanism with exponential backoff for transient failures
+
+### �📝 Report Generation Tools (NEW!)
 
 Professional malware analysis report generation with accurate timestamps:
 
+- **One-Shot Submission**: Generate standardized JSON reports with a single command (`generate_malware_submission`)
 - **Session Tracking**: Start/end analysis sessions with automatic duration calculation
 - **IOC Collection**: Collect and organize indicators during analysis (hashes, IPs, domains, URLs)
 - **MITRE ATT&CK Mapping**: Document techniques with proper framework references
-- **Multiple Templates**: Full analysis, quick triage, IOC summary, executive brief
 - **Email Delivery**: Send reports directly to security teams (SMTP support)
-- **Timezone Support**: UTC, KST, EST, PST, CET and more
 
-```
-# Example workflow
-get_system_time()                    # Accurate server timestamp
+```python
+# Example 1: One-Shot JSON Submission
+generate_malware_submission(
+    file_path="wannacry.exe",
+    analyst_name="Hunter",
+    tags="ransomware,critical"
+)
+
+# Example 2: Interactive Session
+get_system_time()                    
 start_analysis_session(sample_path="malware.exe")
 add_session_ioc("ips", "192.168.1.100")
 add_session_mitre("T1059.001", "PowerShell", "Execution")
-end_analysis_session(summary="Ransomware variant detected")
+end_analysis_session(summary="Ransomware detected")
 create_analysis_report(template_type="full_analysis")
 ```
 
