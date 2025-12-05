@@ -18,8 +18,6 @@ r2pipe>=1.7.0
 # YARA Python bindings
 yara-python==4.5.4
 
-# Capstone disassembly framework
-capstone>=5.0.0
 
 # LIEF binary parsing library
 lief>=0.13.0
