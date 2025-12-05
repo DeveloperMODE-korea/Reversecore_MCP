@@ -17,6 +17,7 @@ Environment Variables:
     DEFAULT_TOOL_TIMEOUT: Default timeout in seconds (default: 120)
     R2_POOL_SIZE: Radare2 connection pool size (default: 3)
     R2_POOL_TIMEOUT: Radare2 pool connection timeout (default: 30)
+    GHIDRA_MAX_PROJECTS: Max Ghidra projects to cache for multi-malware analysis (default: 3)
     REVERSECORE_STRICT_PATHS: Strict path validation mode (default: false)
 """
 
@@ -140,6 +141,21 @@ class Settings(BaseSettings):
         ge=5,
         le=300,
         description="Timeout for acquiring radare2 connection from pool",
+    )
+
+    # Ghidra configuration
+    ghidra_max_projects: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum number of Ghidra projects to cache (higher = more RAM)",
+    )
+
+    # AI Memory configuration
+    memory_db_path: Path = Field(
+        default=Path.home() / ".reversecore_mcp" / "memory.db",
+        alias="MEMORY_DB_PATH",
+        description="Path to AI memory SQLite database",
     )
 
     @field_validator("log_level")
@@ -305,6 +321,10 @@ class Config:
     @property
     def r2_pool_timeout(self) -> int:
         return self._settings.r2_pool_timeout
+
+    @property
+    def ghidra_max_projects(self) -> int:
+        return self._settings.ghidra_max_projects
 
     @classmethod
     def from_env(cls) -> "Config":

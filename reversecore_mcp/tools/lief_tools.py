@@ -28,20 +28,26 @@ def _extract_sections(binary: Any) -> list[dict[str, Any]]:
     ]
 
 
-def _extract_symbols(binary: Any) -> dict[str, Any]:
-    """Extract symbol information (imports/exports) from binary."""
+def _extract_symbols(binary: Any, max_imports: int = 100, max_exports: int = 100) -> dict[str, Any]:
+    """Extract symbol information (imports/exports) from binary.
+    
+    Args:
+        binary: LIEF binary object
+        max_imports: Maximum number of imports to extract (P2 memory protection)
+        max_exports: Maximum number of exports to extract (P2 memory protection)
+    """
     symbols: dict[str, Any] = {}
 
     if hasattr(binary, "imported_functions") and binary.imported_functions:
-        # Use islice to avoid creating full list before slicing
+        # Use islice with configurable limit
         symbols["imported_functions"] = [
-            str(func) for func in islice(binary.imported_functions, 100)
+            str(func) for func in islice(binary.imported_functions, max_imports)
         ]
 
     if hasattr(binary, "exported_functions") and binary.exported_functions:
-        # Use islice to avoid creating full list before slicing
+        # Use islice with configurable limit
         symbols["exported_functions"] = [
-            str(func) for func in islice(binary.exported_functions, 100)
+            str(func) for func in islice(binary.exported_functions, max_exports)
         ]
 
     # PE-specific imports/exports
@@ -50,7 +56,7 @@ def _extract_symbols(binary: Any) -> dict[str, Any]:
         # OPTIMIZATION: Extract function list creation outside the dict to avoid
         # nested comprehension inside loop
         formatted_imports: list[dict[str, Any]] = []
-        for imp in islice(binary.imports, 20):
+        for imp in islice(binary.imports, min(20, max_imports // 5)):
             entries = getattr(imp, "entries", [])
             # Process entries directly without intermediate list conversion
             # Build function list separately for better performance
@@ -127,22 +133,56 @@ def _format_lief_output(result: dict[str, Any], format: str) -> str:
     return "\n".join(lines)
 
 
+# P2: Memory protection thresholds for LIEF parsing
+LIEF_WARN_SIZE_MB = 100    # Warn user about memory usage
+LIEF_LIMIT_SIZE_MB = 500   # Limit extraction to prevent OOM
+
+
 @log_execution(tool_name="parse_binary_with_lief")
 @track_metrics("parse_binary_with_lief")
 @handle_tool_errors
 def parse_binary_with_lief(file_path: str, format: str = "json") -> ToolResult:
-    """Parse binary metadata using LIEF and return structured results."""
+    """Parse binary metadata using LIEF and return structured results.
+    
+    Memory-safe implementation with progressive limits:
+    - Under 100MB: Full parsing with all details
+    - 100-500MB: Warning + reduced extraction limits
+    - Over 500MB: Minimal parsing (headers only)
+    - Over config limit: Rejected
+    """
 
     validated_path = validate_file_path(file_path)
 
     max_file_size = get_config().lief_max_file_size
     file_size = validated_path.stat().st_size
+    file_size_mb = file_size / (1024 * 1024)
+    
     if file_size > max_file_size:
         return failure(
             "FILE_TOO_LARGE",
             f"File size ({file_size} bytes) exceeds maximum allowed size ({max_file_size} bytes)",
             hint="Set LIEF_MAX_FILE_SIZE environment variable to increase limit",
         )
+    
+    # P2: Determine extraction limits based on file size
+    extraction_warning = None
+    if file_size_mb > LIEF_LIMIT_SIZE_MB:
+        # Very large file: minimal extraction
+        max_imports = 10
+        max_exports = 10
+        max_sections = 10
+        extraction_warning = f"Large file ({file_size_mb:.0f}MB): extraction limited to prevent OOM"
+    elif file_size_mb > LIEF_WARN_SIZE_MB:
+        # Large file: reduced extraction
+        max_imports = 50
+        max_exports = 50
+        max_sections = 20
+        extraction_warning = f"Large file ({file_size_mb:.0f}MB): some details may be truncated"
+    else:
+        # Normal file: full extraction
+        max_imports = 100
+        max_exports = 100
+        max_sections = None  # No limit
 
     try:
         import lief
@@ -174,12 +214,19 @@ def parse_binary_with_lief(file_path: str, format: str = "json") -> ToolResult:
         "format": str(binary.format).split(".")[-1].lower(),
         "entry_point": (hex(binary.entrypoint) if hasattr(binary, "entrypoint") else None),
     }
+    
+    # P2: Add warning if extraction was limited
+    if extraction_warning:
+        result_data["_warning"] = extraction_warning
 
+    # P2: Apply extraction limits based on file size
     sections = _extract_sections(binary)
     if sections:
+        if max_sections is not None:
+            sections = sections[:max_sections]
         result_data["sections"] = sections
 
-    symbols = _extract_symbols(binary)
+    symbols = _extract_symbols(binary, max_imports=max_imports, max_exports=max_exports)
     result_data.update(symbols)
 
     if format.lower() == "json":

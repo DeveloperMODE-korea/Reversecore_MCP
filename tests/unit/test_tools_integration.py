@@ -1,7 +1,7 @@
 """Additional coverage tests for low-coverage modules to reach 80%.
 
 Targets: cli_tools, adaptive_vaccine, static_analysis, diff_tools,
-         neural_decompiler, ioc_tools, r2_pool, json_utils
+         dormant_detector, ioc_tools, r2_pool, json_utils
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -96,29 +96,30 @@ class TestDiffToolsDiffBinaries:
 
 
 # ============================================================================
-# Neural Decompiler Tests (59% -> higher)
+# Dormant Detector Tests (replaces neural_decompiler)
 # ============================================================================
 
 
-class TestNeuralDecompilerRegister:
-    """Tests for neural_decompiler registration."""
+class TestDormantDetectorRegister:
+    """Tests for dormant_detector registration."""
 
-    def test_register_neural_decompiler(self):
-        """Test register_neural_decompiler."""
-        from reversecore_mcp.tools.neural_decompiler import register_neural_decompiler
+    def test_register_dormant_detector(self):
+        """Test register_dormant_detector."""
+        from reversecore_mcp.tools.dormant_detector import DormantDetectorPlugin
 
+        plugin = DormantDetectorPlugin()
         mock_mcp = MagicMock()
-        register_neural_decompiler(mock_mcp)
+        plugin.register(mock_mcp)
         mock_mcp.tool.assert_called()
 
 
-class TestNeuralDecompilerMain:
-    """Tests for neural_decompiler main function."""
+class TestDormantDetectorMain:
+    """Tests for dormant_detector main function."""
 
     @pytest.mark.asyncio
-    async def test_neural_decompile_basic(self, patched_workspace_config, workspace_dir):
-        """Test neural_decompile with basic file."""
-        from reversecore_mcp.tools.neural_decompiler import neural_decompile
+    async def test_dormant_detector_basic(self, patched_workspace_config, workspace_dir):
+        """Test dormant_detector with basic file."""
+        from reversecore_mcp.tools.dormant_detector import dormant_detector
 
         test_file = workspace_dir / "test.bin"
         test_file.write_bytes(b"\x7fELF" + b"\x00" * 100)
@@ -127,9 +128,9 @@ class TestNeuralDecompilerMain:
         with patch(
             "reversecore_mcp.core.execution.execute_subprocess_async",
             new_callable=AsyncMock,
-            return_value=("mov eax, 0\nret", ""),
+            return_value=('[{"name": "main", "offset": 4096}]', ""),
         ):
-            result = await neural_decompile(str(test_file), "0x401000")
+            result = await dormant_detector(str(test_file))
             assert result.status in ("success", "error")
 
 
@@ -428,12 +429,12 @@ class TestAdditionalEdgeCases:
     @pytest.mark.asyncio
     async def test_multiple_tool_registrations(self):
         """Test multiple tools can be registered to same MCP."""
-        from reversecore_mcp.tools.ghost_trace import register_ghost_trace
-        from reversecore_mcp.tools.trinity_defense import register_trinity_defense
+        from reversecore_mcp.tools.dormant_detector import DormantDetectorPlugin
+        from reversecore_mcp.tools.vulnerability_hunter import VulnerabilityHunterPlugin
 
         mock_mcp = MagicMock()
-        register_ghost_trace(mock_mcp)
-        register_trinity_defense(mock_mcp)
+        DormantDetectorPlugin().register(mock_mcp)
+        VulnerabilityHunterPlugin().register(mock_mcp)
 
         assert mock_mcp.tool.call_count >= 2
 

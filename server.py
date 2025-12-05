@@ -78,6 +78,15 @@ async def server_lifespan(server: FastMCP):
     # 3. Start Resource Manager
     await resource_manager.start()
 
+    # 4. Initialize AI Memory Store
+    from reversecore_mcp.core.memory import initialize_memory_store
+
+    try:
+        await initialize_memory_store()
+        logger.info("✅ AI Memory store initialized")
+    except Exception as e:
+        logger.warning(f"⚠️ Memory store initialization failed: {e}")
+
     # ============================================================================
     # SERVER RUNNING (yield control)
     # ============================================================================
@@ -90,6 +99,16 @@ async def server_lifespan(server: FastMCP):
 
     # Stop Resource Manager
     await resource_manager.stop()
+
+    # Close AI Memory Store
+    from reversecore_mcp.core.memory import get_memory_store
+
+    try:
+        memory_store = get_memory_store()
+        await memory_store.close()
+        logger.info("💾 AI Memory store closed")
+    except Exception as e:
+        logger.debug(f"Memory store close: {e}")
 
     # Cleanup temporary files
     try:

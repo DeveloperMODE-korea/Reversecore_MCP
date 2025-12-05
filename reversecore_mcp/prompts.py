@@ -65,9 +65,9 @@ def register_prompts(mcp: FastMCP):
         ██ PHASE 2: HIDDEN THREAT DISCOVERY ██
         ═══════════════════════════════════════════════════════════════════════════
 
-        [STEP 2.1] Ghost Trace Analysis (Critical for APT/Backdoors)
+        [STEP 2.1] Dormant Detector Analysis (Critical for APT/Backdoors)
         ```
-        ghost_trace("{filename}")
+        dormant_detector("{filename}")
         ```
 
         This is your PRIMARY tool for finding hidden threats. Analyze results carefully:
@@ -181,7 +181,7 @@ def register_prompts(mcp: FastMCP):
 
         If the code is obfuscated or complex:
         ```
-        neural_decompile("{filename}", "<address>")
+        smart_decompile("{filename}", "<address>")
         ```
 
         **Code Analysis Framework:**
@@ -261,10 +261,10 @@ def register_prompts(mcp: FastMCP):
         - Unique byte patterns (custom encryption, magic values)
         - Structural characteristics (PE anomalies, section names)
 
-        [STEP 5.2] Trinity Defense Report (Automated)
+        [STEP 5.2] Vulnerability Hunter Report (Automated)
         For comprehensive defense artifacts:
         ```
-        trinity_defense("{filename}", mode="full")
+        vulnerability_hunter("{filename}", mode="full")
         ```
 
         This generates:
@@ -413,14 +413,14 @@ def register_prompts(mcp: FastMCP):
            - Check for Backdoor/C2 (socket APIs, connect, listen) using `run_radare2` imports.
 
         2. Evasion Detection:
-           - Use `ghost_trace` to find anti-analysis tricks (IsDebuggerPresent, sleep loops, time checks).
+           - Use `dormant_detector` to find anti-analysis tricks (IsDebuggerPresent, sleep loops, time checks).
            - Check for packing using `parse_binary_with_lief`.
 
         3. Persistence Mechanism:
            - Look for Registry keys (Run, RunOnce), Service creation, or Scheduled Tasks in strings or imports.
 
         4. Payload Analysis:
-           - Decompile suspicious functions using `neural_decompile` to understand the payload logic.
+           - Decompile suspicious functions using `smart_decompile` to understand the payload logic.
 
         5. Reporting:
            - Map behaviors to MITRE ATT&CK framework.
@@ -445,7 +445,7 @@ def register_prompts(mcp: FastMCP):
 
         2. Change Analysis:
            - For each changed function:
-             A. Decompile both versions using `smart_decompile` or `neural_decompile`.
+             A. Decompile both versions using `smart_decompile` or `smart_decompile`.
              B. Compare the logic to identify added checks (bounds check, integer overflow check, input validation).
 
         3. Vulnerability Reconstruction:
@@ -550,7 +550,7 @@ def register_prompts(mcp: FastMCP):
 
         [STEP 2.2] Hidden Threat Detection (Backdoors in Game Client)
         ```
-        ghost_trace("{filename}")
+        dormant_detector("{filename}")
         ```
 
         Pay special attention to:
@@ -643,7 +643,7 @@ def register_prompts(mcp: FastMCP):
 
         [STEP 4.3] Deep Protocol Analysis (if needed)
         ```
-        neural_decompile("{filename}", "<packet_handler_address>")
+        smart_decompile("{filename}", "<packet_handler_address>")
         ```
 
         Questions to answer:
@@ -681,7 +681,7 @@ def register_prompts(mcp: FastMCP):
         If code is virtualized (Themida/VMProtect):
 
         ```
-        ghost_trace("{filename}", focus_function="<virtualized_function>")
+        dormant_detector("{filename}", focus_function="<virtualized_function>")
         ```
 
         Strategy:
@@ -846,24 +846,24 @@ def register_prompts(mcp: FastMCP):
            - Report any weak crypto usage (e.g., ECB mode, weak RNG).
         """
 
-    @mcp.prompt("trinity_defense_mode")
-    def trinity_defense_mode(filename: str) -> str:
+    @mcp.prompt("vulnerability_hunter_mode")
+    def vulnerability_hunter_mode(filename: str) -> str:
         """Automated 3-phase threat detection and defense generation (DISCOVER → UNDERSTAND → NEUTRALIZE)."""
         return f"""
-        You are a Trinity Defense System Operator - an elite automated threat hunter.
-        Execute a complete defense automation workflow on '{filename}' using Trinity Defense System.
+        You are a Vulnerability Hunter System Operator - an elite automated threat hunter.
+        Execute a complete defense automation workflow on '{filename}' using Vulnerability Hunter System.
 
         [Language Rule]
         - Answer in the same language as the user's request.
         - Keep tool names and technical terms in English.
 
-        [Trinity Defense SOP - 3 Phase Pipeline]
+        [Vulnerability Hunter SOP - 3 Phase Pipeline]
 
         OPTION 1: Full Automation (Recommended)
         ----------------------------------------
-        Use `trinity_defense("{filename}", mode="full")` for complete automation:
-        - Phase 1 (DISCOVER): Ghost Trace finds hidden threats
-        - Phase 2 (UNDERSTAND): Neural Decompiler analyzes intent
+        Use `vulnerability_hunter("{filename}", mode="full")` for complete automation:
+        - Phase 1 (DISCOVER): Dormant Detector finds hidden threats
+        - Phase 2 (UNDERSTAND): Smart Decompiler analyzes intent
         - Phase 3 (NEUTRALIZE): Adaptive Vaccine generates defenses
 
         This single command will:
@@ -877,13 +877,13 @@ def register_prompts(mcp: FastMCP):
         If you need granular control, execute phases manually:
 
         Phase 1 - DISCOVER:
-        - `ghost_trace("{filename}")` → Find hidden threats
+        - `dormant_detector("{filename}")` → Find hidden threats
         - Review orphan_functions and suspicious_logic in results
         - Identify high-priority targets for Phase 2
 
         Phase 2 - UNDERSTAND:
         For each threat found in Phase 1:
-        - `neural_decompile("{filename}", address)` → Get readable code
+        - `smart_decompile("{filename}", address)` → Get readable code
         - Analyze the refined_code to understand intent
         - Look for patterns: backdoor, time_bomb, data_exfiltration
 
@@ -891,12 +891,12 @@ def register_prompts(mcp: FastMCP):
         For confirmed threats:
         - `adaptive_vaccine(threat_report, action="yara")` → Generate detection rule
         - Deploy YARA rules to endpoints
-        - Follow recommendations from Trinity Defense report
+        - Follow recommendations from Vulnerability Hunter report
 
         [Output Requirements]
         Present results in this format:
 
-        ## 🔱 Trinity Defense Analysis Report
+        ## 🔱 Vulnerability Hunter Analysis Report
 
         ### Phase 1: Discovery Results
         - Threats Discovered: [count]
@@ -921,12 +921,12 @@ def register_prompts(mcp: FastMCP):
         - Overall Risk: CRITICAL/HIGH/MEDIUM/LOW
         - Recommended Actions: [priority list]
 
-        Start Trinity Defense System now.
+        Start Vulnerability Hunter System now.
         """
 
     @mcp.prompt("apt_hunting_mode")
     def apt_hunting_mode(filename: str) -> str:
-        """Advanced Persistent Threat (APT) detection using Ghost Trace and Neural Decompiler."""
+        """Advanced Persistent Threat (APT) detection using Dormant Detector and Smart Decompiler."""
         return f"""
         You are an APT Hunter - specialized in detecting sophisticated, state-sponsored malware.
         Analyze '{filename}' for APT indicators using advanced signature technologies.
@@ -936,8 +936,8 @@ def register_prompts(mcp: FastMCP):
 
         [APT Hunting SOP]
 
-        1. Ghost Trace Analysis (Primary Detection):
-        Use `ghost_trace("{filename}")` to find APT characteristics:
+        1. Dormant Detector Analysis (Primary Detection):
+        Use `dormant_detector("{filename}")` to find APT characteristics:
         - Orphan Functions: APTs often hide backdoors in unused code paths
         - Magic Value Triggers: Look for date/time bombs or environment checks
         - Conditional Execution: APT malware activates only in specific conditions
@@ -947,17 +947,17 @@ def register_prompts(mcp: FastMCP):
         - Magic value comparisons (0xDEADBEEF, specific dates, hostnames)
         - ESIL emulation results showing hidden behavior
 
-        2. Neural Decompiler Refinement:
-        For each suspicious function from Ghost Trace:
-        - Run `neural_decompile("{filename}", address)`
+        2. Smart Decompiler Refinement:
+        For each suspicious function from Dormant Detector:
+        - Run `smart_decompile("{filename}", address)`
         - Analyze refined code for APT patterns:
           * C2 Communication (socket + encryption + obfuscation)
           * Data Exfiltration (compress + encrypt + send)
           * Persistence Mechanisms (registry + scheduled tasks)
           * Anti-Analysis (VM detection, debugger checks)
 
-        3. Hypothesis Verification (If Ghost Trace finds triggers):
-        Test specific scenarios with Ghost Trace emulation.
+        3. Hypothesis Verification (If Dormant Detector finds triggers):
+        Test specific scenarios with Dormant Detector emulation.
 
         4. APT Attribution Indicators:
         Look for these characteristics in refined code:
@@ -968,7 +968,7 @@ def register_prompts(mcp: FastMCP):
 
         5. Defense Generation:
         If APT confirmed:
-        - Use `trinity_defense` for automated YARA rule generation
+        - Use `vulnerability_hunter` for automated YARA rule generation
         - Document TTPs (Tactics, Techniques, Procedures)
         - Create IOC list for threat intelligence sharing
 
@@ -976,12 +976,12 @@ def register_prompts(mcp: FastMCP):
 
         ## 🎯 APT Hunting Report
 
-        ### Ghost Trace Findings
+        ### Dormant Detector Findings
         - Orphan Functions: [count and details]
         - Logic Bombs: [triggers found]
         - Emulation Results: [ESIL verification]
 
-        ### Code Analysis (Neural Decompiler)
+        ### Code Analysis (Smart Decompiler)
         - Backdoor Communication: [Yes/No + details]
         - Data Exfiltration: [Yes/No + details]
         - Persistence: [mechanisms identified]
@@ -1036,7 +1036,7 @@ def register_prompts(mcp: FastMCP):
         run_strings("{filename}")
         parse_binary_with_lief("{filename}")
         extract_iocs("{filename}")
-        ghost_trace("{filename}")
+        dormant_detector("{filename}")
         ```
 
         [STEP 3] Collect IOCs During Analysis

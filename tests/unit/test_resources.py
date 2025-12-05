@@ -433,8 +433,8 @@ class TestDynamicResources:
             assert "Total functions: 2" in result
 
     @pytest.mark.asyncio
-    async def test_get_trinity_defense_report_success(self, mock_mcp):
-        """Test trinity defense report resource."""
+    async def test_get_dormant_detector_report_success(self, mock_mcp):
+        """Test dormant detector report resource."""
         registered_funcs = {}
 
         def capture_resource(uri):
@@ -447,48 +447,31 @@ class TestDynamicResources:
         mock_mcp.resource = capture_resource
         register_resources(mock_mcp)
 
-        trinity_func = registered_funcs.get("reversecore://{filename}/trinity_defense")
-        assert trinity_func is not None
+        dormant_func = registered_funcs.get("reversecore://{filename}/dormant_detector")
+        assert dormant_func is not None
 
-        # Mock trinity defense result
+        # Mock dormant detector result
         mock_result = Mock()
         mock_result.status = "success"
         mock_result.data = {
-            "summary": {"threats_discovered": 2, "threats_analyzed": 2, "defenses_generated": 1},
-            "status": "complete",
-            "phase_1_discover": {"orphan_functions": 1, "suspicious_logic": 1, "total_threats": 2},
-            "phase_2_understand": [
-                {
-                    "function": "malware_func",
-                    "address": "0x401000",
-                    "intent": "malicious",
-                    "confidence": 0.9,
-                    "reason": "Suspicious API usage",
-                }
+            "orphan_functions": [
+                {"name": "orphan1", "address": "0x401000", "size": 100, "xrefs": 0}
             ],
-            "phase_3_neutralize": ["rule1"],
-            "recommendations": [
-                {
-                    "severity": "HIGH",
-                    "threat_type": "Malware",
-                    "location": "0x401000",
-                    "confidence": 0.9,
-                    "immediate_actions": ["Isolate binary", "Block execution"],
-                }
+            "suspicious_logic": [
+                {"function": "suspicious1", "address": "0x402000", "instruction": "cmp eax, 0xdeadbeef", "reason": "Magic values"}
             ],
         }
 
         with patch(
-            "reversecore_mcp.tools.trinity_defense.trinity_defense", return_value=mock_result
+            "reversecore_mcp.tools.dormant_detector.dormant_detector", return_value=mock_result
         ):
-            result = await trinity_func("test.exe")
-            assert "🔱 Trinity Defense System Report" in result
-            assert "Threats Discovered" in result
-            assert "Phase 1: DISCOVER" in result
+            result = await dormant_func("test.exe")
+            assert "Dormant Detector" in result
+            assert "Orphan Functions" in result
 
     @pytest.mark.asyncio
-    async def test_get_trinity_defense_report_failure(self, mock_mcp):
-        """Test trinity defense report resource when it fails."""
+    async def test_get_dormant_detector_report_failure(self, mock_mcp):
+        """Test dormant detector report resource when it fails."""
         registered_funcs = {}
 
         def capture_resource(uri):
@@ -501,95 +484,19 @@ class TestDynamicResources:
         mock_mcp.resource = capture_resource
         register_resources(mock_mcp)
 
-        trinity_func = registered_funcs.get("reversecore://{filename}/trinity_defense")
-        assert trinity_func is not None
+        dormant_func = registered_funcs.get("reversecore://{filename}/dormant_detector")
+        assert dormant_func is not None
 
-        # Mock trinity defense failure
+        # Mock dormant detector failure
         mock_result = Mock()
         mock_result.status = "error"
         mock_result.message = "Analysis failed"
 
         with patch(
-            "reversecore_mcp.tools.trinity_defense.trinity_defense", return_value=mock_result
+            "reversecore_mcp.tools.dormant_detector.dormant_detector", return_value=mock_result
         ):
-            result = await trinity_func("test.exe")
-            assert "Trinity Defense analysis failed" in result
-
-    @pytest.mark.asyncio
-    async def test_get_ghost_trace_report_success(self, mock_mcp):
-        """Test ghost trace report resource."""
-        registered_funcs = {}
-
-        def capture_resource(uri):
-            def decorator(func):
-                registered_funcs[uri] = func
-                return func
-
-            return decorator
-
-        mock_mcp.resource = capture_resource
-        register_resources(mock_mcp)
-
-        ghost_func = registered_funcs.get("reversecore://{filename}/ghost_trace")
-        assert ghost_func is not None
-
-        # Mock ghost trace result
-        mock_result = Mock()
-        mock_result.status = "success"
-        mock_result.data = {
-            "mode": "discover",
-            "orphan_functions": [
-                {"function": "orphan1", "address": "0x401000", "reason": "No xrefs"}
-            ],
-            "suspicious_logic": [
-                {"function": "suspicious1", "address": "0x402000", "reason": "Magic values"}
-            ],
-        }
-
-        with patch("reversecore_mcp.tools.ghost_trace.ghost_trace", return_value=mock_result):
-            result = await ghost_func("test.exe")
-            assert "👻 Ghost Trace Report" in result or "Ghost Trace" in result
-
-    @pytest.mark.asyncio
-    async def test_get_neural_decompiler_report_success(self, mock_mcp):
-        """Test neural decompiler report resource."""
-        registered_funcs = {}
-
-        def capture_resource(uri):
-            def decorator(func):
-                registered_funcs[uri] = func
-                return func
-
-            return decorator
-
-        mock_mcp.resource = capture_resource
-        register_resources(mock_mcp)
-
-        # Use correct URI
-        neural_func = registered_funcs.get(
-            "reversecore://{filename}/func/{address}/neural_decompile"
-        )
-        assert neural_func is not None
-
-        # Mock neural decompiler result
-        mock_result = Mock()
-        mock_result.status = "success"
-        mock_result.data = {
-            "neural_code": "void steal_data() { send_to_server(data); }",
-            "ghidra_code": "void FUN_00401000() { uVar1 = 0; }",
-            "refinement_stats": {
-                "variables_renamed": 5,
-                "structures_inferred": 2,
-                "comments_added": 3,
-            },
-        }
-
-        with patch(
-            "reversecore_mcp.tools.neural_decompiler.neural_decompile", return_value=mock_result
-        ):
-            result = await neural_func("test.exe", "0x401000")
-            assert "🧠 Neural Decompiler" in result
-            assert "AI-Refined Code" in result
+            result = await dormant_func("test.exe")
+            assert "Dormant Detector analysis failed" in result
 
     @pytest.mark.asyncio
     async def test_get_file_strings_exception(self, mock_mcp):

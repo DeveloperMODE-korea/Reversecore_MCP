@@ -69,10 +69,21 @@ class GhidraService:
         self._jvm_started = False
         self._projects: dict[str, Any] = {}
         self._project_lock = threading.RLock()
-        self._max_projects = 1  # Limit to prevent OOM
+        self._max_projects: int | None = None  # Lazy-loaded from config
         self._pyghidra = None
         self._flat_program_api = None
         self._initialized = True
+
+    @property
+    def max_projects(self) -> int:
+        """Get max projects from config (lazy-loaded)."""
+        if self._max_projects is None:
+            try:
+                from reversecore_mcp.core.config import get_config
+                self._max_projects = get_config().ghidra_max_projects
+            except Exception:
+                self._max_projects = 3  # Default fallback
+        return self._max_projects
 
     def is_available(self) -> bool:
         """Check if Ghidra and PyGhidra are available."""
@@ -151,9 +162,13 @@ class GhidraService:
                 return val
 
             # Evict if needed (LRU)
-            if len(self._projects) >= self._max_projects:
-                oldest_path, _ = self._projects.popitem()
+            while len(self._projects) >= self.max_projects:
+                oldest_path, (_, _, old_ctx) = self._projects.popitem(last=False)
                 logger.info(f"Evicting Ghidra project: {oldest_path}")
+                try:
+                    old_ctx.__exit__(None, None, None)
+                except Exception as e:
+                    logger.warning(f"Error closing evicted project: {e}")
 
             logger.info(f"Loading Ghidra project: {file_path}")
             ctx = self._pyghidra.open_program(file_path)

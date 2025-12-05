@@ -1,5 +1,5 @@
 """
-Ghost Trace: Hybrid Reverse Engineering Tool.
+Dormant Detector: Hybrid Reverse Engineering Tool.
 
 This tool combines static analysis and partial emulation to detect hidden malicious behaviors
 (Logic Bombs, Dormant Malware) that are often missed by traditional dynamic analysis.
@@ -95,9 +95,9 @@ def _validate_r2_identifier(identifier: str) -> str:
     )
 
 
-def register_ghost_trace(mcp: FastMCP) -> None:
-    """Register the Ghost Trace tool with the FastMCP server."""
-    mcp.tool(ghost_trace)
+def register_dormant_detector(mcp: FastMCP) -> None:
+    """Register the Dormant Detector tool with the FastMCP server."""
+    mcp.tool(dormant_detector)
 
 
 def _get_file_cache_key(file_path: str) -> str:
@@ -160,10 +160,10 @@ async def _run_r2_cmd(
     return output
 
 
-@log_execution(tool_name="ghost_trace")
-@track_metrics("ghost_trace")
+@log_execution(tool_name="dormant_detector")
+@track_metrics("dormant_detector")
 @handle_tool_errors
-async def ghost_trace(
+async def dormant_detector(
     file_path: str,
     focus_function: str | None = None,
     hypothesis: dict[str, Any] | None = None,
@@ -171,7 +171,7 @@ async def ghost_trace(
     ctx: Context = None,
 ) -> ToolResult:
     """
-    Detect hidden malicious behaviors using "Ghost Trace" (Static + Emulation).
+    Detect hidden malicious behaviors using static analysis + emulation.
 
     This tool performs a hybrid analysis:
     1. **Scan**: Finds "Orphan Functions" (not called by main) and "Suspicious Logic" (magic value checks).
@@ -198,14 +198,14 @@ async def ghost_trace(
     # 1. If focus_function is provided, run emulation (Verification Phase)
     if focus_function and hypothesis:
         if ctx:
-            await ctx.info(f"👻 Ghost Trace: Emulating {focus_function} with hypothesis...")
+            await ctx.info(f"� Dormant Detector: Emulating {focus_function} with hypothesis...")
         return await _verify_hypothesis_with_emulation(
             validated_path, focus_function, hypothesis, timeout
         )
 
     # 2. Otherwise, run full scan (Discovery Phase)
     if ctx:
-        await ctx.info("👻 Ghost Trace: Scanning for suspicious logic...")
+        await ctx.info("� Dormant Detector: Scanning for suspicious logic...")
 
     # Run analysis
     # We chain commands: aaa (analyze), aflj (list functions json)
@@ -284,13 +284,13 @@ async def ghost_trace(
 
     if ctx:
         await ctx.report_progress(30, 100)
-        await ctx.info("👻 Ghost Trace: Identifying orphan functions...")
+        await ctx.info("� Dormant Detector: Identifying orphan functions...")
 
     orphans = await _find_orphan_functions(validated_path, functions)
 
     if ctx:
         await ctx.report_progress(60, 100)
-        await ctx.info("👻 Ghost Trace: Analyzing conditional logic...")
+        await ctx.info("� Dormant Detector: Analyzing conditional logic...")
 
     suspicious_logic = await _identify_conditional_paths(
         validated_path, functions[:20], ctx
@@ -522,17 +522,17 @@ async def _verify_hypothesis_with_emulation(
 from reversecore_mcp.core.plugin import Plugin  # noqa: E402
 
 
-class GhostTracePlugin(Plugin):
-    """Plugin for Ghost Trace tool."""
+class DormantDetectorPlugin(Plugin):
+    """Plugin for Dormant Detector tool."""
 
     @property
     def name(self) -> str:
-        return "ghost_trace"
+        return "dormant_detector"
 
     @property
     def description(self) -> str:
         return "Hybrid reverse engineering tool (Static + Emulation) for detecting hidden malicious behaviors."
 
     def register(self, mcp_server: Any) -> None:
-        """Register Ghost Trace tool."""
-        mcp_server.tool(ghost_trace)
+        """Register Dormant Detector tool."""
+        mcp_server.tool(dormant_detector)

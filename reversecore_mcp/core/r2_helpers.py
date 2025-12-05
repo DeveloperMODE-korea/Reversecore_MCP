@@ -23,6 +23,15 @@ from pathlib import Path
 
 from reversecore_mcp.core import json_utils as json
 from reversecore_mcp.core.execution import execute_subprocess_async
+from reversecore_mcp.core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+# File size thresholds for adaptive analysis
+SMALL_FILE_MB = 10      # Files under this use 'aaa' (full analysis)
+MEDIUM_FILE_MB = 50     # Files under this use 'aa' (basic analysis)
+LARGE_FILE_MB = 200     # Files under this use 'aab' (minimal analysis)
+# Files over LARGE_FILE_MB use '-n' (no analysis)
 
 # OPTIMIZATION: Pre-compile patterns for better performance
 _ADDRESS_PREFIX_PATTERN = re.compile(r"(0x|sym\.|fcn\.)")
@@ -101,31 +110,92 @@ def calculate_dynamic_timeout(file_path: str, base_timeout: int = 300) -> int:
         return base_timeout
 
 
+@lru_cache(maxsize=256)
+def get_adaptive_analysis_level(file_path: str, requested_level: str = "aaa") -> str:
+    """
+    Determine optimal analysis level based on file size.
+    
+    This prevents timeout/OOM issues on large binaries while maintaining
+    quality for smaller files.
+    
+    Args:
+        file_path: Path to the binary file
+        requested_level: Requested analysis level (may be overridden)
+        
+    Returns:
+        Optimal analysis level for the file size
+    """
+    # If user explicitly requested no analysis, respect that
+    if requested_level == "-n":
+        return "-n"
+    
+    try:
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    except OSError:
+        return requested_level  # Can't determine size, use requested
+    
+    # Adaptive analysis based on file size
+    if file_size_mb < SMALL_FILE_MB:
+        # Small files: full analysis is fast
+        return "aaa"
+    elif file_size_mb < MEDIUM_FILE_MB:
+        # Medium files: basic analysis only
+        logger.debug(f"File {file_size_mb:.1f}MB > {SMALL_FILE_MB}MB, using 'aa' instead of 'aaa'")
+        return "aa"
+    elif file_size_mb < LARGE_FILE_MB:
+        # Large files: minimal analysis
+        logger.debug(f"File {file_size_mb:.1f}MB > {MEDIUM_FILE_MB}MB, using 'aab' (minimal analysis)")
+        return "aab"
+    else:
+        # Very large files: no analysis to prevent timeout
+        logger.warning(f"File {file_size_mb:.1f}MB > {LARGE_FILE_MB}MB, skipping analysis")
+        return "-n"
+
+
 def build_r2_cmd(file_path: str, r2_commands: list[str], analysis_level: str = "aaa") -> list[str]:
     """
-    Build radare2 command.
+    Build radare2 command with adaptive analysis.
 
-    Simplified version: Always run analysis if requested, skipping project persistence
-    to avoid permission issues and 'exit 1' errors in Docker environments.
+    Automatically adjusts analysis level based on file size to prevent
+    timeouts on large binaries.
 
     Args:
         file_path: Path to the binary file
         r2_commands: List of radare2 commands to execute
-        analysis_level: Analysis level ("aaa", "aa", "-n")
+        analysis_level: Requested analysis level (may be adjusted)
 
     Returns:
         Complete command list for subprocess execution
     """
     base_cmd = ["r2", "-q"]
+    
+    # Apply adaptive analysis based on file size
+    effective_level = get_adaptive_analysis_level(file_path, analysis_level)
 
-    # If we just want to run commands without analysis (adaptive analysis)
-    if analysis_level == "-n":
+    # If no analysis requested/determined
+    if effective_level == "-n":
         return base_cmd + ["-n"] + ["-c", ";".join(r2_commands), str(file_path)]
 
-    # Always run analysis + commands
+    # Run with analysis
     # We use 'e scr.color=0' to ensure no color codes in output
-    combined_cmds = ["e scr.color=0", analysis_level] + r2_commands
+    combined_cmds = ["e scr.color=0", effective_level] + r2_commands
     return base_cmd + ["-c", ";".join(combined_cmds), str(file_path)]
+
+
+# Global reference to r2_pool (lazy-loaded to avoid circular imports)
+_r2_pool = None
+
+
+def _get_r2_pool():
+    """Get r2_pool singleton, lazy-loading to avoid circular imports."""
+    global _r2_pool
+    if _r2_pool is None:
+        try:
+            from reversecore_mcp.core.r2_pool import r2_pool
+            _r2_pool = r2_pool
+        except ImportError:
+            pass
+    return _r2_pool
 
 
 async def execute_r2_command(
@@ -134,33 +204,61 @@ async def execute_r2_command(
     analysis_level: str = "aaa",
     max_output_size: int = 10_000_000,
     base_timeout: int = 300,
+    skip_cache: bool = False,
 ) -> tuple[str, int]:
     """
-    Execute radare2 commands with common pattern.
+    Execute radare2 commands with analysis caching.
 
     This helper consolidates the repeated pattern of:
-    1. Calculate dynamic timeout
-    2. Build r2 command
-    3. Execute subprocess
+    1. Check if file already analyzed (cache hit = skip analysis)
+    2. Calculate dynamic timeout
+    3. Build r2 command with adaptive analysis level
+    4. Execute subprocess
+    5. Mark file as analyzed for future calls
+
+    Performance optimization:
+    - First call: runs full analysis (slow)
+    - Subsequent calls: skips analysis (fast) - uses cached r2 session
 
     Args:
         file_path: Path to the binary file (already validated)
         r2_commands: List of radare2 commands to execute
-        analysis_level: Analysis level ("aaa", "aa", "-n")
+        analysis_level: Requested analysis level (may be adapted)
         max_output_size: Maximum output size in bytes
         base_timeout: Base timeout in seconds
+        skip_cache: Force fresh analysis (ignore cache)
 
     Returns:
         Tuple of (output, bytes_read)
     """
-    effective_timeout = calculate_dynamic_timeout(str(file_path), base_timeout)
-    cmd = build_r2_cmd(str(file_path), r2_commands, analysis_level)
+    file_path_str = str(file_path)
+    pool = _get_r2_pool()
+    
+    # Check if file was already analyzed (P0 optimization)
+    already_analyzed = False
+    if pool and not skip_cache:
+        already_analyzed = pool.is_analyzed(file_path_str)
+        if already_analyzed:
+            # Skip analysis - file already analyzed in this session
+            logger.debug(f"Cache hit: skipping analysis for {file_path_str}")
+            analysis_level = "-n"  # No analysis needed
+    
+    # Apply adaptive analysis based on file size (P1 optimization)
+    effective_level = get_adaptive_analysis_level(file_path_str, analysis_level)
+    
+    effective_timeout = calculate_dynamic_timeout(file_path_str, base_timeout)
+    cmd = build_r2_cmd(file_path_str, r2_commands, effective_level)
 
     output, bytes_read = await execute_subprocess_async(
         cmd,
         max_output_size=max_output_size,
         timeout=effective_timeout,
     )
+    
+    # Mark file as analyzed for future calls (if analysis was performed)
+    if pool and effective_level not in ("-n",) and not already_analyzed:
+        pool.mark_analyzed(file_path_str)
+        logger.debug(f"Marked {file_path_str} as analyzed (level: {effective_level})")
 
     return output, bytes_read
 

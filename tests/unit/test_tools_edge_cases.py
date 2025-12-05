@@ -150,17 +150,17 @@ class TestDiffToolsFinal:
 
 
 # ============================================================================
-# Neural Decompiler additional tests
+# Dormant Detector additional tests
 # ============================================================================
 
 
-class TestNeuralDecompilerFinal:
-    """Final tests for neural_decompiler."""
+class TestDormantDetectorFinal:
+    """Final tests for dormant_detector."""
 
     @pytest.mark.asyncio
-    async def test_neural_decompile_basic(self, patched_workspace_config, workspace_dir):
-        """Test neural_decompile basic call."""
-        from reversecore_mcp.tools.neural_decompiler import neural_decompile
+    async def test_dormant_detector_basic(self, patched_workspace_config, workspace_dir):
+        """Test dormant_detector basic call."""
+        from reversecore_mcp.tools.dormant_detector import dormant_detector
 
         test_file = workspace_dir / "test.bin"
         test_file.write_bytes(b"\x7fELF" + b"\x00" * 100)
@@ -168,9 +168,9 @@ class TestNeuralDecompilerFinal:
         with patch(
             "reversecore_mcp.core.execution.execute_subprocess_async",
             new_callable=AsyncMock,
-            return_value=("// Decompiled code", ""),
+            return_value=('{"traces": []}', ""),
         ):
-            result = await neural_decompile(str(test_file), "0x401000")
+            result = await dormant_detector(str(test_file))
             assert result.status in ("success", "error")
 
 
@@ -198,17 +198,17 @@ class TestYaraToolsFinal:
 
 
 # ============================================================================
-# Trinity Defense additional tests
+# Vulnerability Hunter additional tests
 # ============================================================================
 
 
-class TestTrinityDefenseFinal:
-    """Final tests for trinity_defense."""
+class TestVulnerabilityHunterFinal:
+    """Final tests for vulnerability_hunter."""
 
     @pytest.mark.asyncio
-    async def test_trinity_defense_basic(self, patched_workspace_config, workspace_dir):
-        """Test trinity_defense basic call."""
-        from reversecore_mcp.tools.trinity_defense import trinity_defense
+    async def test_vulnerability_hunter_basic(self, patched_workspace_config, workspace_dir):
+        """Test vulnerability_hunter basic call."""
+        from reversecore_mcp.tools.vulnerability_hunter import vulnerability_hunter
 
         test_file = workspace_dir / "test.bin"
         test_file.write_bytes(b"\x7fELF" + b"\x00" * 100)
@@ -218,32 +218,7 @@ class TestTrinityDefenseFinal:
             new_callable=AsyncMock,
             return_value=('{"result": "clean"}', ""),
         ):
-            result = await trinity_defense(str(test_file))
-            assert result.status in ("success", "error")
-
-
-# ============================================================================
-# Ghost Trace additional tests
-# ============================================================================
-
-
-class TestGhostTraceFinal:
-    """Final tests for ghost_trace."""
-
-    @pytest.mark.asyncio
-    async def test_ghost_trace_basic(self, patched_workspace_config, workspace_dir):
-        """Test ghost_trace basic call."""
-        from reversecore_mcp.tools.ghost_trace import ghost_trace
-
-        test_file = workspace_dir / "test.bin"
-        test_file.write_bytes(b"\x7fELF" + b"\x00" * 100)
-
-        with patch(
-            "reversecore_mcp.core.execution.execute_subprocess_async",
-            new_callable=AsyncMock,
-            return_value=('{"traces": []}', ""),
-        ):
-            result = await ghost_trace(str(test_file))
+            result = await vulnerability_hunter(str(test_file))
             assert result.status in ("success", "error")
 
 
