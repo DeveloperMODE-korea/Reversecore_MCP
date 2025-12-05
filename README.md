@@ -52,7 +52,7 @@ chmod +x ./scripts/install-ghidra.sh
    ```bash
    # Linux/macOS (~/.bashrc or ~/.zshrc)
    export GHIDRA_INSTALL_DIR=/path/to/ghidra_11.4.3_PUBLIC_YYYYMMDD
-   
+
    # Windows (PowerShell - permanent)
    [Environment]::SetEnvironmentVariable("GHIDRA_INSTALL_DIR", "C:\path\to\ghidra", "User")
    ```
@@ -154,6 +154,18 @@ Add to `~/.cursor/mcp.json`:
 }
 ```
 </details>
+
+> ⚠️ **IMPORTANT: File Path Usage in Docker**
+>
+> The MCP server runs inside a Docker container. When using analysis tools, **use only the filename, not the full local path**.
+>
+> | ❌ Wrong | ✅ Correct |
+> |----------|-----------|
+> | `run_file("/Users/john/Reversecore_Workspace/sample.exe")` | `run_file("sample.exe")` |
+>
+> **Why?** Your local path (e.g., `/Users/.../Reversecore_Workspace/`) is mounted to `/app/workspace/` inside the container. Tools automatically look for files in the workspace directory.
+>
+> **Tip:** Use `list_workspace()` to see all available files in your workspace.
 
 ## ✨ Key Features
 

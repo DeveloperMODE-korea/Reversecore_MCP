@@ -1,8 +1,40 @@
 from fastmcp import FastMCP
 
+# Common path rule instruction for Docker environment
+# This constant is included in prompts to guide AI clients on proper file path usage
+DOCKER_PATH_RULE = """
+[CRITICAL: File Path Rule for Docker Environment]
+- This server runs in a Docker container with workspace at /app/workspace/
+- When the user provides a full path like "/Users/.../file.exe", extract ONLY the filename
+- Example: "/Users/john/Reversecore_Workspace/sample.exe" → use "sample.exe"
+- First, ALWAYS run `list_workspace()` to verify the file exists in the workspace
+- If the file is not in the workspace, inform the user to copy it there first
+"""
+
 
 def register_prompts(mcp: FastMCP):
-    """Registers analysis scenarios (prompts) to the server."""
+    """
+    Registers analysis scenarios (prompts) to the server.
+
+    [IMPORTANT: Docker Environment Path Rules]
+    ==========================================
+    This MCP server runs inside a Docker container with an isolated workspace.
+
+    Path Mapping:
+    - Host path: /Users/<username>/Reversecore_Workspace/<file>
+    - Container path: /app/workspace/<file>
+
+    When using tools, ALWAYS use only the FILENAME (not full path):
+    ✅ Correct: run_file("wannacry_sample.exe")
+    ❌ Wrong: run_file("/Users/john/Reversecore_Workspace/wannacry_sample.exe")
+
+    The container automatically looks for files in /app/workspace/.
+    Files must be placed in the host's Reversecore_Workspace directory
+    to be accessible by the analysis tools.
+
+    To list available files in the workspace:
+    - Use `list_workspace()` tool to see all accessible files
+    """
 
     @mcp.prompt("full_analysis_mode")
     def full_analysis_mode(filename: str) -> str:
@@ -23,6 +55,12 @@ def register_prompts(mcp: FastMCP):
         [Language Rule]
         - Answer in the same language as the user's request.
         - Keep technical terms (API names, addresses, opcodes) in English.
+
+        [CRITICAL: File Path Rule for Docker Environment]
+        - This server runs in a Docker container with workspace at /app/workspace/
+        - When the user provides a full path like "/Users/.../file.exe", extract ONLY the filename
+        - Example: "/Users/john/Reversecore_Workspace/sample.exe" → use "sample.exe"
+        - First, ALWAYS run `list_workspace()` to verify the file exists in the workspace
 
         ═══════════════════════════════════════════════════════════════════════════
         ██ PHASE 1: INITIAL TRIAGE & THREAT CLASSIFICATION ██
@@ -406,6 +444,10 @@ def register_prompts(mcp: FastMCP):
         [Language Rule]
         - Answer in the same language as the user's request.
 
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the file exists
+
         [Analysis SOP]
         1. Behavioral Triage:
            - Check for Ransomware indicators (crypto constants, file enumeration) using `run_yara` and `run_strings`.
@@ -438,6 +480,10 @@ def register_prompts(mcp: FastMCP):
         [Language Rule]
         - Answer in the same language as the user's request.
 
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{original_binary}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the files exist
+
         [Analysis SOP]
         1. Binary Diffing:
            - Run `diff_binaries("{original_binary}", "{patched_binary}")` to find changed functions.
@@ -467,7 +513,10 @@ def register_prompts(mcp: FastMCP):
 
         [Language Rule]
         - Answer in the same language as the user's request (Korean/English/Chinese, etc.).
-        - Answer in the same language as the user's request.
+
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the file exists
 
         [Analysis SOP (Standard Operating Procedure)]
         Never use time-consuming deep analysis tools (Ghidra, Decompile, Emulation).
@@ -511,6 +560,10 @@ def register_prompts(mcp: FastMCP):
         [Language Rule]
         - Answer in the same language as the user's request.
         - Keep technical terms (API names, addresses, opcodes) in English.
+
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the file exists
 
         ═══════════════════════════════════════════════════════════════════════════
         ██ PHASE 1: RECONNAISSANCE & ENGINE IDENTIFICATION ██
@@ -780,6 +833,10 @@ def register_prompts(mcp: FastMCP):
         [Language Rule]
         - Answer in the same language as the user's request.
 
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the file exists
+
         [Analysis SOP]
         1. Extraction:
            - Use `run_binwalk` to identify and extract embedded file systems (SquashFS, UBIFS, etc.) and bootloaders.
@@ -805,6 +862,10 @@ def register_prompts(mcp: FastMCP):
 
         [Language Rule]
         - Answer in the same language as the user's request.
+
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the file exists
 
         [Analysis SOP]
         1. Dangerous API Search:
@@ -832,6 +893,10 @@ def register_prompts(mcp: FastMCP):
         [Language Rule]
         - Answer in the same language as the user's request.
 
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the file exists
+
         [Analysis SOP]
         1. Algo Identification:
            - Identify crypto constants (S-Boxes, IVs, Magic Numbers) using `run_yara` (crypto-signatures) or `run_strings`.
@@ -856,6 +921,10 @@ def register_prompts(mcp: FastMCP):
         [Language Rule]
         - Answer in the same language as the user's request.
         - Keep tool names and technical terms in English.
+
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the file exists
 
         [Vulnerability Hunter SOP - 3 Phase Pipeline]
 
@@ -933,6 +1002,10 @@ def register_prompts(mcp: FastMCP):
 
         [Language Rule]
         - Answer in the same language as the user's request.
+
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the file exists
 
         [APT Hunting SOP]
 
@@ -1012,6 +1085,10 @@ def register_prompts(mcp: FastMCP):
         - Answer in the same language as the user's request.
         - Keep technical terms (API names, hashes, IOCs) in English.
 
+        [CRITICAL: File Path Rule]
+        - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
+        - Run `list_workspace()` first to verify the file exists
+
         ═══════════════════════════════════════════════════════════════════════════
         ██ REPORT GENERATION WORKFLOW ██
         ═══════════════════════════════════════════════════════════════════════════
@@ -1081,7 +1158,7 @@ def register_prompts(mcp: FastMCP):
         [STEP 7] End Session and Generate Report
         ```
         end_analysis_session(summary="Brief summary of findings...")
-        
+
         create_analysis_report(
             template_type="full_analysis",     # full_analysis, quick_triage, ioc_summary, executive_brief
             classification="TLP:AMBER"

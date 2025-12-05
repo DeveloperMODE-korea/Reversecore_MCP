@@ -130,13 +130,27 @@ def validate_file_path(
     """
     active_config = config or get_workspace_config()
 
+    # Handle relative paths: resolve them relative to workspace directory
+    # This allows users to specify just the filename (e.g., "sample.exe")
+    # instead of the full path ("/app/workspace/sample.exe")
+    file_path = Path(path)
+    if not file_path.is_absolute():
+        # Try workspace-relative path first
+        workspace_path = active_config.workspace / path
+        if workspace_path.exists():
+            path = str(workspace_path)
+
     # Use cached path resolution to avoid repeated filesystem calls
     abs_path, is_file, error = _resolve_path_cached(path)
 
     if error:
         raise ValidationError(
             f"Invalid file path: {path}. Error: {error}",
-            details={"path": path, "error": error},
+            details={
+                "path": path,
+                "error": error,
+                "hint": "Ensure the file is in the workspace directory",
+            },
         )
 
     # Check that it's a file, not a directory
