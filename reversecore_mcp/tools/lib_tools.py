@@ -7,8 +7,6 @@ This module acts as a facade that imports and exposes tools from specialized mod
 - lief_tools: LIEF binary parsing
 """
 
-from reversecore_mcp.tools.capstone_tools import disassemble_with_capstone
-
 # Import all tools from specialized modules
 from reversecore_mcp.tools.ioc_tools import _IOC_IPV4_PATTERN, extract_iocs
 from reversecore_mcp.tools.lief_tools import _format_lief_output, parse_binary_with_lief
@@ -18,7 +16,6 @@ from reversecore_mcp.tools.yara_tools import _format_yara_match, run_yara
 __all__ = [
     "extract_iocs",
     "run_yara",
-    "disassemble_with_capstone",
     "parse_binary_with_lief",
     "register_lib_tools",
     # Internal symbols for backward compatibility (used by tests)
@@ -34,7 +31,7 @@ from reversecore_mcp.core.plugin import Plugin
 
 
 class LibToolsPlugin(Plugin):
-    """Plugin for library-backed tools (YARA, Capstone, LIEF, IOCs)."""
+    """Plugin for library-backed tools (YARA, LIEF, IOCs)."""
 
     @property
     def name(self) -> str:
@@ -42,11 +39,10 @@ class LibToolsPlugin(Plugin):
 
     @property
     def description(self) -> str:
-        return "Library-backed tools for YARA scanning, disassembly, binary parsing, and IOC extraction."
+        return "Library-backed tools for YARA scanning, binary parsing, and IOC extraction."
 
     def register(self, mcp_server: Any) -> None:
         """Register library tools."""
         mcp_server.tool(run_yara)
-        mcp_server.tool(disassemble_with_capstone)
         mcp_server.tool(parse_binary_with_lief)
         mcp_server.tool(extract_iocs)
