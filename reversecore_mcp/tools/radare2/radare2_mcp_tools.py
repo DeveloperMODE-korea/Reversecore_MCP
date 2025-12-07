@@ -1406,7 +1406,22 @@ class Radare2ToolsPlugin(Plugin):
         # - list_files: potential path traversal attack vector
         # - run_javascript: arbitrary code execution risk
 
-        logger.info(f"Registered {self.name} plugin with 30 Radare2 tools (security hardened)")
+        # =====================================================================
+        # Advanced Analysis Tools (from r2_analysis module)
+        # =====================================================================
+        # Import and register advanced analysis tools for unified plugin management
+        from reversecore_mcp.tools.radare2.r2_analysis import (
+            run_radare2,
+            trace_execution_path,
+            generate_function_graph,
+            analyze_xrefs,
+        )
+        mcp.tool(run_radare2)
+        mcp.tool(trace_execution_path)
+        mcp.tool(generate_function_graph)
+        mcp.tool(analyze_xrefs)
+
+        logger.info(f"Registered {self.name} plugin with 34 Radare2 tools (security hardened)")
 
 
 def register_radare2_tools(mcp: FastMCP) -> None:

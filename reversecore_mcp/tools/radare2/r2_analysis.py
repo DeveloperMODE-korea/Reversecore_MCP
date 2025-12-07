@@ -107,27 +107,9 @@ async def run_radare2(
         raise
 
 
-# Plugin import at bottom to avoid circular imports
-from reversecore_mcp.core.plugin import Plugin  # noqa: E402
-
-
-class R2AnalysisPlugin(Plugin):
-    """Plugin for Radare2 analysis tools."""
-
-    @property
-    def name(self) -> str:
-        return "r2_analysis"
-
-    @property
-    def description(self) -> str:
-        return "Radare2-based analysis tools for binary analysis, cross-references, and execution tracing."
-
-    def register(self, mcp_server: Any) -> None:
-        """Register R2 analysis tools."""
-        mcp_server.tool(run_radare2)
-        mcp_server.tool(trace_execution_path)
-        mcp_server.tool(generate_function_graph)
-        mcp_server.tool(analyze_xrefs)
+# Note: R2AnalysisPlugin has been removed.
+# All tools (run_radare2, trace_execution_path, generate_function_graph, analyze_xrefs)
+# are now registered via Radare2ToolsPlugin in radare2_mcp_tools.py for unified management.
 
 
 # Dangerous sink APIs for prioritized path tracing
