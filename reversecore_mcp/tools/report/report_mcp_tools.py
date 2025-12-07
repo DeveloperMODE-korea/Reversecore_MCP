@@ -5,31 +5,32 @@ Register these tools in your MCP server
 
 # Use optimized JSON implementation (3-5x faster than standard json)
 from pathlib import Path
+from typing import Any
 
 from reversecore_mcp.core import json_utils as json
+from reversecore_mcp.core.plugin import Plugin
 
 from .report_tools import get_report_tools
 
 
-def register_report_tools(mcp_server, template_dir: Path | None = None, output_dir: Path | None = None):
-    """
-    Register report tools with the MCP server.
-    
-    Args:
-        mcp_server: FastMCP server instance
-        template_dir: Template directory path
-        output_dir: Output directory path
-    
-    Returns:
-        ReportTools instance
-    """
+class ReportToolsPlugin(Plugin):
+    """Plugin for Report Generation tools."""
 
-    # Initialize ReportTools instance
-    report_tools = get_report_tools(
-        template_dir=template_dir or Path("templates/reports"),
-        output_dir=output_dir or Path("reports"),
-        default_timezone="Asia/Seoul"
-    )
+    name = "report_tools"
+    description = "Malware analysis report generation tools with session tracking, IOC collection, and email delivery."
+
+    def __init__(self):
+        self._report_tools = None
+
+    def register(self, mcp_server: Any) -> None:
+        """Register report tools with the MCP server."""
+        # Initialize ReportTools instance
+        report_tools = get_report_tools(
+            template_dir=Path("templates/reports"),
+            output_dir=Path("reports"),
+            default_timezone="Asia/Seoul"
+        )
+        self._report_tools = report_tools
 
     # =========================================================================
     # Time & Timezone Tools
@@ -769,4 +770,14 @@ def register_report_tools(mcp_server, template_dir: Path | None = None, output_d
                 "traceback": traceback.format_exc()
             })
 
-    return report_tools
+
+# Legacy function for backward compatibility
+def register_report_tools(mcp_server, template_dir: Path | None = None, output_dir: Path | None = None):
+    """
+    Legacy function for registering report tools.
+    Use ReportToolsPlugin class instead for Plugin pattern.
+    """
+    plugin = ReportToolsPlugin()
+    plugin.register(mcp_server)
+    return plugin._report_tools
+
