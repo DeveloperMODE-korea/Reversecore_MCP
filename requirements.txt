@@ -42,7 +42,7 @@ python-multipart>=0.0.20
 
 # Ghidra Python bindings (optional for enhanced decompilation)
 # Note: pyghidra 2.2.0 is compatible with Ghidra 11.2 installed in Dockerfile
-pyghidra>=2.0.0,<3.0.0
+pyghidra>=2.0.0,<4.0.0
 jpype1>=1.4.0  # PyGhidra dependency
 
 # Environment variable management
