@@ -78,6 +78,28 @@ def register_prompts(mcp: FastMCP):
         - Example: "/Users/john/Reversecore_Workspace/sample.exe" → use "sample.exe"
         - First, ALWAYS run `list_workspace()` to verify the file exists in the workspace
 
+        [CRITICAL: Evidence-Based Analysis Rule]
+        ==========================================
+        **Every finding MUST be labeled with an evidence level:**
+        
+        🔍 [OBSERVED] - Directly observed through dynamic analysis, logs, or traces
+           Example: "Procmon captured CreateMutexA('WNcry@2ol7') call"
+           Confidence: 100%
+        
+        🔎 [INFERRED] - Logically inferred from static analysis (high confidence)
+           Example: "CryptEncrypt import suggests encryption capability"
+           Confidence: 70-85%
+        
+        ❓ [POSSIBLE] - Possible based on patterns, requires verification
+           Example: "SMB functions present, may attempt lateral movement"
+           Confidence: 40-60%
+        
+        **NEVER state 'confirmed' or 'detected' for inferred/possible findings!**
+        Use language like:
+        - OBSERVED: "확인됨", "detected", "observed"
+        - INFERRED: "추정됨", "likely", "suggests"
+        - POSSIBLE: "가능성 있음", "may", "could"
+
         ═══════════════════════════════════════════════════════════════════════════
         ██ PHASE 1: INITIAL TRIAGE & THREAT CLASSIFICATION ██
         ═══════════════════════════════════════════════════════════════════════════
@@ -304,18 +326,49 @@ def register_prompts(mcp: FastMCP):
         ██ PHASE 5: DEFENSE ARTIFACT GENERATION ██
         ═══════════════════════════════════════════════════════════════════════════
 
-        [STEP 5.1] YARA Rule Generation
-        Based on unique characteristics found:
+        [STEP 5.1] Enhanced YARA Rule Generation (Low False Positive)
+        **IMPORTANT: Use enhanced YARA generator with structural conditions!**
+        
+        Simple string-only rules have HIGH false positive rates.
+        Use `generate_enhanced_yara_rule` with structural conditions:
+        
+        ```python
+        generate_enhanced_yara_rule(
+            "{filename}",
+            rule_name="Sample_Detection",
+            strings=["unique_string1", "unique_string2", "unique_string3"],
+            imports=["CryptEncrypt", "CreateServiceA"],  # Optional but reduces FP
+            file_type="PE",
+            min_filesize=100000,      # Minimum file size
+            max_filesize=5000000,     # Maximum file size
+            section_names=[".rsrc"],  # Required section names (optional)
+        )
         ```
-        generate_yara_rule("{filename}", "<unique_code_address>", length=64)
-        ```
-
-        **Good YARA Signatures Include:**
+        
+        **Good Enhanced YARA Signatures Include:**
         - Unique strings (C2 domains, mutex names, registry keys)
-        - Unique byte patterns (custom encryption, magic values)
-        - Structural characteristics (PE anomalies, section names)
+        - Structural conditions (PE header, file size range)
+        - Import table checks (at least 1-2 dangerous APIs)
+        - Minimum string match threshold (default: 2/3 of strings)
 
-        [STEP 5.2] Vulnerability Hunter Report (Automated)
+        [STEP 5.2] MITRE ATT&CK Mapping with Confidence Levels
+        **CRITICAL: Every MITRE technique MUST have a confidence level!**
+        
+        Use this format in your report:
+        | Technique ID | Name | Tactic | Confidence | Evidence |
+        |-------------|------|--------|------------|----------|
+        | T1486 | Data Encrypted for Impact | Impact | ✅ CONFIRMED | CryptEncrypt + ransom note strings |
+        | T1055 | Process Injection | Defense Evasion | 🟢 HIGH | VirtualAllocEx + WriteProcessMemory imports |
+        | T1570 | Lateral Tool Transfer | Lateral Movement | 🟡 MEDIUM | SMB API imports (no observed network activity) |
+        | T1021 | Remote Services | Lateral Movement | 🔴 LOW | Possible based on port 445 reference |
+        
+        **Confidence Levels:**
+        - ✅ CONFIRMED: Multiple independent evidence sources
+        - 🟢 HIGH: Strong single evidence (observed or high-confidence inferred)
+        - 🟡 MEDIUM: Inferred from API/patterns (needs verification)
+        - 🔴 LOW: Possible based on weak indicators
+
+        [STEP 5.3] Vulnerability Hunter Report (Automated)
         For comprehensive defense artifacts:
         ```
         vulnerability_hunter("{filename}", mode="full")
@@ -362,11 +415,12 @@ def register_prompts(mcp: FastMCP):
         | Size | X bytes |
         | Entropy | X.XX |
 
-        ### Capabilities (MITRE ATT&CK Mapping)
-        | Technique ID | Technique Name | Evidence |
-        |-------------|----------------|----------|
-        | T1059 | Command Execution | [specific finding] |
-        | ... | ... | ... |
+        ### Capabilities (MITRE ATT&CK Mapping with Confidence)
+        | Technique ID | Technique Name | Tactic | Confidence | Evidence |
+        |-------------|----------------|--------|------------|----------|
+        | T1486 | Data Encrypted for Impact | Impact | ✅ CONFIRMED | [specific finding + source] |
+        | T1055 | Process Injection | Defense Evasion | 🟢 HIGH | [specific finding] |
+        | ... | ... | ... | ... | ... |
 
         ### Indicators of Compromise (IOCs)
         **Network:**
@@ -413,8 +467,13 @@ def register_prompts(mcp: FastMCP):
         3. **Long-term:** [prevention measures]
 
         ## Analyst Notes
-        - **Confidence Assessment:** [why you're confident in this verdict]
-        - **Gaps in Analysis:** [what couldn't be determined]
+        - **Confidence Assessment:** [Detailed breakdown: X observed, Y inferred, Z possible]
+        - **Evidence Summary:**
+          - 🔍 Observed findings: [count] (highest confidence)
+          - 🔎 Inferred findings: [count] (medium-high confidence)
+          - ❓ Possible findings: [count] (requires verification)
+        - **Gaps in Analysis:** [what couldn't be determined and why]
+        - **Recommended Next Steps:** [additional analysis or dynamic analysis needed]
         - **Recommended Next Steps:** [additional analysis needed]
 
         ## Appendix
