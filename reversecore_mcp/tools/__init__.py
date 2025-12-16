@@ -36,6 +36,9 @@ ghost_trace = dormant_detector  # ghost_trace was renamed to dormant_detector
 from reversecore_mcp.tools.report import report_tools
 from reversecore_mcp.tools.report import report_mcp_tools
 
+# Common tools extra - backward compatibility
+from reversecore_mcp.tools.common import patch_explainer
+
 __all__ = [
     "static_analysis",
     "diff_tools",
@@ -53,4 +56,6 @@ __all__ = [
     # Report tools
     "report_tools",
     "report_mcp_tools",
+    # Common tools extra
+    "patch_explainer",
 ]
