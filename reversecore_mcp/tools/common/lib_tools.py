@@ -25,24 +25,6 @@ __all__ = [
 ]
 
 
-from typing import Any
+# Note: LibToolsPlugin has been removed.
+# The tools are now registered via MalwareToolsPlugin and AnalysisToolsPlugin.
 
-from reversecore_mcp.core.plugin import Plugin
-
-
-class LibToolsPlugin(Plugin):
-    """Plugin for library-backed tools (YARA, LIEF, IOCs)."""
-
-    @property
-    def name(self) -> str:
-        return "lib_tools"
-
-    @property
-    def description(self) -> str:
-        return "Library-backed tools for YARA scanning, binary parsing, and IOC extraction."
-
-    def register(self, mcp_server: Any) -> None:
-        """Register library tools."""
-        mcp_server.tool(run_yara)
-        mcp_server.tool(parse_binary_with_lief)
-        mcp_server.tool(extract_iocs)

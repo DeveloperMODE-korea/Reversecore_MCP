@@ -11,7 +11,6 @@ from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.error_handling import handle_tool_errors
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.metrics import track_metrics
-from reversecore_mcp.core.plugin import Plugin
 from reversecore_mcp.core.result import ToolResult, failure, success
 from reversecore_mcp.core.security import validate_file_path
 from reversecore_mcp.tools.ghidra import decompilation, diff_tools
@@ -19,20 +18,8 @@ from reversecore_mcp.tools.ghidra import decompilation, diff_tools
 logger = get_logger(__name__)
 
 
-class PatchExplainerPlugin(Plugin):
-    """Plugin for Semantic Patch Explainer tool."""
-
-    @property
-    def name(self) -> str:
-        return "patch_explainer"
-
-    @property
-    def description(self) -> str:
-        return "Analyzes binary differences to explain security patches in natural language."
-
-    def register(self, mcp_server: Any) -> None:
-        """Register Patch Explainer tool."""
-        mcp_server.tool(explain_patch)
+# Note: PatchExplainerPlugin has been removed.
+# The explain_patch tool is now registered via CommonToolsPlugin in common/__init__.py.
 
 
 @log_execution(tool_name="explain_patch")

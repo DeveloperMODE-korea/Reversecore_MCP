@@ -342,25 +342,6 @@ async def scan_workspace(
     )
 
 
-from typing import Any
+# Note: FileOperationsPlugin has been removed.
+# The file operation tools are now registered via CommonToolsPlugin in common/__init__.py.
 
-from reversecore_mcp.core.plugin import Plugin
-
-
-class FileOperationsPlugin(Plugin):
-    """Plugin for file operation tools."""
-
-    @property
-    def name(self) -> str:
-        return "file_operations"
-
-    @property
-    def description(self) -> str:
-        return "File management tools for workspace operations."
-
-    def register(self, mcp_server: Any) -> None:
-        """Register file operation tools."""
-        mcp_server.tool(run_file)
-        mcp_server.tool(copy_to_workspace)
-        mcp_server.tool(list_workspace)
-        mcp_server.tool(scan_workspace)

@@ -401,23 +401,5 @@ async def generate_yara_rule(
     )
 
 
-from typing import Any
-
-from reversecore_mcp.core.plugin import Plugin
-
-
-class SignatureToolsPlugin(Plugin):
-    """Plugin for signature generation tools."""
-
-    @property
-    def name(self) -> str:
-        return "signature_tools"
-
-    @property
-    def description(self) -> str:
-        return "Tools for generating YARA rules and binary signatures."
-
-    def register(self, mcp_server: Any) -> None:
-        """Register signature tools."""
-        mcp_server.tool(generate_signature)
-        mcp_server.tool(generate_yara_rule)
+# Note: SignatureToolsPlugin has been removed.
+# The signature tools are now registered via AnalysisToolsPlugin in analysis/__init__.py.

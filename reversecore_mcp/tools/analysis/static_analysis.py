@@ -458,26 +458,5 @@ async def extract_rtti_info(
     )
 
 
-from typing import Any
-
-from reversecore_mcp.core.plugin import Plugin
-
-
-class StaticAnalysisPlugin(Plugin):
-    """Plugin for static analysis tools."""
-
-    @property
-    def name(self) -> str:
-        return "static_analysis"
-
-    @property
-    def description(self) -> str:
-        return "Static analysis tools for string extraction, version scanning, and RTTI analysis."
-
-    def register(self, mcp_server: Any) -> None:
-        """Register static analysis tools."""
-        mcp_server.tool(run_strings)
-        mcp_server.tool(run_binwalk)
-        mcp_server.tool(run_binwalk_extract)
-        mcp_server.tool(scan_for_versions)
-        mcp_server.tool(extract_rtti_info)
+# Note: StaticAnalysisPlugin has been removed.
+# The static analysis tools are now registered via AnalysisToolsPlugin in analysis/__init__.py.
