@@ -26,8 +26,15 @@ def get_report_tools(
     """Get or create ReportTools singleton instance."""
     global _report_tools
     if _report_tools is None:
+        # Use package-relative path for templates (works regardless of CWD)
+        if template_dir is None:
+            # Get the package root directory
+            package_root = Path(__file__).parent.parent.parent  # tools/report -> tools -> reversecore_mcp
+            project_root = package_root.parent  # reversecore_mcp -> Reversecore_MCP
+            template_dir = project_root / "templates" / "reports"
+        
         _report_tools = ReportTools(
-            template_dir=template_dir or Path("templates/reports"),
+            template_dir=template_dir,
             output_dir=output_dir or Path("reports"),
             default_timezone=default_timezone,
             email_config=EmailConfig.from_env()

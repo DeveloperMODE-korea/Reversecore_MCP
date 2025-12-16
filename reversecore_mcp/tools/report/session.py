@@ -74,6 +74,8 @@ class AnalysisSession:
         "registry": [],
         "mutexes": [],
         "emails": [],
+        "bitcoin_addresses": [],   # For ransomware BTC wallets
+        "crypto_wallets": [],      # ETH, XMR, etc.
     })
     mitre_techniques: list[dict[str, str]] = field(default_factory=list)
     notes: list[dict[str, str]] = field(default_factory=list)
