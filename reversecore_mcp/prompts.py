@@ -523,26 +523,47 @@ def register_prompts(mcp: FastMCP):
         - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
         - Run `list_workspace()` first to verify the file exists
 
+        [CRITICAL: Evidence-Based Analysis]
+        ==========================================
+        **Every finding MUST be labeled with an evidence level:**
+        
+        🔍 [OBSERVED] - Directly observed (sandbox, Procmon, API trace)
+           Confidence: 100% - Use "detected", "confirmed", "확인됨"
+        
+        🔎 [INFERRED] - Inferred from static analysis (imports, strings)
+           Confidence: 70-85% - Use "likely", "suggests", "추정됨"
+        
+        ❓ [POSSIBLE] - Possible based on patterns (needs verification)
+           Confidence: 40-60% - Use "may", "could", "가능성 있음"
+
         [Analysis SOP]
         1. Behavioral Triage:
            - Check for Ransomware indicators (crypto constants, file enumeration) using `run_yara` and `run_strings`.
            - Check for Stealer behaviors (browser paths, credential vaults) using `run_strings`.
            - Check for Backdoor/C2 (socket APIs, connect, listen) using `run_radare2` imports.
+           → Label each finding: [🔍 OBSERVED] or [🔎 INFERRED]
 
         2. Evasion Detection:
            - Use `dormant_detector` to find anti-analysis tricks (IsDebuggerPresent, sleep loops, time checks).
            - Check for packing using `parse_binary_with_lief`.
+           → Orphan functions = [❓ POSSIBLE] hidden behavior
 
         3. Persistence Mechanism:
            - Look for Registry keys (Run, RunOnce), Service creation, or Scheduled Tasks in strings or imports.
+           → API import only = [🔎 INFERRED], Registry log = [🔍 OBSERVED]
 
         4. Payload Analysis:
            - Decompile suspicious functions using `smart_decompile` to understand the payload logic.
 
         5. Reporting:
-           - Map behaviors to MITRE ATT&CK framework.
+           - Map behaviors to MITRE ATT&CK framework with confidence levels:
+             | Technique | Confidence | Evidence |
+             |-----------|------------|----------|
+             | T1486 | ✅ CONFIRMED | CryptEncrypt + ransom note |
+             | T1055 | 🟢 HIGH | VirtualAllocEx import |
+           
            - Extract all IOCs (C2, Hashes, Mutexes).
-           - Generate a YARA rule for detection.
+           - Generate enhanced YARA rule: `generate_enhanced_yara_rule()` with structural conditions.
         """
 
     @mcp.prompt("patch_analysis_mode")
@@ -942,20 +963,43 @@ def register_prompts(mcp: FastMCP):
         - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
         - Run `list_workspace()` first to verify the file exists
 
+        [CRITICAL: Evidence-Based Vulnerability Reporting]
+        ==========================================
+        Vulnerability claims require STRONG evidence. False positives damage credibility.
+        
+        🔍 [CONFIRMED] - Verified through PoC, fuzzing, or dynamic testing
+           Example: "Crash at strcpy with controlled input (PoC attached)"
+        
+        🔎 [LIKELY] - Strong static evidence (dangerous pattern + reachable sink)
+           Example: "User input reaches sprintf without bounds check"
+        
+        ❓ [POSSIBLE] - Pattern present but exploitability unclear
+           Example: "strcpy used but input source not confirmed"
+
         [Analysis SOP]
         1. Dangerous API Search:
            - Identify usage of dangerous functions (strcpy, system, sprintf, gets) using `run_radare2` imports.
            - Use `analyze_xrefs` to check if user input reaches these sinks.
+           → API present only = [❓ POSSIBLE]
+           → API + reachable input = [🔎 LIKELY]
+           → PoC crash = [🔍 CONFIRMED]
 
         2. Mitigation Check:
            - Check for exploit mitigations (ASLR, DEP/NX, Canary, PIE) using `parse_binary_with_lief`.
+           → Mitigations affect exploitability, not vulnerability existence
 
         3. Fuzzing Candidate Identification:
            - Identify parsing functions or network handlers suitable for fuzzing.
 
-        4. Reporting:
-           - List potential vulnerabilities with code context.
-           - Recommend PoC (Proof of Concept) strategies.
+        4. Reporting Format:
+           | Vulnerability | CWE | Confidence | Evidence |
+           |---------------|-----|------------|----------|
+           | Stack Buffer Overflow | CWE-121 | 🔍 CONFIRMED | PoC crash at 0x401234 |
+           | Command Injection | CWE-78 | 🔎 LIKELY | system() called with user input |
+           | Integer Overflow | CWE-190 | ❓ POSSIBLE | Unchecked multiplication, needs verification |
+           
+           - Include code snippets for each finding
+           - Recommend PoC (Proof of Concept) strategies
         """
 
     @mcp.prompt("crypto_analysis_mode")
@@ -1082,69 +1126,73 @@ def register_prompts(mcp: FastMCP):
         - Use only FILENAME (not full path): e.g., "{filename}" not "/Users/.../file.exe"
         - Run `list_workspace()` first to verify the file exists
 
+        [CRITICAL: Evidence-Based Analysis]
+        ==========================================
+        APT hunting requires RIGOROUS evidence standards. Never speculate without evidence.
+        
+        🔍 [OBSERVED] - Dynamic analysis confirmed (sandbox, memory forensics)
+           Example: "Network capture shows C2 beacon to 1.2.3.4:443"
+        
+        🔎 [INFERRED] - High-confidence static analysis
+           Example: "Custom XOR encryption routine at 0x401000"
+        
+        ❓ [POSSIBLE] - Pattern matching, needs verification
+           Example: "Code similarity with APT29 tooling"
+        
+        **Attribution requires MULTIPLE [🔍 OBSERVED] + [🔎 INFERRED] findings!**
+
         [APT Hunting SOP]
 
         1. Dormant Detector Analysis (Primary Detection):
         Use `dormant_detector("{filename}")` to find APT characteristics:
-        - Orphan Functions: APTs often hide backdoors in unused code paths
-        - Magic Value Triggers: Look for date/time bombs or environment checks
+        - Orphan Functions: APTs often hide backdoors in unused code paths [❓ POSSIBLE]
+        - Magic Value Triggers: Look for date/time bombs or environment checks [🔎 INFERRED]
         - Conditional Execution: APT malware activates only in specific conditions
-
-        Key Indicators:
-        - Functions with NO cross-references but >100 bytes (suspicious)
-        - Magic value comparisons (0xDEADBEEF, specific dates, hostnames)
-        - ESIL emulation results showing hidden behavior
 
         2. Smart Decompiler Refinement:
         For each suspicious function from Dormant Detector:
         - Run `smart_decompile("{filename}", address)`
-        - Analyze refined code for APT patterns:
-          * C2 Communication (socket + encryption + obfuscation)
-          * Data Exfiltration (compress + encrypt + send)
-          * Persistence Mechanisms (registry + scheduled tasks)
-          * Anti-Analysis (VM detection, debugger checks)
+        - Analyze refined code for APT patterns
 
-        3. Hypothesis Verification (If Dormant Detector finds triggers):
-        Test specific scenarios with Dormant Detector emulation.
+        3. MITRE ATT&CK with Confidence Levels:
+        | Technique ID | Name | Confidence | Evidence Source |
+        |-------------|------|------------|------------------|
+        | T1055 | Process Injection | 🟢 HIGH | [🔎 INFERRED] VirtualAllocEx+WriteProcessMemory |
+        | T1071.001 | HTTPS C2 | ✅ CONFIRMED | [🔍 OBSERVED] PCAP + [🔎 INFERRED] imports |
+        | T1070.006 | Timestomping | 🟡 MEDIUM | [🔎 INFERRED] SetFileTime import |
 
-        4. APT Attribution Indicators:
-        Look for these characteristics in refined code:
-        - Custom crypto implementations (not OpenSSL/standard libs)
-        - Specific C2 infrastructure patterns
-        - Unique persistence mechanisms
-        - Advanced anti-forensics techniques
+        4. APT Attribution Standards:
+        - NEVER attribute without multiple independent evidence sources
+        - Use "Code similarities suggest" not "This is APT29"
+        - List evidence explicitly for any attribution claim
 
         5. Defense Generation:
         If APT confirmed:
-        - Use `vulnerability_hunter` for automated YARA rule generation
-        - Document TTPs (Tactics, Techniques, Procedures)
-        - Create IOC list for threat intelligence sharing
+        - Use `generate_enhanced_yara_rule()` with structural conditions
+        - Document TTPs with evidence levels
+        - Create IOC list with confidence ratings
 
         [Report Format]
 
         ## 🎯 APT Hunting Report
 
-        ### Dormant Detector Findings
-        - Orphan Functions: [count and details]
-        - Logic Bombs: [triggers found]
-        - Emulation Results: [ESIL verification]
+        ### Evidence Summary
+        | Level | Count | Examples |
+        |-------|-------|----------|
+        | 🔍 OBSERVED | X | (list key findings) |
+        | 🔎 INFERRED | Y | (list key findings) |
+        | ❓ POSSIBLE | Z | (list hypotheses) |
 
-        ### Code Analysis (Smart Decompiler)
-        - Backdoor Communication: [Yes/No + details]
-        - Data Exfiltration: [Yes/No + details]
-        - Persistence: [mechanisms identified]
-        - Anti-Analysis: [techniques detected]
+        ### Dormant Detector Findings
+        - Orphan Functions: [count] [❓ POSSIBLE hidden functionality]
+        - Logic Bombs: [triggers found] [🔎 INFERRED/🔍 OBSERVED]
+        - Emulation Results: [ESIL verification] [🔍 OBSERVED]
 
         ### APT Assessment
-        - Sophistication Level: [1-10]
-        - Probable Attribution: [APT group or Unknown]
-        - TTPs: [MITRE ATT&CK mapping]
-
-        ### Recommended Actions
-        1. Immediate containment steps
-        2. Forensic preservation
-        3. Threat intelligence sharing
-        4. Defense deployment
+        - Sophistication Level: [1-10] (evidence-based)
+        - Attribution: ["Possible APT29" or "Unknown - insufficient evidence"]
+        - Confidence: [✅ CONFIRMED / 🟢 HIGH / 🟡 MEDIUM / 🔴 LOW]
+        - Key Evidence: [list of evidence supporting attribution]
 
         Begin APT analysis now.
         """
@@ -1222,6 +1270,13 @@ def register_prompts(mcp: FastMCP):
         ```
 
         Note categories: general, finding, warning, important, behavior
+        
+        **Tip: Label each note with evidence level!**
+        ```
+        add_session_note("[🔍 OBSERVED] Procmon captured registry write to Run key", category="finding")
+        add_session_note("[🔎 INFERRED] CryptEncrypt import suggests encryption capability", category="finding")
+        add_session_note("[❓ POSSIBLE] SMB functions may enable lateral movement", category="warning")
+        ```
 
         [STEP 6] Set Severity and Tags
         ```
@@ -1239,6 +1294,18 @@ def register_prompts(mcp: FastMCP):
             classification="TLP:AMBER"
         )
         ```
+        
+        [CRITICAL: Evidence Summary in Report]
+        The final report MUST include an evidence summary:
+        
+        ## Confidence Assessment
+        | Evidence Level | Count | Key Findings |
+        |----------------|-------|---------------|
+        | 🔍 OBSERVED | X | (sandbox, logs, traces) |
+        | 🔎 INFERRED | Y | (static analysis) |
+        | ❓ POSSIBLE | Z | (needs verification) |
+        
+        **Overall Confidence**: [✅ CONFIRMED / 🟢 HIGH / 🟡 MEDIUM / 🔴 LOW]
 
         [STEP 8] Optional: Email Report
         ```
