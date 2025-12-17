@@ -6,30 +6,22 @@ and libraries, making them accessible to AI agents through the MCP protocol.
 """
 
 # Analysis tools
-from reversecore_mcp.tools.analysis import static_analysis
-from reversecore_mcp.tools.analysis import diff_tools
-from reversecore_mcp.tools.analysis import signature_tools
-from reversecore_mcp.tools.analysis import lief_tools
+from reversecore_mcp.tools.analysis import diff_tools, lief_tools, signature_tools, static_analysis
 
 # Common tools
-from reversecore_mcp.tools.common import file_operations
-from reversecore_mcp.tools.common import lib_tools
-from reversecore_mcp.tools.common import patch_explainer
-
-# Radare2 tools
-from reversecore_mcp.tools.radare2 import r2_analysis
+from reversecore_mcp.tools.common import file_operations, patch_explainer
 
 # Ghidra tools
 from reversecore_mcp.tools.ghidra import decompilation
 
 # Malware tools
-from reversecore_mcp.tools.malware import dormant_detector
-from reversecore_mcp.tools.malware import adaptive_vaccine
-from reversecore_mcp.tools.malware import vulnerability_hunter
+from reversecore_mcp.tools.malware import adaptive_vaccine, dormant_detector, vulnerability_hunter
+
+# Radare2 tools
+from reversecore_mcp.tools.radare2 import r2_analysis
 
 # Report tools
-from reversecore_mcp.tools.report import report_tools
-from reversecore_mcp.tools.report import report_mcp_tools
+from reversecore_mcp.tools.report import report_mcp_tools, report_tools
 
 __all__ = [
     # Analysis tools
@@ -39,7 +31,6 @@ __all__ = [
     "lief_tools",
     # Common tools
     "file_operations",
-    "lib_tools",
     "patch_explainer",
     # Radare2 tools
     "r2_analysis",

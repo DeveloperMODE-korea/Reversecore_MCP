@@ -14,7 +14,8 @@ from reversecore_mcp.core.metrics import track_metrics
 
 # Import tools at module level for better performance
 # These imports are used by resource functions below
-from reversecore_mcp.tools.ghidra import decompilation, lib_tools, r2_analysis, static_analysis
+from reversecore_mcp.tools.ghidra import decompilation, r2_analysis, static_analysis
+from reversecore_mcp.tools.malware import ioc_tools
 
 # Type variable for generic function wrapper
 F = TypeVar("F", bound=Callable[..., Any])
@@ -155,7 +156,7 @@ def register_resources(mcp: FastMCP):
             strings_data = (
                 strings_res.data if isinstance(strings_res.data, str) else str(strings_res.data)
             )
-            ioc_res = lib_tools.extract_iocs(strings_data)
+            ioc_res = ioc_tools.extract_iocs(strings_data)
 
             # 3. Format output
             if ioc_res.status == "success":
