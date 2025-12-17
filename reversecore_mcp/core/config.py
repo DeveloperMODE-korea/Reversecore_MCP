@@ -117,6 +117,12 @@ class Settings(BaseSettings):
         ge=1_000_000,
         description="Maximum file size for LIEF parsing (bytes)",
     )
+    
+    file_retention_minutes: int = Field(
+        default=1440,  # 24 hours
+        ge=60,
+        description="Retention period for temporary files (minutes)",
+    )
 
     # Transport configuration
     mcp_transport: TransportMode = Field(

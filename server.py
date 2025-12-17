@@ -8,8 +8,16 @@ It includes health and metrics endpoints for monitoring in HTTP mode.
 import asyncio
 import re
 import shutil
+import time
 import uuid
 from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
+import aiofiles
+try:
+    import magic
+except ImportError:
+    magic = None
 
 from fastmcp import FastMCP
 
@@ -23,30 +31,21 @@ logger = get_logger(__name__)
 
 
 @asynccontextmanager
-async def server_lifespan(server: FastMCP):
+async def server_lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
     """
     Manage server lifecycle events.
-
-    Startup:
-        - Validate dependencies (radare2, java, etc.)
-        - Ensure workspace directory exists
-        - Initialize metrics collector
-
-    Shutdown:
-        - Cleanup temporary files
-        - Log final statistics
+    1. Initialize resources (DB, tools)
+    2. Start background tasks (cleanup)
+    3. Cleanup on shutdown
     """
-    # ============================================================================
-    # STARTUP
-    # ============================================================================
+    # Startup
     logger.info("🚀 Reversecore MCP Server starting...")
-
-    config = get_config()
-
+    settings = get_config()
+    
     # 1. Ensure workspace exists
     try:
-        config.workspace.mkdir(parents=True, exist_ok=True)
-        logger.info(f"✅ Workspace ready: {config.workspace}")
+        settings.workspace.mkdir(parents=True, exist_ok=True)
+        logger.info(f"✅ Workspace ready: {settings.workspace}")
     except Exception as e:
         logger.error(f"❌ Failed to create workspace: {e}")
         raise
@@ -90,16 +89,26 @@ async def server_lifespan(server: FastMCP):
     except Exception as e:
         logger.warning(f"⚠️ Memory store initialization failed: {e}")
 
+    # Initialize async resources (e.g. SQLite memory)
+    # This ensures "lazy" resources are ready before first request
+    from reversecore_mcp.core.execution import initialize_async
+    
+    await initialize_async()
+    logger.info("Async resources initialized")
+    
+    # Start cleanup task
+    cleanup_task = asyncio.create_task(_cleanup_old_files())
+    
     # ============================================================================
     # SERVER RUNNING (yield control)
     # ============================================================================
     yield
-
+    
     # ============================================================================
     # SHUTDOWN
     # ============================================================================
     logger.info("🛑 Reversecore MCP Server shutting down...")
-
+    
     # Stop Resource Manager
     await resource_manager.stop()
 
@@ -113,10 +122,32 @@ async def server_lifespan(server: FastMCP):
     except Exception as e:
         logger.debug(f"Memory store close: {e}")
 
-    # Cleanup temporary files
+    # Cancel cleanup task
+    cleanup_task.cancel()
     try:
-        temp_files = list(config.workspace.glob("*.tmp"))
-        temp_files.extend(config.workspace.glob(".r2_*"))  # radare2 temp files
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+        
+    try:
+        # Perform cleanup
+        from reversecore_mcp.core.ghidra_manager import ghidra_manager
+        
+        ghidra_manager.close_all()
+        
+        # Cleanup temp directory if it exists
+        temp_dir = settings.workspace / "tmp"
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            logger.info("Cleaned up temporary directory")
+            
+    except Exception as e:
+        logger.error(f"Error during shutdown cleanup: {e}")
+
+    # Cleanup temporary files (original logic, kept for now)
+    try:
+        temp_files = list(settings.workspace.glob("*.tmp"))
+        temp_files.extend(settings.workspace.glob(".r2_*"))  # radare2 temp files
 
         for temp_file in temp_files:
             try:
@@ -131,6 +162,97 @@ async def server_lifespan(server: FastMCP):
         logger.error(f"Error during cleanup: {e}")
 
     logger.info("👋 Server shutdown complete")
+
+
+async def _cleanup_old_files():
+    """Background task to delete files older than retention period."""
+    settings = get_config()
+    retention_seconds = settings.file_retention_minutes * 60
+    logger.info(f"Started workspace cleaner (Retention: {settings.file_retention_minutes} mins)")
+    
+    while True:
+        try:
+            # Check every hour (or frequent enough)
+            await asyncio.sleep(3600)
+            
+            workspace = settings.workspace
+            if not workspace.exists():
+                continue
+                
+            now = time.time()
+            count = 0
+            
+            # Scan only tmp/ or uploads/ if organized, but here we scan workspace root files carefully
+            # Usually safer to scan a dedicated uploads/tmp folder. 
+            # Assuming temporary files are in workspace root.
+            # We will conservatively clean only things that look temp or explicitly marked.
+            # For now, let's target the 'tmp' folder and specific file patterns if needed.
+            
+            targets = [workspace / "tmp", workspace] # Include workspace root for files not in 'tmp'
+            
+            for target_dir in targets:
+                if not target_dir.exists():
+                    continue
+                    
+                for p in target_dir.rglob("*"):
+                    if p.is_file():
+                        # Check mtime
+                        if now - p.stat().st_mtime > retention_seconds:
+                            # Only delete files that are clearly temporary or uploaded
+                            # This is a safety measure to avoid deleting user's important files
+                            if p.name.startswith(f"{uuid.UUID(int=0).hex[:8]}_") or p.suffix in [".tmp", ".r2_"]: # Placeholder for UUID prefix
+                                try:
+                                    p.unlink()
+                                    count += 1
+                                except Exception:
+                                    pass
+            
+            if count > 0:
+                logger.info(f"Cleaner: Removed {count} old files")
+                
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Cleaner task error: {e}")
+            await asyncio.sleep(300) # Retry sooner on error
+
+
+async def _validate_file_magic(file_path: str, filename: str):
+    """
+    Validate file content matches extension using libmagic.
+    
+    prevents malicious renaming (e.g. malware.exe -> report.pdf).
+    """
+    if not magic:
+        logger.warning("python-magic not installed. Skipping content validation.")
+        return
+
+    try:
+        # Get MIME type from content
+        mime = magic.from_file(file_path, mime=True)
+        ext = filename.lower().split(".")[-1] if "." in filename else ""
+        
+        # Define suspicious mismatches
+        # executing header but safe extension
+        is_executable = mime in ["application/x-dosexec", "application/x-executable", "application/x-elf", "application/x-mach-binary"]
+        is_safe_ext = ext in ["txt", "pdf", "json", "yml", "yaml", "md", "csv", "log", "png", "jpg", "jpeg", "gif"]
+        
+        if is_executable and is_safe_ext:
+            logger.warning(f"SECURITY: Executable content detected in {filename} (MIME: {mime})")
+            # In high security mode, we might delete it. 
+            # For now, log a prominent warning or rename it to .dangerous
+            import os
+            new_path = file_path + ".dangerous"
+            os.rename(file_path, new_path)
+            raise ValueError(f"Security Alert: File {filename} contains executable code but has safe extension. Renamed to .dangerous")
+
+    except Exception as e:
+        if "Security Alert" in str(e):
+            raise
+        logger.warning(f"Magic validation failed for {filename}: {e}")
+        # Re-raise if it's a critical validation failure, otherwise just log.
+        # For now, we'll re-raise to prevent processing potentially malicious files.
+        raise
 
 
 # Initialize the FastMCP server with lifespan management
@@ -405,14 +527,15 @@ def main():
 
                 # PERFORMANCE: Use aiofiles for non-blocking async I/O
                 # This prevents blocking the event loop during large file uploads
-                import aiofiles
                 
                 async with aiofiles.open(file_path, 'wb') as out_file:
-                    while content := await file.read(1024 * 64):  # Read in 64KB chunks
+                    while content := await file.read(1024 * 64):  # 64KB chunks
                         await out_file.write(content)
+                
+                # Security: Validate file content (Magic Number)
+                await _validate_file_magic(str(file_path), safe_filename)
 
-                logger.info(f"File uploaded: {original_filename} -> {file_path}")
-
+                logger.info(f"File uploaded successfully: {safe_filename} ({file_path})")
                 return JSONResponse(
                     content={
                         "status": "success",

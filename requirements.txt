@@ -58,3 +58,6 @@ python-dotenv==1.2.1
 # Note: Using >=3.9.15 to avoid recursion depth vulnerability
 # (https://github.com/ijl/orjson/security/advisories/GHSA-xqr8-7jwr-rhp7)
 orjson>=3.9.15
+
+# File Type Validation (Magic Number)
+python-magic>=0.4.27

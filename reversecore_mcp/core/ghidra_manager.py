@@ -12,6 +12,16 @@ from typing import Any
 from reversecore_mcp.core.config import get_config
 from reversecore_mcp.core.logging_config import get_logger
 
+
+# Custom Exceptions for Structured Error Handling
+class GhidraError(Exception):
+    """Base exception for Ghidra operations."""
+    pass
+
+class DecompilationError(GhidraError):
+    """Raised when decompilation fails."""
+    pass
+
 logger = get_logger(__name__)
 
 
@@ -143,6 +153,12 @@ class GhidraManager:
         """
         self._ensure_jvm_started()
 
+        self._ensure_jvm_started()
+
+        # [PERFORMANCE BOTTLENECK]
+        # Ghidra/JPype requires single-threaded access to the JVM bridge via this lock.
+        # This serializes all decompilation requests.
+        # DO NOT REMOVE this lock without implementing a multi-process worker pool architecture.
         with self._lock:
             try:
                 # Get cached project
@@ -173,19 +189,22 @@ class GhidraManager:
                             pass
 
                     if not addr:
-                        return f"// Error: Invalid address {function_address}"
+                        raise ValueError(f"Invalid address or symbol: {function_address}")
 
                     func = flat_api.getFunctionAt(addr)
                     if not func:
-                        return f"// Error: No function at {function_address}"
+                        # Try to find nearest function
+                        func = flat_api.getFunctionBefore(addr)
+                        if not func:
+                             raise ValueError(f"No function found at or near {function_address}")
 
                     res = decompiler.decompileFunction(func, 60, monitor)
                     if not res.decompileCompleted():
-                        return "// Error: Decompilation failed"
+                        raise DecompilationError(f"Decompilation failed: {res.getErrorMessage()}")
 
                     return res.getDecompiledFunction().getC()
                 else:
-                    return "// Full file decompilation not supported in this mode. Please specify a function."
+                    raise NotImplementedError("Full file decompilation not supported. Please specify a function.")
 
             except Exception as e:
                 logger.error(f"Ghidra decompilation failed: {e}")
