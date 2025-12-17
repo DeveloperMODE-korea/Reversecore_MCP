@@ -124,9 +124,9 @@ async def run_strings(
                 preview_text,
                 bytes_read=bytes_read,
                 truncated=True,
-                data={
+                string_statistics={
                     "count": count,
-                    "preview": lines[:50], # First 50 lines list
+                     "preview": lines[:50], # First 50 lines list
                     "file_path": strings_path,
                     "full_size": len(text_output)
                 }
@@ -143,7 +143,7 @@ async def run_strings(
     return success(
         output, 
         bytes_read=bytes_read,
-        data={
+        string_statistics={
             "count": count,
             "preview": lines[:50],
             "full_size": len(text_output)
