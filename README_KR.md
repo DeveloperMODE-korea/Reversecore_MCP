@@ -302,8 +302,7 @@ reversecore_mcp/
 
 | 파일 | 아키텍처 | 사용 사례 |
 |------|----------|----------|
-| `Dockerfile` | x86_64 (Intel/AMD) | 리눅스 서버, Intel Mac |
-| `Dockerfile.arm64` | ARM64 | Apple Silicon Mac |
+| `Dockerfile` | 멀티 아키텍처 (x86_64, ARM64) | 모든 플랫폼 |
 
 ### 실행 명령
 
@@ -316,7 +315,7 @@ reversecore_mcp/
 
 # 수동 Docker 빌드 명령
 # Apple Silicon (M1/M2/M3/M4)
-docker build -f Dockerfile.arm64 -t reversecore-mcp:arm64 .
+docker build -f Dockerfile -t reversecore-mcp:arm64 .
 
 # Intel/AMD (x86_64)
 docker build -f Dockerfile -t reversecore-mcp:latest .

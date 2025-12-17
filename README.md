@@ -314,8 +314,7 @@ reversecore_mcp/
 
 | File | Architecture | Use Case |
 |------|--------------|----------|
-| \`Dockerfile\` | x86_64 (Intel/AMD) | Linux servers, Intel Macs |
-| \`Dockerfile.arm64\` | ARM64 | Apple Silicon Macs |
+| `Dockerfile` | Multi-Arch (x86_64, ARM64) | All platforms |
 
 ### Run Commands
 
@@ -328,7 +327,7 @@ reversecore_mcp/
 
 # Manual Docker build commands
 # Apple Silicon (M1/M2/M3/M4)
-docker build -f Dockerfile.arm64 -t reversecore-mcp:arm64 .
+docker build -f Dockerfile -t reversecore-mcp:arm64 .
 
 # Intel/AMD (x86_64)
 docker build -f Dockerfile -t reversecore-mcp:latest .

@@ -42,7 +42,7 @@ services:
   reversecore-mcp-arm64:
     build:
       context: .
-      dockerfile: Dockerfile.arm64
+      dockerfile: Dockerfile
     image: reversecore-mcp:arm64
     container_name: reversecore-mcp-arm64
     ports:
