@@ -5,10 +5,12 @@ Input validators for tool-specific parameters.
 import re
 from typing import Any
 
+from reversecore_mcp.core.config import get_config
 from reversecore_mcp.core.exceptions import ValidationError
 
 # Pre-compile address validation pattern for performance
-_ADDRESS_PATTERN = re.compile(r"^[a-zA-Z0-9_.]+$")
+# Allow alphanumeric, dots, underscores, and C++ symbol chars (:, <, >, ~, *, &, [, ])
+_ADDRESS_PATTERN = re.compile(r"^[a-zA-Z0-9_:.<>~*&\[\]]+$")
 
 # OPTIMIZATION: Pre-compile pattern for hex prefix removal
 _HEX_PREFIX_PATTERN = re.compile(r"^0[xX]")
@@ -33,8 +35,8 @@ def validate_address_format(address: str, param_name: str = "address") -> None:
 
     if not _ADDRESS_PATTERN.match(clean_address):
         raise ValidationError(
-            f"{param_name} must contain only alphanumeric characters, dots, "
-            "underscores, and '0x' prefix"
+            f"{param_name} must contain only safe characters (alphanumeric, dots, underscores, "
+            "and C++ symbol characters like :, <, >)"
         )
 
 
@@ -75,7 +77,7 @@ def _validate_strings_params(params: dict[str, Any]) -> None:
     if not isinstance(min_length, int) or min_length < 1:
         raise ValidationError("min_length must be a positive integer")
 
-    max_output_size = params.get("max_output_size", 10_000_000)
+    max_output_size = params.get("max_output_size", get_config().max_output_size)
     if not isinstance(max_output_size, int) or max_output_size < 1:
         raise ValidationError("max_output_size must be a positive integer")
 
@@ -141,9 +143,10 @@ def _validate_emulation_params(params: dict[str, Any]) -> None:
     if instructions < 1:
         raise ValidationError("instructions must be at least 1")
 
-    if instructions > 1000:
+    max_instructions = get_config().max_emulation_instructions
+    if instructions > max_instructions:
         raise ValidationError(
-            "instructions cannot exceed 1000 (safety limit to prevent CPU exhaustion)"
+            f"instructions cannot exceed {max_instructions} (safety limit to prevent CPU exhaustion)"
         )
 
 

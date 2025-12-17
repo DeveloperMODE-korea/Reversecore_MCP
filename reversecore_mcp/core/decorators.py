@@ -12,7 +12,7 @@ from collections.abc import Callable
 from typing import Any, TypeVar
 
 from reversecore_mcp.core.logging_config import get_logger
-from reversecore_mcp.core.result import ToolResult, failure
+from reversecore_mcp.core.result import ToolResult
 
 logger = get_logger(__name__)
 
@@ -92,11 +92,9 @@ def log_execution(tool_name: str | None = None) -> Callable[[F], F]:
                         extra=log_extra,
                         exc_info=True,
                     )
-                    return failure(
-                        "INTERNAL_ERROR",
-                        f"{actual_tool_name} failed: {exc}",
-                        exception_type=type(exc).__name__,
-                    )
+                    # Critical: Re-raise exception so @handle_tool_errors can catch it
+                    # returning failure() here would hide the error from outer decorators
+                    raise
 
             return async_wrapper  # type: ignore
 
@@ -146,11 +144,8 @@ def log_execution(tool_name: str | None = None) -> Callable[[F], F]:
                     extra=log_extra,
                     exc_info=True,
                 )
-                return failure(
-                    "INTERNAL_ERROR",
-                    f"{actual_tool_name} failed: {exc}",
-                    exception_type=type(exc).__name__,
-                )
+                # Critical: Re-raise exception so @handle_tool_errors can catch it
+                raise
 
         return wrapper  # type: ignore
 
