@@ -26,6 +26,8 @@ from typing import Any
 
 # Use optimized JSON implementation (3-5x faster than standard json)
 from reversecore_mcp.core import json_utils as json
+import asyncio
+import aiofiles
 
 # Import session and email utilities from submodules
 from reversecore_mcp.tools.report.session import (
@@ -513,7 +515,8 @@ class ReportTools:
                 "available_templates": available
             }
 
-        template = template_path.read_text(encoding='utf-8')
+        async with aiofiles.open(template_path, mode='r', encoding='utf-8') as f:
+            template = await f.read()
 
         # Basic fields
         fields = {
@@ -623,7 +626,8 @@ class ReportTools:
 
         # 리포트 저장
         output_path = self.output_dir / f"{ts['report_id']}.md"
-        output_path.write_text(report, encoding='utf-8')
+        async with aiofiles.open(output_path, mode='w', encoding='utf-8') as f:
+            await f.write(report)
 
         return {
             "success": True,
@@ -642,7 +646,8 @@ class ReportTools:
         templates = []
 
         for f in self.template_dir.glob("*.md"):
-            content = f.read_text(encoding='utf-8')
+            async with aiofiles.open(f, mode='r', encoding='utf-8') as tf:
+                content = await tf.read()
             # 첫 줄에서 설명 추출 (<!-- description --> 형식)
             desc = ""
             if content.startswith("<!--"):
@@ -674,7 +679,8 @@ class ReportTools:
                 "available_reports": reports
             }
 
-        content = report_path.read_text(encoding='utf-8')
+        async with aiofiles.open(report_path, mode='r', encoding='utf-8') as f:
+            content = await f.read()
 
         return {
             "success": True,
@@ -822,7 +828,8 @@ class ReportTools:
             else:
                 resolved_recipients.append(r)
 
-        report_content = report_path.read_text(encoding='utf-8')
+        async with aiofiles.open(report_path, mode='r', encoding='utf-8') as f:
+            report_content = await f.read()
 
         # 기본 제목
         if not subject:
@@ -869,23 +876,26 @@ class ReportTools:
                 )
                 msg.attach(attachment)
 
-            # 전송
-            with smtplib.SMTP(
-                self.email_config.smtp_server,
-                self.email_config.smtp_port
-            ) as server:
-                if self.email_config.use_tls:
-                    server.starttls()
-                if self.email_config.username and self.email_config.password:
-                    server.login(
+            # 전송 (Run in thread to avoid blocking event loop)
+            def _send_sync():
+                with smtplib.SMTP(
+                    self.email_config.smtp_server,
+                    self.email_config.smtp_port
+                ) as server:
+                    if self.email_config.use_tls:
+                        server.starttls()
+                    if self.email_config.username and self.email_config.password:
+                        server.login(
+                            self.email_config.username,
+                            self.email_config.password
+                        )
+                    server.sendmail(
                         self.email_config.username,
-                        self.email_config.password
+                        resolved_recipients,
+                        msg.as_string()
                     )
-                server.sendmail(
-                    self.email_config.username,
-                    resolved_recipients,
-                    msg.as_string()
-                )
+
+            await asyncio.to_thread(_send_sync)
 
             return {
                 "success": True,
@@ -919,23 +929,40 @@ class ReportTools:
                 "error": "File not found"
             }
 
-        data = path.read_bytes()
+        
+        # Stream file read to prevent memory explosion with large files
+        md5_hash = hashlib.md5()
+        sha1_hash = hashlib.sha1()
+        sha256_hash = hashlib.sha256()
+        
+        file_size = 0
+        first_chunk = b""
+        
+        async with aiofiles.open(path, mode='rb') as f:
+            while chunk := await f.read(64 * 1024):  # 64KB chunks
+                if not first_chunk:
+                    first_chunk = chunk
+                file_size += len(chunk)
+                md5_hash.update(chunk)
+                sha1_hash.update(chunk)
+                sha256_hash.update(chunk)
+                
         stat = path.stat()
 
         info = {
             "filename": path.name,
             "filepath": str(path.absolute()),
-            "filesize": len(data),
-            "filesize_hr": self._human_readable_size(len(data)),
-            "md5": hashlib.md5(data).hexdigest(),
-            "sha1": hashlib.sha1(data).hexdigest(),
-            "sha256": hashlib.sha256(data).hexdigest(),
+            "filesize": file_size,
+            "filesize_hr": self._human_readable_size(file_size),
+            "md5": md5_hash.hexdigest(),
+            "sha1": sha1_hash.hexdigest(),
+            "sha256": sha256_hash.hexdigest(),
             "file_created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
             "file_modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
         }
 
         # 파일 타입 식별
-        info["file_type"] = self._identify_file_type(data)
+        info["file_type"] = self._identify_file_type(first_chunk)
 
         return info
 

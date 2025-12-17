@@ -113,6 +113,16 @@ class ServiceContainer:
             if name in self._singleton_factories:
                 instance = self._singleton_factories[name]()
                 self._singletons[name] = instance
+                
+                # If container is already initialized, start the service immediately
+                if self._initialized and hasattr(instance, "start") and asyncio.iscoroutinefunction(instance.start):
+                    # We can't await here as get is sync, but we can schedule it
+                    # Warning: This creates a potential race condition for immediate use
+                    # ideally initialize_async should have caught this.
+                    # For safety, we log this event.
+                    logger.warning(f"Service '{name}' instantiated after initialization. Scheduling start.")
+                    asyncio.create_task(self._safe_start(name, instance))
+                    
                 return instance
 
             # Check factories
@@ -168,6 +178,14 @@ class ServiceContainer:
                 or name in self._factories
             )
 
+    async def _safe_start(self, name: str, instance: Any) -> None:
+        """Helper to start a service safely in background."""
+        try:
+            await instance.start()
+            logger.info(f"Async service '{name}' started (lazy)")
+        except Exception as e:
+            logger.error(f"Failed to start '{name}': {e}")
+
     async def initialize_async(self) -> None:
         """
         Initialize all async-capable singletons.
@@ -179,6 +197,11 @@ class ServiceContainer:
 
         with self._lock:
             self._initialized = True
+
+            # Eagerly instantiate all singleton factories to ensure they are started
+            # This prevents race conditions where a service is accessed later but missed the start phase
+            for name in list(self._singleton_factories.keys()):
+                self.get(name)
 
             # Initialize singletons that have async start methods
             for name, instance in self._singletons.items():
