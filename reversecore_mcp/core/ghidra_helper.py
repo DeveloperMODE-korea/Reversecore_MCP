@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from ghidra.program.model.listing import Function
 
 logger = get_logger(__name__)
+from reversecore_mcp.core.ghidra_manager import get_ghidra_manager
 
 # OPTIMIZATION: Pre-compile pattern for hex prefix removal (case insensitive)
 _HEX_PREFIX_PATTERN = re.compile(r"^0[xX]")
@@ -126,106 +127,98 @@ def decompile_function_with_ghidra(
     """
     try:
         import pyghidra
-
+        
+        # Ensure Ghidra environment is set up
         _configure_ghidra_environment()
-    except ImportError as e:
-        raise ImportError("PyGhidra is not installed. Install with: pip install pyghidra") from e
 
-    # Create temporary project directory
-    with tempfile.TemporaryDirectory() as temp_dir:
-        project_location = Path(temp_dir) / "ghidra_project"
-        project_name = "temp_analysis"
+        # Use GhidraManager for efficient project reuse
+        manager = get_ghidra_manager()
+        
+        # Get or create context for this binary
+        # This will reuse existing project if available, avoiding re-import
+        with manager.context(file_path) as flat_api:
+            # Import Ghidra classes here, after JVM is started
+            from ghidra.app.decompiler import DecompileResults, DecompInterface
 
-        try:
-            # Open program with PyGhidra
-            logger.info(f"Opening binary with Ghidra: {file_path}")
+            program = flat_api.getCurrentProgram()
 
-            with pyghidra.open_program(
-                str(file_path),
-                project_location=str(project_location),
-                project_name=project_name,
-                analyze=True,  # Run auto-analysis
-            ) as flat_api:
-                # Import Ghidra classes here, after JVM is started
-                from ghidra.app.decompiler import DecompileResults, DecompInterface
+            # Resolve function address
+            function = _resolve_function(flat_api, function_address)
 
-                program = flat_api.getCurrentProgram()
+            if function is None:
+                raise ValidationError(
+                    f"Could not find function at address: {function_address}",
+                    details={"address": function_address},
+                )
 
-                # Resolve function address
-                function = _resolve_function(flat_api, function_address)
+            # Initialize decompiler
+            decompiler = DecompInterface()
+            decompiler.openProgram(program)
 
-                if function is None:
+            try:
+                # Decompile the function
+                logger.info(f"Decompiling function: {function.getName()}")
+
+                results: DecompileResults = decompiler.decompileFunction(
+                    function, timeout, None
+                )  # monitor
+
+                # Check for errors
+                if not results.decompileCompleted():
+                    error_msg = results.getErrorMessage()
                     raise ValidationError(
-                        f"Could not find function at address: {function_address}",
-                        details={"address": function_address},
+                        f"Decompilation failed: {error_msg}",
+                        details={
+                            "function": function.getName(),
+                            "address": function_address,
+                        },
                     )
 
-                # Initialize decompiler
-                decompiler = DecompInterface()
-                decompiler.openProgram(program)
+                # Extract decompiled C code
+                decompiled_function = results.getDecompiledFunction()
+                c_code = decompiled_function.getC()
 
-                try:
-                    # Decompile the function
-                    logger.info(f"Decompiling function: {function.getName()}")
+                # Extract metadata
+                high_function = results.getHighFunction()
+                metadata = {
+                    "function_name": function.getName(),
+                    "entry_point": str(function.getEntryPoint()),
+                    "parameter_count": (
+                        high_function.getFunctionPrototype().getNumParams()
+                        if high_function
+                        else 0
+                    ),
+                    "local_symbol_count": (
+                        high_function.getLocalSymbolMap().getNumSymbols()
+                        if high_function
+                        else 0
+                    ),
+                    "signature": function.getSignature().getPrototypeString(),
+                    "body_size": function.getBody().getNumAddresses(),
+                    "decompiler": "ghidra",
+                }
 
-                    results: DecompileResults = decompiler.decompileFunction(
-                        function, timeout, None
-                    )  # monitor
+                logger.info(f"Successfully decompiled {function.getName()}")
 
-                    # Check for errors
-                    if not results.decompileCompleted():
-                        error_msg = results.getErrorMessage()
-                        raise ValidationError(
-                            f"Decompilation failed: {error_msg}",
-                            details={
-                                "function": function.getName(),
-                                "address": function_address,
-                            },
-                        )
+                return c_code, metadata
 
-                    # Extract decompiled C code
-                    decompiled_function = results.getDecompiledFunction()
-                    c_code = decompiled_function.getC()
+            finally:
+                # Always dispose of decompiler resources
+                decompiler.dispose()
 
-                    # Extract metadata
-                    high_function = results.getHighFunction()
-                    metadata = {
-                        "function_name": function.getName(),
-                        "entry_point": str(function.getEntryPoint()),
-                        "parameter_count": (
-                            high_function.getFunctionPrototype().getNumParams()
-                            if high_function
-                            else 0
-                        ),
-                        "local_symbol_count": (
-                            high_function.getLocalSymbolMap().getNumSymbols()
-                            if high_function
-                            else 0
-                        ),
-                        "signature": function.getSignature().getPrototypeString(),
-                        "body_size": function.getBody().getNumAddresses(),
-                        "decompiler": "ghidra",
-                    }
-
-                    logger.info(f"Successfully decompiled {function.getName()}")
-
-                    return c_code, metadata
-
-                finally:
-                    # Always dispose of decompiler resources
-                    decompiler.dispose()
-
-        except subprocess.CalledProcessError as e:
-            if "LaunchSupport" in str(e.cmd):
-                logger.error("Ghidra LaunchSupport failed. Check JAVA_HOME and permissions.")
-                raise ValidationError(
-                    "Ghidra failed to launch. Please ensure JAVA_HOME is set correctly and the user has write permissions to Ghidra installation.",
-                    details={"error": str(e), "command": str(e.cmd)},
-                )
-            raise
-        except Exception as e:
-            logger.error(f"Ghidra decompilation failed: {e}", exc_info=True)
-            raise
+    except ImportError as e:
+        raise ImportError("PyGhidra is not installed. Install with: pip install pyghidra") from e
+    except subprocess.CalledProcessError as e:
+        if "LaunchSupport" in str(e.cmd):
+            logger.error("Ghidra LaunchSupport failed. Check JAVA_HOME and permissions.")
+            raise ValidationError(
+                "Ghidra failed to launch. Please ensure JAVA_HOME is set correctly and the user has write permissions to Ghidra installation.",
+                details={"error": str(e), "command": str(e.cmd)},
+            )
+        raise
+    except Exception as e:
+        logger.error(f"Ghidra decompilation failed: {e}", exc_info=True)
+        raise
 
 
 def _resolve_function(flat_api: "FlatProgramAPI", address_str: str) -> Optional["Function"]:
@@ -319,180 +312,170 @@ def recover_structures_with_ghidra(
         import pyghidra
 
         _configure_ghidra_environment()
+        
+        # Use GhidraManager for efficient project reuse
+        manager = get_ghidra_manager()
+        
+        # Get or create context for this binary
+        with manager.context(file_path) as flat_api:
+            # Import Ghidra classes here
+            from ghidra.app.decompiler import DecompileResults, DecompInterface
+            from ghidra.program.model.pcode import HighFunction, HighVariable
+
+            program = flat_api.getCurrentProgram()
+
+            # Resolve function address
+            function = _resolve_function(flat_api, function_address)
+
+            if function is None:
+                raise ValidationError(
+                    f"Could not find function at address: {function_address}",
+                    details={"address": function_address},
+                )
+
+            # Initialize decompiler for high-level analysis
+            decompiler = DecompInterface()
+            decompiler.openProgram(program)
+
+            try:
+                # Decompile the function to get high-level representation
+                logger.info(f"Analyzing structures in function: {function.getName()}")
+
+                results: DecompileResults = decompiler.decompileFunction(
+                    function, timeout, None
+                )
+
+                if not results.decompileCompleted():
+                    error_msg = results.getErrorMessage()
+                    raise ValidationError(
+                        f"Structure analysis failed: {error_msg}",
+                        details={
+                            "function": function.getName(),
+                            "address": function_address,
+                        },
+                    )
+
+                # Extract structure information from high function
+                high_function: HighFunction = results.getHighFunction()
+
+                if high_function is None:
+                    raise ValidationError(
+                        "Could not get high-level function representation",
+                        details={"function": function.getName()},
+                    )
+
+                # Collect all data types used in the function
+                structures_found = {}
+
+                # Analyze local variables for structure types
+                local_symbols = high_function.getLocalSymbolMap()
+
+                for i in range(local_symbols.getNumSymbols()):
+                    symbol = local_symbols.getSymbol(i)
+                    high_var: HighVariable = symbol.getHighVariable()
+
+                    if high_var is not None:
+                        data_type = high_var.getDataType()
+
+                        # Check if this is a structure or pointer to structure
+                        if data_type is not None:
+                            type_name = data_type.getName()
+
+                            # Look for structure types (including pointers to structures)
+                            if "struct" in type_name.lower() or data_type.getLength() > 8:
+                                # Try to get the underlying structure
+                                actual_type = data_type
+
+                                # If it's a pointer, get the pointed-to type
+                                if hasattr(data_type, "getDataType"):
+                                    actual_type = data_type.getDataType()
+
+                                struct_name = actual_type.getName()
+
+                                if struct_name not in structures_found:
+                                    # OPTIMIZATION: Use helper function to extract fields
+                                    fields = _extract_structure_fields(actual_type)
+
+                                    structures_found[struct_name] = {
+                                        "name": struct_name,
+                                        "size": actual_type.getLength(),
+                                        "fields": fields,
+                                    }
+
+                # Also analyze function parameters for structure types
+                for param in function.getParameters():
+                    param_type = param.getDataType()
+
+                    if param_type is not None:
+                        type_name = param_type.getName()
+
+                        if "struct" in type_name.lower() and type_name not in structures_found:
+                            # OPTIMIZATION: Use helper function to extract fields
+                            fields = _extract_structure_fields(param_type)
+
+                            structures_found[type_name] = {
+                                "name": type_name,
+                                "size": param_type.getLength(),
+                                "fields": fields,
+                            }
+
+                # Generate C structure definitions
+                # OPTIMIZATION: Build field strings outside of dict comprehension
+                c_definitions = []
+                for struct_name, struct_data in structures_found.items():
+                    if struct_data["fields"]:
+                        # Pre-build field strings for better performance
+                        field_strs = [
+                            f"{field['type']} {field['name']}; // offset {field['offset']}, size {field['size']}"
+                            for field in struct_data["fields"]
+                        ]
+                        fields_str = "\n    ".join(field_strs)
+                        c_def = f"struct {struct_name} {{\n    {fields_str}\n}};"
+                    else:
+                        c_def = f"struct {struct_name} {{ /* size: {struct_data['size']} bytes */ }};"
+
+                    c_definitions.append(c_def)
+
+                # Prepare result
+                result = {
+                    "structures": list(structures_found.values()),
+                    "c_definitions": (
+                        "\n\n".join(c_definitions)
+                        if c_definitions
+                        else "// No structures found"
+                    ),
+                    "count": len(structures_found),
+                }
+
+                # Metadata
+                metadata = {
+                    "function_name": function.getName(),
+                    "entry_point": str(function.getEntryPoint()),
+                    "structure_count": len(structures_found),
+                    "analyzed_variables": local_symbols.getNumSymbols(),
+                    "decompiler": "ghidra",
+                }
+
+                logger.info(
+                    f"Successfully recovered {len(structures_found)} structure(s) from {function.getName()}"
+                )
+
+                return result, metadata
+
+            finally:
+                # Always dispose of decompiler resources
+                decompiler.dispose()
+                
     except ImportError as e:
         raise ImportError("PyGhidra is not installed. Install with: pip install pyghidra") from e
-
-    # Create temporary project directory
-    with tempfile.TemporaryDirectory() as temp_dir:
-        project_location = Path(temp_dir) / "ghidra_project"
-        project_name = "struct_analysis"
-
-        try:
-            # Open program with PyGhidra
-            logger.info(f"Opening binary with Ghidra for structure recovery: {file_path}")
-
-            with pyghidra.open_program(
-                str(file_path),
-                project_location=str(project_location),
-                project_name=project_name,
-                analyze=True,  # Run auto-analysis for better structure detection
-            ) as flat_api:
-                # Import Ghidra classes here
-                from ghidra.app.decompiler import DecompileResults, DecompInterface
-                from ghidra.program.model.pcode import HighFunction, HighVariable
-
-                program = flat_api.getCurrentProgram()
-
-                # Resolve function address
-                function = _resolve_function(flat_api, function_address)
-
-                if function is None:
-                    raise ValidationError(
-                        f"Could not find function at address: {function_address}",
-                        details={"address": function_address},
-                    )
-
-                # Initialize decompiler for high-level analysis
-                decompiler = DecompInterface()
-                decompiler.openProgram(program)
-
-                try:
-                    # Decompile the function to get high-level representation
-                    logger.info(f"Analyzing structures in function: {function.getName()}")
-
-                    results: DecompileResults = decompiler.decompileFunction(
-                        function, timeout, None
-                    )
-
-                    if not results.decompileCompleted():
-                        error_msg = results.getErrorMessage()
-                        raise ValidationError(
-                            f"Structure analysis failed: {error_msg}",
-                            details={
-                                "function": function.getName(),
-                                "address": function_address,
-                            },
-                        )
-
-                    # Extract structure information from high function
-                    high_function: HighFunction = results.getHighFunction()
-
-                    if high_function is None:
-                        raise ValidationError(
-                            "Could not get high-level function representation",
-                            details={"function": function.getName()},
-                        )
-
-                    # Collect all data types used in the function
-                    structures_found = {}
-
-                    # Analyze local variables for structure types
-                    local_symbols = high_function.getLocalSymbolMap()
-
-                    for i in range(local_symbols.getNumSymbols()):
-                        symbol = local_symbols.getSymbol(i)
-                        high_var: HighVariable = symbol.getHighVariable()
-
-                        if high_var is not None:
-                            data_type = high_var.getDataType()
-
-                            # Check if this is a structure or pointer to structure
-                            if data_type is not None:
-                                type_name = data_type.getName()
-
-                                # Look for structure types (including pointers to structures)
-                                if "struct" in type_name.lower() or data_type.getLength() > 8:
-                                    # Try to get the underlying structure
-                                    actual_type = data_type
-
-                                    # If it's a pointer, get the pointed-to type
-                                    if hasattr(data_type, "getDataType"):
-                                        actual_type = data_type.getDataType()
-
-                                    struct_name = actual_type.getName()
-
-                                    if struct_name not in structures_found:
-                                        # OPTIMIZATION: Use helper function to extract fields
-                                        fields = _extract_structure_fields(actual_type)
-
-                                        structures_found[struct_name] = {
-                                            "name": struct_name,
-                                            "size": actual_type.getLength(),
-                                            "fields": fields,
-                                        }
-
-                    # Also analyze function parameters for structure types
-                    for param in function.getParameters():
-                        param_type = param.getDataType()
-
-                        if param_type is not None:
-                            type_name = param_type.getName()
-
-                            if "struct" in type_name.lower() and type_name not in structures_found:
-                                # OPTIMIZATION: Use helper function to extract fields
-                                fields = _extract_structure_fields(param_type)
-
-                                structures_found[type_name] = {
-                                    "name": type_name,
-                                    "size": param_type.getLength(),
-                                    "fields": fields,
-                                }
-
-                    # Generate C structure definitions
-                    # OPTIMIZATION: Build field strings outside of dict comprehension
-                    c_definitions = []
-                    for struct_name, struct_data in structures_found.items():
-                        if struct_data["fields"]:
-                            # Pre-build field strings for better performance
-                            field_strs = [
-                                f"{field['type']} {field['name']}; // offset {field['offset']}, size {field['size']}"
-                                for field in struct_data["fields"]
-                            ]
-                            fields_str = "\n    ".join(field_strs)
-                            c_def = f"struct {struct_name} {{\n    {fields_str}\n}};"
-                        else:
-                            c_def = f"struct {struct_name} {{ /* size: {struct_data['size']} bytes */ }};"
-
-                        c_definitions.append(c_def)
-
-                    # Prepare result
-                    result = {
-                        "structures": list(structures_found.values()),
-                        "c_definitions": (
-                            "\n\n".join(c_definitions)
-                            if c_definitions
-                            else "// No structures found"
-                        ),
-                        "count": len(structures_found),
-                    }
-
-                    # Metadata
-                    metadata = {
-                        "function_name": function.getName(),
-                        "entry_point": str(function.getEntryPoint()),
-                        "structure_count": len(structures_found),
-                        "analyzed_variables": local_symbols.getNumSymbols(),
-                        "decompiler": "ghidra",
-                    }
-
-                    logger.info(
-                        f"Successfully recovered {len(structures_found)} structure(s) from {function.getName()}"
-                    )
-
-                    return result, metadata
-
-                finally:
-                    # Always dispose of decompiler resources
-                    decompiler.dispose()
-
-        except subprocess.CalledProcessError as e:
-            if "LaunchSupport" in str(e.cmd):
-                logger.error("Ghidra LaunchSupport failed. Check JAVA_HOME and permissions.")
-                raise ValidationError(
-                    "Ghidra failed to launch. Please ensure JAVA_HOME is set correctly and the user has write permissions to Ghidra installation.",
-                    details={"error": str(e), "command": str(e.cmd)},
-                )
-            raise
-        except Exception as e:
-            logger.error(f"Ghidra structure recovery failed: {e}", exc_info=True)
-            raise
+    except subprocess.CalledProcessError as e:
+        if "LaunchSupport" in str(e.cmd):
+            logger.error("Ghidra LaunchSupport failed. Check JAVA_HOME and permissions.")
+            raise ValidationError(
+                "Ghidra failed to launch. Please ensure JAVA_HOME is set correctly and the user has write permissions to Ghidra installation.",
+                details={"error": str(e), "command": str(e.cmd)},
+            )
+        raise
+    except Exception as e:
+        logger.error(f"Ghidra structure recovery failed: {e}", exc_info=True)
+        raise

@@ -69,8 +69,12 @@ class MemoryStore:
         self._db.row_factory = aiosqlite.Row
 
         await self._create_schema()
+        
+        # Enable WAL mode for better concurrency
+        await self._db.execute("PRAGMA journal_mode=WAL;")
+        
         self._initialized = True
-        logger.info(f"Memory store initialized at {self.db_path}")
+        logger.info(f"Memory store initialized at {self.db_path} (WAL enabled)")
 
     async def _create_schema(self) -> None:
         """Create database schema if not exists."""
@@ -428,7 +432,23 @@ class MemoryStore:
                 JOIN memories_fts fts ON m.id = fts.rowid
                 WHERE memories_fts MATCH ?
             """
-            params: list[Any] = [query]
+            # Sanitize query for FTS5
+            # 1. Escape double quotes
+            safe_query = query.replace('"', '""')
+            # 2. Wrap in quotes to treat as phrase if it contains spaces or symbols
+            # This prevents syntax errors from FTS5 operators in user input
+            if any(c in safe_query for c in ' .-_'):
+                safe_query = f'"{safe_query}"'
+            
+            # Use raw query if it seems to be an explicit FTS query (this is a heuristic)
+            if ' OR ' in query or ' AND ' in query or 'NEAR(' in query:
+                # Trust the user if they look like they know FTS syntax, but still risk error
+                # For safety in this fix, we prioritize stability over advanced syntax for raw inputs
+                # so we stick to the safe version unless we validate it.
+                # Reverting to safe method for now as per plan.
+                pass
+
+            params: list[Any] = [safe_query]
 
             if session_id:
                 base_query += " AND m.session_id = ?"
