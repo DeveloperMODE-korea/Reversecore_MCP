@@ -107,6 +107,11 @@ class Settings(BaseSettings):
     )
 
     # File size limits
+    max_output_size: int = Field(
+        default=10_000_000,
+        ge=1000,
+        description="Maximum output size for tools (bytes)",
+    )
     lief_max_file_size: int = Field(
         default=1_000_000_000,
         ge=1_000_000,
@@ -149,6 +154,14 @@ class Settings(BaseSettings):
         ge=1,
         le=10,
         description="Maximum number of Ghidra projects to cache (higher = more RAM)",
+    )
+
+    # Emulation configuration
+    max_emulation_instructions: int = Field(
+        default=1000,
+        ge=1,
+        le=1_000_000,
+        description="Maximum instructions for emulation safety limit",
     )
 
     # AI Memory configuration
@@ -307,6 +320,10 @@ class Config:
         return self._settings.lief_max_file_size
 
     @property
+    def max_output_size(self) -> int:
+        return self._settings.max_output_size
+
+    @property
     def mcp_transport(self) -> str:
         return self._settings.mcp_transport.value
 
@@ -325,6 +342,10 @@ class Config:
     @property
     def ghidra_max_projects(self) -> int:
         return self._settings.ghidra_max_projects
+
+    @property
+    def max_emulation_instructions(self) -> int:
+        return self._settings.max_emulation_instructions
 
     @classmethod
     def from_env(cls) -> "Config":
