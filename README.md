@@ -3,7 +3,7 @@
 ![Icon](icon.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![FastMCP](https://img.shields.io/badge/FastMCP-2.13.1-green)](https://github.com/jlowin/fastmcp)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)](https://www.docker.com/)
 [![Tests](https://img.shields.io/badge/tests-852%20passed-brightgreen)](tests/)
@@ -82,12 +82,14 @@ docker compose --profile arm64 up -d
 
 **Step 1: Build Docker Image**
 
-```bash
-# macOS Apple Silicon (M1/M2/M3/M4)
-docker build -f Dockerfile.arm64 -t reversecore-mcp:arm64 .
+The unified Dockerfile automatically detects your system architecture:
 
-# macOS Intel / Linux / Windows (x86_64)
-docker build -f Dockerfile -t reversecore-mcp:latest .
+```bash
+# Automatic architecture detection (works for all platforms)
+docker build -t reversecore-mcp:latest .
+
+# Or use the convenience script
+./scripts/run-docker.sh
 ```
 
 **Step 2: Configure MCP Client**
@@ -95,7 +97,7 @@ docker build -f Dockerfile -t reversecore-mcp:latest .
 Add to `~/.cursor/mcp.json`:
 
 <details>
-<summary>🍎 <b>macOS Apple Silicon (M1/M2/M3/M4)</b></summary>
+<summary>🍎 <b>macOS (All Processors)</b></summary>
 
 ```json
 {
@@ -107,7 +109,7 @@ Add to `~/.cursor/mcp.json`:
         "-v", "/Users/YOUR_USERNAME/Reversecore_Workspace:/app/workspace",
         "-e", "REVERSECORE_WORKSPACE=/app/workspace",
         "-e", "MCP_TRANSPORT=stdio",
-        "reversecore-mcp:arm64"
+        "reversecore-mcp:latest"
       ]
     }
   }
@@ -116,7 +118,7 @@ Add to `~/.cursor/mcp.json`:
 </details>
 
 <details>
-<summary>🖥️ <b>macOS Intel / Linux (x86_64)</b></summary>
+<summary>🐧 <b>Linux</b></summary>
 
 ```json
 {
@@ -137,7 +139,7 @@ Add to `~/.cursor/mcp.json`:
 </details>
 
 <details>
-<summary>🪟 <b>Windows (x86_64)</b></summary>
+<summary>🪟 <b>Windows</b></summary>
 
 ```json
 {
@@ -171,40 +173,44 @@ Add to `~/.cursor/mcp.json`:
 
 ## ✨ Key Features
 
-### 🔱 Trinity Defense System
+### 🔍 Static Analysis
 
-Fully automated threat detection and neutralization pipeline:
+Comprehensive file analysis and metadata extraction:
 
-- **Phase 1 (DISCOVER)**: Ghost Trace scans for hidden threats
-- **Phase 2 (UNDERSTAND)**: Neural Decompiler analyzes intent
-- **Phase 3 (NEUTRALIZE)**: Adaptive Vaccine generates defenses
+- **File Type Detection**: Identify binary format, architecture, and compiler information (`run_file`)
+- **String Extraction**: Extract ASCII/Unicode strings with configurable limits (`run_strings`)
+- **Firmware Analysis**: Deep scan for embedded files and signatures (`run_binwalk`)
+- **Binary Parsing**: Parse PE/ELF/Mach-O headers and sections with LIEF (`parse_binary_with_lief`)
 
-### 👻 Ghost Trace
+### ⚙️ Disassembly & Decompilation
 
-Detects "Logic Bombs" and "Dormant Malware" that evade sandbox detection:
+Multi-architecture binary analysis with intelligent tooling:
 
-- Orphan function detection (hidden backdoors)
-- Magic value trigger identification
-- AI-driven partial emulation
+- **Radare2 Integration**: Full r2 command access with connection pooling (`run_radare2`, `Radare2_disassemble`)
+- **Ghidra Decompilation**: Enterprise-grade decompilation with 16GB JVM heap (`smart_decompile`, `get_pseudo_code`)
+- **Multi-Architecture Support**: x86, x86-64, ARM, ARM64, MIPS, PowerPC via Capstone (`disassemble_with_capstone`)
+- **Smart Fallback**: Automatic Ghidra-first, r2-fallback strategy for best results
 
-### 🧠 Neural Decompiler
+### 🧬 Advanced Analysis
 
-Transforms raw decompiled code into human-readable format:
+Deep code analysis and behavior understanding:
 
-- Semantic variable renaming (\`iVar1\` → \`sock_fd\`)
-- Structure inference from pointer arithmetic
-- Smart annotation with explanatory comments
+- **Cross-Reference Analysis**: Track function calls, data references, and control flow (`analyze_xrefs`)
+- **Structure Recovery**: Infer data structures from pointer arithmetic and memory access patterns (`recover_structures`)
+- **Emulation**: ESIL-based code emulation for dynamic behavior analysis (`emulate_machine_code`)
+- **Binary Comparison**: Diff binaries and match library functions (`diff_binaries`, `match_libraries`)
 
-### 🎮 Game Security Analysis
+### 🦠 Malware Analysis & Defense
 
-Specialized tools for game client reverse engineering:
+Specialized tools for threat detection and mitigation:
 
-- **Cheat Point Finder**: Automated detection of speed hacks, teleport, god mode, item duplication, wallhack
-- **Anti-Cheat Profiler**: Identifies GameGuard, XIGNCODE, EAC, VAC patterns
-- **Protocol Analyzer**: Korean MMO protocol pattern detection (CS_/SC_, MSG_/PKT_)
-- **Function Pattern Matching**: Speed multiplier, coordinate manipulation, health modification detection
+- **Dormant Threat Detection**: Find hidden backdoors, orphan functions, and logic bombs (`dormant_detector`)
+- **IOC Extraction**: Automatically extract IPs, URLs, domains, emails, hashes, and crypto addresses (`extract_iocs`)
+- **YARA Scanning**: Pattern-based malware detection with custom rules (`run_yara`)
+- **Adaptive Vaccine**: Generate defensive measures (YARA rules, binary patches, NOP injection) (`adaptive_vaccine`)
+- **Vulnerability Hunter**: Detect dangerous API patterns and exploit paths (`vulnerability_hunter`)
 
-### � Server Health & Monitoring (NEW!)
+### 📊 Server Health & Monitoring
 
 Built-in observability tools for enterprise environments:
 
@@ -212,15 +218,16 @@ Built-in observability tools for enterprise environments:
 - **Performance Metrics**: Track tool execution times, error rates, and call counts (`get_tool_metrics`)
 - **Auto-Recovery**: Automatic retry mechanism with exponential backoff for transient failures
 
-### �📝 Report Generation Tools (NEW!)
+### 📝 Report Generation (v3.1)
 
 Professional malware analysis report generation with accurate timestamps:
 
 - **One-Shot Submission**: Generate standardized JSON reports with a single command (`generate_malware_submission`)
-- **Session Tracking**: Start/end analysis sessions with automatic duration calculation
-- **IOC Collection**: Collect and organize indicators during analysis (hashes, IPs, domains, URLs)
-- **MITRE ATT&CK Mapping**: Document techniques with proper framework references
-- **Email Delivery**: Send reports directly to security teams (SMTP support)
+- **Session Tracking**: Start/end analysis sessions with automatic duration calculation (`start_analysis_session`, `end_analysis_session`)
+- **IOC Collection**: Collect and organize indicators during analysis (`add_session_ioc`)
+- **MITRE ATT&CK Mapping**: Document techniques with proper framework references (`add_session_mitre`)
+- **Email Delivery**: Send reports directly to security teams with SMTP support (`send_report_email`)
+- **Multiple Templates**: Full analysis, quick triage, IOC summary, executive brief
 
 ```python
 # Example 1: One-Shot JSON Submission
@@ -230,13 +237,14 @@ generate_malware_submission(
     tags="ransomware,critical"
 )
 
-# Example 2: Interactive Session
+# Example 2: Interactive Session Workflow
 get_system_time()
 start_analysis_session(sample_path="malware.exe")
 add_session_ioc("ips", "192.168.1.100")
 add_session_mitre("T1059.001", "PowerShell", "Execution")
 end_analysis_session(summary="Ransomware detected")
 create_analysis_report(template_type="full_analysis")
+send_report_email(to="security-team@company.com")
 ```
 
 ### ⚡ Performance & Reliability (v3.1)
@@ -259,15 +267,16 @@ create_analysis_report(template_type="full_analysis")
 
 | Category | Tools |
 |----------|-------|
-| **Basic Analysis** | \`run_file\`, \`run_strings\`, \`run_binwalk\` |
-| **Disassembly** | \`run_radare2\`, \`disassemble_with_capstone\` |
-| **Decompilation** | \`smart_decompile\`, \`get_pseudo_code\` (Ghidra/r2) |
-| **Advanced** | \`analyze_xrefs\`, \`recover_structures\`, \`emulate_machine_code\` |
-| **Malware Analysis & Vaccine** | \`dormant_detector\`, \`adaptive_vaccine\`, \`vulnerability_hunter\`, \`extract_iocs\`, \`run_yara\` |
-| **Binary Parsing** | \`parse_binary_with_lief\` |
-| **Diffing** | \`diff_binaries\`, \`match_libraries\` |
-| **Game Analysis** | \`find_cheat_points\`, \`analyze_game_protocol\` |
-| **Reporting** | \`get_system_time\`, \`start_analysis_session\`, \`create_analysis_report\` |
+| **File Operations** | `list_workspace`, `get_file_info` |
+| **Static Analysis** | `run_file`, `run_strings`, `run_binwalk` |
+| **Disassembly** | `run_radare2`, `Radare2_disassemble`, `disassemble_with_capstone` |
+| **Decompilation** | `smart_decompile`, `get_pseudo_code` |
+| **Advanced Analysis** | `analyze_xrefs`, `recover_structures`, `emulate_machine_code` |
+| **Binary Parsing** | `parse_binary_with_lief` |
+| **Binary Comparison** | `diff_binaries`, `match_libraries` |
+| **Malware Analysis** | `dormant_detector`, `extract_iocs`, `run_yara`, `adaptive_vaccine`, `vulnerability_hunter` |
+| **Report Generation** | `get_system_time`, `set_timezone`, `start_analysis_session`, `add_session_ioc`, `add_session_mitre`, `end_analysis_session`, `create_analysis_report`, `send_report_email`, `generate_malware_submission` |
+| **Server Management** | `get_server_health`, `get_tool_metrics` |
 
 ## 📊 Analysis Workflow
 
@@ -277,44 +286,85 @@ create_analysis_report(template_type="full_analysis")
 
 **Use built-in prompts for guided analysis:**
 
-- \`full_analysis_mode\` - Comprehensive malware analysis with **6-phase expert reasoning**
-- \`basic_analysis_mode\` - Quick triage
-- \`game_analysis_mode\` - Game client analysis with **cheat detection heuristics**
-- \`firmware_analysis_mode\` - IoT/Firmware analysis
-- \`report_generation_mode\` - Professional report generation workflow **(NEW!)**
+- `full_analysis_mode` - Comprehensive malware analysis with **6-phase expert reasoning** and evidence classification
+- `basic_analysis_mode` - Quick triage for fast initial assessment
+- `game_analysis_mode` - Game client analysis with cheat detection guidance
+- `firmware_analysis_mode` - IoT/Firmware security analysis with embedded system focus
+- `report_generation_mode` - Professional report generation workflow with MITRE ATT&CK mapping
 
-> 💡 **AI Reasoning Enhancement**: Prompts use expert persona priming, Chain-of-Thought checkpoints, and structured reasoning to maximize AI analysis capabilities.
+> 💡 **AI Reasoning Enhancement**: Analysis prompts use expert persona priming, Chain-of-Thought checkpoints, structured reasoning phases, and evidence classification (OBSERVED/INFERRED/POSSIBLE) to maximize AI analysis capabilities and ensure thorough documentation.
 
 ## 🏗️ Architecture
 
 ```
 reversecore_mcp/
-├── core/                 # Infrastructure
-│   ├── config.py         # Configuration management
-│   ├── container.py      # Dependency injection
-│   ├── ghidra.py         # Ghidra integration (16GB JVM heap)
-│   ├── r2_helpers.py     # Radare2 utilities
-│   ├── result.py         # ToolSuccess/ToolError models
-│   └── security.py       # Input validation
-├── tools/                # MCP Tools
-│   ├── cli_tools.py      # CLI wrappers
-│   ├── decompilation.py  # Decompilers
-│   ├── game_analysis.py  # Game security analysis (NEW!)
-│   ├── ghost_trace.py    # Hidden threat detection
-│   ├── r2_analysis.py    # R2 analysis (v3.0 optimized)
-│   ├── trinity_defense.py # Automated defense
-│   └── ...
-├── prompts.py            # AI reasoning prompts (enhanced)
-└── resources.py          # Dynamic resources
+├── core/                           # Infrastructure & Services
+│   ├── config.py                   # Configuration management
+│   ├── ghidra.py, ghidra_manager.py, ghidra_helper.py  # Ghidra integration (16GB JVM)
+│   ├── r2_helpers.py, r2_pool.py   # Radare2 connection pooling
+│   ├── security.py                 # Path validation & input sanitization
+│   ├── result.py                   # ToolSuccess/ToolError response models
+│   ├── metrics.py                  # Tool execution metrics
+│   ├── report_generator.py         # Report generation service
+│   ├── plugin.py                   # Plugin interface for extensibility
+│   ├── decorators.py               # @log_execution, @track_metrics
+│   ├── error_handling.py           # @handle_tool_errors decorator
+│   ├── logging_config.py           # Structured logging setup
+│   ├── memory.py                   # AI memory store (async SQLite)
+│   ├── mitre_mapper.py             # MITRE ATT&CK framework mapping
+│   ├── resource_manager.py         # Subprocess lifecycle management
+│   └── validators.py               # Input validation
+│
+├── tools/                          # MCP Tool Implementations
+│   ├── analysis/                   # Basic analysis tools
+│   │   ├── static_analysis.py      # file, strings, binwalk
+│   │   ├── lief_tools.py           # PE/ELF/Mach-O parsing
+│   │   ├── diff_tools.py           # Binary comparison
+│   │   └── signature_tools.py      # YARA scanning
+│   │
+│   ├── radare2/                    # Radare2 integration
+│   │   ├── r2_analysis.py          # Core r2 analysis
+│   │   ├── radare2_mcp_tools.py    # Advanced r2 tools (CFG, ESIL)
+│   │   ├── r2_session.py           # Session management
+│   │   └── r2_pool.py              # Connection pooling
+│   │
+│   ├── ghidra/                     # Ghidra decompilation
+│   │   ├── decompilation.py        # smart_decompile, pseudo-code
+│   │   └── ghidra_tools.py         # Structure/Enum management
+│   │
+│   ├── malware/                    # Malware analysis & defense
+│   │   ├── dormant_detector.py     # Hidden threat detection
+│   │   ├── adaptive_vaccine.py     # Defense generation
+│   │   ├── vulnerability_hunter.py # Vulnerability detection
+│   │   ├── ioc_tools.py            # IOC extraction
+│   │   └── yara_tools.py           # YARA rule management
+│   │
+│   ├── common/                     # Cross-cutting concerns
+│   │   ├── file_operations.py      # Workspace file management
+│   │   ├── server_tools.py         # Health checks, metrics
+│   │   └── memory_tools.py         # AI memory operations
+│   │
+│   └── report/                     # Report generation (v3.1)
+│       ├── report_tools.py         # Core report engine
+│       ├── report_mcp_tools.py     # MCP tool registration
+│       ├── session.py              # Analysis session tracking
+│       └── email.py                # SMTP integration
+│
+├── prompts.py                      # AI reasoning prompts (5 modes)
+├── resources.py                    # Dynamic MCP resources (reversecore:// URIs)
+└── server.py                       # FastMCP server initialization & HTTP setup
 ```
 
 ## 🐳 Docker Deployment
 
 ### Multi-Architecture Support
 
-| File | Architecture | Use Case |
-|------|--------------|----------|
-| `Dockerfile` | Multi-Arch (x86_64, ARM64) | All platforms |
+The unified `Dockerfile` automatically detects your system architecture:
+
+| Architecture | Auto-Detected | Support |
+|--------------|---------------|---------|
+| x86_64 (Intel/AMD) | ✅ | Full support |
+| ARM64 (Apple Silicon M1-M4) | ✅ | Full support |
 
 ### Run Commands
 
@@ -325,12 +375,11 @@ reversecore_mcp/
 ./scripts/run-docker.sh logs         # View logs
 ./scripts/run-docker.sh shell        # Shell access
 
-# Manual Docker build commands
-# Apple Silicon (M1/M2/M3/M4)
-docker build -f Dockerfile -t reversecore-mcp:arm64 .
+# Manual Docker build (works for all architectures)
+docker build -t reversecore-mcp:latest .
 
-# Intel/AMD (x86_64)
-docker build -f Dockerfile -t reversecore-mcp:latest .
+# Or using Docker Compose
+docker compose up -d
 ```
 
 ### Environment Variables
@@ -369,7 +418,7 @@ black reversecore_mcp/
 ### Test Status
 
 - ✅ **852 tests passed**
-- 📊 **75% coverage**
+- 📊 **76% coverage**
 - ⏱️ ~14 seconds execution time
 
 ## 📚 API Reference
