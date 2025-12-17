@@ -408,10 +408,9 @@ def main():
                     content={
                         "status": "success",
                         "message": "File uploaded successfully",
-                        "file_path": str(file_path),
-                        "workspace_path": str(file_path),
+                        # SECURITY: Don't expose absolute server paths
+                        "filename": safe_filename,
                         "original_filename": original_filename,
-                        "safe_filename": safe_filename,
                         "size": file_path.stat().st_size,
                     }
                 )

@@ -94,8 +94,8 @@ class ResourceManager:
                         if now - mtime > max_age:
                             temp_file.unlink()
                             cleaned_count += 1
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to delete temp file {temp_file}: {e}")
 
             if cleaned_count > 0:
                 logger.info(f"Cleaned up {cleaned_count} stale temporary files")

@@ -9,6 +9,7 @@ import asyncio
 import threading
 from typing import Any
 
+from reversecore_mcp.core.config import get_config
 from reversecore_mcp.core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -44,7 +45,8 @@ class GhidraManager:
             str, Any
         ] = {}  # Cache for loaded programs (path -> (program, flat_api))
         self._project_lock = threading.RLock()
-        self._max_projects = 1  # Keep only 1 project in memory to avoid OOM
+        # Use config value instead of hardcoded 1
+        self._max_projects = get_config().ghidra_max_projects
         self._initialized = True
         self._pyghidra = None
         self._flat_program_api = None
