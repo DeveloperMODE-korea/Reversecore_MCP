@@ -449,8 +449,8 @@ def main():
 
             app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
         except ImportError:
-            # slowapi unavailable: skip gracefully
-            logger.debug("slowapi not installed, rate limiting disabled")
+            # slowapi unavailable: log warning as this is a security risk
+            logger.warning("slowapi not installed: Rate limiting is DISABLED. This is a security risk in production.")
         except Exception as e:
             # Version mismatch or other error
             logger.warning(f"Failed to setup rate limiting: {e}")
