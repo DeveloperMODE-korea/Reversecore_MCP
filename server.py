@@ -20,8 +20,8 @@ except ImportError:
     magic = None
 
 from fastmcp import FastMCP
-
-from reversecore_mcp.core.config import get_config
+from reversecore_mcp.core.audit import audit_logger, AuditAction
+from reversecore_mcp.core.config import get_config, TransportMode
 from reversecore_mcp.core.logging_config import get_logger, setup_logging
 from reversecore_mcp.core.resource_manager import resource_manager
 
@@ -256,7 +256,14 @@ async def _validate_file_magic(file_path: str, filename: str):
 
 
 # Initialize the FastMCP server with lifespan management
-mcp = FastMCP(name="Reversecore_MCP", lifespan=server_lifespan)
+# Added Metadata for OpenAPI/Swagger
+mcp = FastMCP(
+    name="Reversecore_MCP", 
+    lifespan=server_lifespan,
+    title="Reversecore MCP",
+    description="Advanced Malware Analysis & Reverse Engineering Platform",
+    version="1.0.0"
+)
 
 # Register plugins dynamically
 import os
@@ -296,8 +303,34 @@ resources.register_resources(mcp)
 # Register report tools for malware analysis reporting
 from reversecore_mcp.tools.report.report_mcp_tools import register_report_tools  # noqa: E402
 
+# Register report tools for malware analysis reporting
+from reversecore_mcp.tools.report.report_mcp_tools import register_report_tools  # noqa: E402
+
 report_tools = register_report_tools(mcp)
 logger.info("Registered report tools")
+
+# ============================================================================
+# Security Middleware
+# ============================================================================
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        return response
+
+# Access underlying FastAPI app to add middleware
+# Note: FastMCP 2.13.1 exposes _fastapi_app or we can use mcp.fastapi_app if available
+# Checking source or assuming standard access.
+if hasattr(mcp, "_fastapi_app"):
+    mcp._fastapi_app.add_middleware(SecurityHeadersMiddleware)
+elif hasattr(mcp, "fastapi_app"):
+    mcp.fastapi_app.add_middleware(SecurityHeadersMiddleware)
 
 # ============================================================================
 # Server Composition (Mounting Sub-servers)
@@ -533,7 +566,28 @@ def main():
                         await out_file.write(content)
                 
                 # Security: Validate file content (Magic Number)
-                await _validate_file_magic(str(file_path), safe_filename)
+                try:
+                    await _validate_file_magic(str(file_path), safe_filename)
+                except Exception as e:
+                    audit_logger.log_event(
+                        AuditAction.FILE_UPLOAD,
+                        safe_filename,
+                        "FAILURE",
+                        details={"error": str(e), "path": str(file_path)}
+                    )
+                    # Cleanup malicious file
+                    try:
+                        file_path.unlink()
+                    except Exception:
+                        pass
+                    raise
+
+                audit_logger.log_event(
+                    AuditAction.FILE_UPLOAD,
+                    safe_filename,
+                    "SUCCESS",
+                    details={"path": str(file_path)}
+                )
 
                 logger.info(f"File uploaded successfully: {safe_filename} ({file_path})")
                 return JSONResponse(

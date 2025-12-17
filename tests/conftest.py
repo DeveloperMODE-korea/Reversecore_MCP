@@ -125,3 +125,29 @@ def patched_config(config, monkeypatch):
     # Note: lib_tools no longer imports get_config at module level
     # Individual tool modules import it directly from core.config
     return config
+
+@pytest.fixture
+def config_isolation():
+    """
+    Fixture to isolate configuration state between tests.
+    
+    1. Saves original environment variables.
+    2. Resets Config singleton.
+    3. Yields control.
+    4. Restores environment and resets singleton.
+    """
+    original_env = os.environ.copy()
+    from reversecore_mcp.core import config as config_module
+    
+    # Reset before test
+    # This ensures a fresh Config is created if read
+    original_config = config_module._CONFIG
+    config_module._CONFIG = None
+    
+    yield
+    
+    # Restore after test
+    os.environ.clear()
+    os.environ.update(original_env)
+    config_module._CONFIG = original_config
+
