@@ -23,26 +23,42 @@ class TimezonePreset(Enum):
     GMT = "Europe/London"       # UTC+0/+1
 
 
-# Simple UTC offset mapping (works without pytz)
-TIMEZONE_OFFSETS: dict[str, int] = {
-    "UTC": 0,
-    "Asia/Seoul": 9,
-    "Asia/Tokyo": 9,
-    "Asia/Shanghai": 8,
-    "America/New_York": -5,
-    "America/Los_Angeles": -8,
-    "Europe/Paris": 1,
-    "Europe/London": 0,
-}
+# Timezone handling using standard library zoneinfo (Python 3.9+)
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    # Fallback for older python versions if backports.zoneinfo not installed
+    from datetime import timezone, timedelta
+    
+    class ZoneInfo:
+        def __init__(self, key: str):
+            self.key = key
+            
+        def utcoffset(self, dt):
+            # Very basic fallback - DOES NOT HANDLE DST
+            # This is just to prevent crashes if zoneinfo missing
+            offsets = {
+                "Asia/Seoul": 9, "Asia/Tokyo": 9, "Asia/Shanghai": 8,
+                "America/New_York": -5, "America/Los_Angeles": -8,
+                "Europe/Paris": 1, "Europe/London": 0, "UTC": 0
+            }
+            return timedelta(hours=offsets.get(self.key, 0))
 
-# Timezone abbreviation mapping
+def get_timezone(tz_name: str):
+    """Get timezone object by name with DST support."""
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:
+        return ZoneInfo("UTC")
+
+# Timezone abbreviation mapping (kept for display purposes)
 TIMEZONE_ABBRS: dict[str, str] = {
     "UTC": "UTC",
     "Asia/Seoul": "KST",
     "Asia/Tokyo": "JST",
     "Asia/Shanghai": "CST",
-    "America/New_York": "EST",
-    "America/Los_Angeles": "PST",
+    "America/New_York": "ET",
+    "America/Los_Angeles": "PT",
     "Europe/Paris": "CET",
     "Europe/London": "GMT",
 }

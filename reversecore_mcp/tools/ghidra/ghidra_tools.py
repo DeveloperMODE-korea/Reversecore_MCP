@@ -91,39 +91,43 @@ async def Ghidra_list_structures(
     """
     validated_path = validate_file_path(file_path)
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        data_type_manager = program.getDataTypeManager()
-        
-        structures = []
-        all_data_types = data_type_manager.getAllStructures()
-        
-        idx = 0
-        for dt in all_data_types:
-            if idx < offset:
+    
+    def _impl():
+        try:
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            data_type_manager = program.getDataTypeManager()
+            
+            structures = []
+            all_data_types = data_type_manager.getAllStructures()
+            
+            idx = 0
+            for dt in all_data_types:
+                if idx < offset:
+                    idx += 1
+                    continue
+                if len(structures) >= limit:
+                    break
+                    
+                structures.append({
+                    "name": dt.getName(),
+                    "size": dt.getLength(),
+                    "category": str(dt.getCategoryPath()),
+                    "num_fields": dt.getNumComponents() if hasattr(dt, "getNumComponents") else 0,
+                })
                 idx += 1
-                continue
-            if len(structures) >= limit:
-                break
-                
-            structures.append({
-                "name": dt.getName(),
-                "size": dt.getLength(),
-                "category": str(dt.getCategoryPath()),
-                "num_fields": dt.getNumComponents() if hasattr(dt, "getNumComponents") else 0,
-            })
-            idx += 1
-        
-        return success(
-            {"structures": structures, "total": idx, "offset": offset, "limit": limit},
-            description=f"Found {len(structures)} structures (cached project)",
-        )
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("STRUCTURE_LIST_ERROR", str(e))
+            
+            return success(
+                {"structures": structures, "total": idx, "offset": offset, "limit": limit},
+                description=f"Found {len(structures)} structures (cached project)",
+            )
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("STRUCTURE_LIST_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 @handle_tool_errors
@@ -146,53 +150,57 @@ async def Ghidra_get_structure(
     """
     validated_path = validate_file_path(file_path)
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        data_type_manager = program.getDataTypeManager()
-        
-        # Search for the structure
-        found_struct = None
-        for dt in data_type_manager.getAllStructures():
-            if dt.getName() == name:
-                found_struct = dt
-                break
-        
-        if found_struct is None:
-            return failure("STRUCTURE_NOT_FOUND", f"Structure '{name}' not found")
-        
-        # Extract fields
-        fields = []
-        if hasattr(found_struct, "getNumComponents"):
-            for i in range(found_struct.getNumComponents()):
-                component = found_struct.getComponent(i)
-                fields.append({
-                    "offset": f"0x{component.getOffset():x}",
-                    "name": component.getFieldName() or f"field_{component.getOffset():x}",
-                    "type": component.getDataType().getName(),
-                    "size": component.getLength(),
-                    "comment": component.getComment() or "",
-                })
-        
-        # Generate C definition
-        field_strs = [
-            f"    {f['type']} {f['name']}; // offset {f['offset']}, size {f['size']}"
-            for f in fields
-        ]
-        c_definition = f"struct {name} {{\n" + "\n".join(field_strs) + "\n};"
-        
-        return success({
-            "name": name,
-            "size": found_struct.getLength(),
-            "category": str(found_struct.getCategoryPath()),
-            "fields": fields,
-            "c_definition": c_definition,
-        })
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("STRUCTURE_GET_ERROR", str(e))
+    
+    def _impl():
+        try:
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            data_type_manager = program.getDataTypeManager()
+            
+            # Search for the structure
+            found_struct = None
+            for dt in data_type_manager.getAllStructures():
+                if dt.getName() == name:
+                    found_struct = dt
+                    break
+            
+            if found_struct is None:
+                return failure("STRUCTURE_NOT_FOUND", f"Structure '{name}' not found")
+            
+            # Extract fields
+            fields = []
+            if hasattr(found_struct, "getNumComponents"):
+                for i in range(found_struct.getNumComponents()):
+                    component = found_struct.getComponent(i)
+                    fields.append({
+                        "offset": f"0x{component.getOffset():x}",
+                        "name": component.getFieldName() or f"field_{component.getOffset():x}",
+                        "type": component.getDataType().getName(),
+                        "size": component.getLength(),
+                        "comment": component.getComment() or "",
+                    })
+            
+            # Generate C definition
+            field_strs = [
+                f"    {f['type']} {f['name']}; // offset {f['offset']}, size {f['size']}"
+                for f in fields
+            ]
+            c_definition = f"struct {name} {{\n" + "\n".join(field_strs) + "\n};"
+            
+            return success({
+                "name": name,
+                "size": found_struct.getLength(),
+                "category": str(found_struct.getCategoryPath()),
+                "fields": fields,
+                "c_definition": c_definition,
+            })
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("STRUCTURE_GET_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 @handle_tool_errors
@@ -221,56 +229,60 @@ async def Ghidra_create_structure(
     """
     validated_path = validate_file_path(file_path)
     
+    
     try:
         field_list = json.loads(fields)
     except json.JSONDecodeError as e:
         return failure("INVALID_FIELDS_JSON", f"Invalid fields JSON: {e}")
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        
-        from ghidra.program.model.data import StructureDataType, CategoryPath
-        
-        data_type_manager = program.getDataTypeManager()
-        
-        # Create structure
-        struct = StructureDataType(CategoryPath.ROOT, name, size)
-        
-        # Add fields
-        for field in field_list:
-            field_name = field.get("name", "unknown")
-            field_type_str = field.get("type", "byte")
-            field_offset = field.get("offset", 0)
-            
-            # Get or create data type
-            field_type = data_type_manager.getDataType(f"/{field_type_str}")
-            if field_type is None:
-                # Use default byte type
-                from ghidra.program.model.data import ByteDataType
-                field_type = ByteDataType.dataType
-            
-            struct.insertAtOffset(field_offset, field_type, field_type.getLength(), field_name, None)
-        
-        # Add to program
-        transaction = program.startTransaction("Create Structure")
+    def _impl():
         try:
-            data_type_manager.addDataType(struct, None)
-            program.endTransaction(transaction, True)
-        except Exception:
-            program.endTransaction(transaction, False)
-            raise
-        
-        return success({
-            "name": name,
-            "size": struct.getLength(),
-            "fields_count": len(field_list),
-        }, description=f"Created structure '{name}' with {len(field_list)} fields")
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("STRUCTURE_CREATE_ERROR", str(e))
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            
+            from ghidra.program.model.data import StructureDataType, CategoryPath
+            
+            data_type_manager = program.getDataTypeManager()
+            
+            # Create structure
+            struct = StructureDataType(CategoryPath.ROOT, name, size)
+            
+            # Add fields
+            for field in field_list:
+                field_name = field.get("name", "unknown")
+                field_type_str = field.get("type", "byte")
+                field_offset = field.get("offset", 0)
+                
+                # Get or create data type
+                field_type = data_type_manager.getDataType(f"/{field_type_str}")
+                if field_type is None:
+                    # Use default byte type
+                    from ghidra.program.model.data import ByteDataType
+                    field_type = ByteDataType.dataType
+                
+                struct.insertAtOffset(field_offset, field_type, field_type.getLength(), field_name, None)
+            
+            # Add to program
+            transaction = program.startTransaction("Create Structure")
+            try:
+                data_type_manager.addDataType(struct, None)
+                program.endTransaction(transaction, True)
+            except Exception:
+                program.endTransaction(transaction, False)
+                raise
+            
+            return success({
+                "name": name,
+                "size": struct.getLength(),
+                "fields_count": len(field_list),
+            }, description=f"Created structure '{name}' with {len(field_list)} fields")
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("STRUCTURE_CREATE_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 # =============================================================================
@@ -300,54 +312,58 @@ async def Ghidra_list_enums(
     """
     validated_path = validate_file_path(file_path)
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        data_type_manager = program.getDataTypeManager()
-        
-        enums = []
-        all_data_types = data_type_manager.getAllDataTypes()
-        
-        idx = 0
-        for dt in all_data_types:
-            # Check if it's an enum
-            if not hasattr(dt, "getCount"):
-                continue
+    
+    def _impl():
+        try:
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            data_type_manager = program.getDataTypeManager()
+            
+            enums = []
+            all_data_types = data_type_manager.getAllDataTypes()
+            
+            idx = 0
+            for dt in all_data_types:
+                # Check if it's an enum
+                if not hasattr(dt, "getCount"):
+                    continue
+                    
+                if idx < offset:
+                    idx += 1
+                    continue
+                if len(enums) >= limit:
+                    break
                 
-            if idx < offset:
+                # Get enum values
+                values = []
+                try:
+                    for i in range(dt.getCount()):
+                        values.append({
+                            "name": dt.getName(i),
+                            "value": dt.getValue(i),
+                        })
+                except Exception:
+                    pass
+                
+                enums.append({
+                    "name": dt.getName(),
+                    "size": dt.getLength(),
+                    "count": dt.getCount() if hasattr(dt, "getCount") else 0,
+                    "values": values[:10],  # Limit values shown
+                })
                 idx += 1
-                continue
-            if len(enums) >= limit:
-                break
             
-            # Get enum values
-            values = []
-            try:
-                for i in range(dt.getCount()):
-                    values.append({
-                        "name": dt.getName(i),
-                        "value": dt.getValue(i),
-                    })
-            except Exception:
-                pass
+            return success(
+                {"enums": enums, "total": idx, "offset": offset, "limit": limit},
+                description=f"Found {len(enums)} enums",
+            )
             
-            enums.append({
-                "name": dt.getName(),
-                "size": dt.getLength(),
-                "count": dt.getCount() if hasattr(dt, "getCount") else 0,
-                "values": values[:10],  # Limit values shown
-            })
-            idx += 1
-        
-        return success(
-            {"enums": enums, "total": idx, "offset": offset, "limit": limit},
-            description=f"Found {len(enums)} enums",
-        )
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("ENUM_LIST_ERROR", str(e))
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("ENUM_LIST_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 # =============================================================================
@@ -379,45 +395,49 @@ async def Ghidra_list_data_types(
     """
     validated_path = validate_file_path(file_path)
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        data_type_manager = program.getDataTypeManager()
-        
-        data_types = []
-        all_types = data_type_manager.getAllDataTypes()
-        
-        idx = 0
-        for dt in all_types:
-            type_category = str(dt.getCategoryPath())
+    
+    def _impl():
+        try:
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            data_type_manager = program.getDataTypeManager()
             
-            # Apply category filter if specified
-            if category and category.lower() not in type_category.lower():
-                continue
+            data_types = []
+            all_types = data_type_manager.getAllDataTypes()
+            
+            idx = 0
+            for dt in all_types:
+                type_category = str(dt.getCategoryPath())
                 
-            if idx < offset:
+                # Apply category filter if specified
+                if category and category.lower() not in type_category.lower():
+                    continue
+                    
+                if idx < offset:
+                    idx += 1
+                    continue
+                if len(data_types) >= limit:
+                    break
+                
+                data_types.append({
+                    "name": dt.getName(),
+                    "category": type_category,
+                    "size": dt.getLength(),
+                    "description": dt.getDescription() or "",
+                })
                 idx += 1
-                continue
-            if len(data_types) >= limit:
-                break
             
-            data_types.append({
-                "name": dt.getName(),
-                "category": type_category,
-                "size": dt.getLength(),
-                "description": dt.getDescription() or "",
-            })
-            idx += 1
-        
-        return success(
-            {"data_types": data_types, "total": idx, "offset": offset, "limit": limit},
-            description=f"Found {len(data_types)} data types",
-        )
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("DATA_TYPE_LIST_ERROR", str(e))
+            return success(
+                {"data_types": data_types, "total": idx, "offset": offset, "limit": limit},
+                description=f"Found {len(data_types)} data types",
+            )
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("DATA_TYPE_LIST_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 # =============================================================================
@@ -449,45 +469,49 @@ async def Ghidra_list_bookmarks(
     """
     validated_path = validate_file_path(file_path)
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        bookmark_manager = program.getBookmarkManager()
-        
-        bookmarks = []
-        all_bookmarks = bookmark_manager.getBookmarksIterator()
-        
-        idx = 0
-        for bookmark in all_bookmarks:
-            bm_type = bookmark.getTypeString()
+    
+    def _impl():
+        try:
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            bookmark_manager = program.getBookmarkManager()
             
-            # Apply type filter
-            if bookmark_type and bm_type.lower() != bookmark_type.lower():
-                continue
+            bookmarks = []
+            all_bookmarks = bookmark_manager.getBookmarksIterator()
+            
+            idx = 0
+            for bookmark in all_bookmarks:
+                bm_type = bookmark.getTypeString()
                 
-            if idx < offset:
+                # Apply type filter
+                if bookmark_type and bm_type.lower() != bookmark_type.lower():
+                    continue
+                    
+                if idx < offset:
+                    idx += 1
+                    continue
+                if len(bookmarks) >= limit:
+                    break
+                
+                bookmarks.append({
+                    "address": str(bookmark.getAddress()),
+                    "type": bm_type,
+                    "category": bookmark.getCategory(),
+                    "comment": bookmark.getComment(),
+                })
                 idx += 1
-                continue
-            if len(bookmarks) >= limit:
-                break
             
-            bookmarks.append({
-                "address": str(bookmark.getAddress()),
-                "type": bm_type,
-                "category": bookmark.getCategory(),
-                "comment": bookmark.getComment(),
-            })
-            idx += 1
-        
-        return success(
-            {"bookmarks": bookmarks, "total": idx, "offset": offset, "limit": limit},
-            description=f"Found {len(bookmarks)} bookmarks",
-        )
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("BOOKMARK_LIST_ERROR", str(e))
+            return success(
+                {"bookmarks": bookmarks, "total": idx, "offset": offset, "limit": limit},
+                description=f"Found {len(bookmarks)} bookmarks",
+            )
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("BOOKMARK_LIST_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 @handle_tool_errors
@@ -516,36 +540,40 @@ async def Ghidra_add_bookmark(
     """
     validated_path = validate_file_path(file_path)
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        bookmark_manager = program.getBookmarkManager()
-        
-        # Parse address
-        addr = flat_api.toAddr(address)
-        if addr is None:
-            return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
-        
-        # Add bookmark
-        transaction = program.startTransaction("Add Bookmark")
+    
+    def _impl():
         try:
-            bookmark_manager.setBookmark(addr, bookmark_type, category, comment)
-            program.endTransaction(transaction, True)
-        except Exception:
-            program.endTransaction(transaction, False)
-            raise
-        
-        return success({
-            "address": address,
-            "type": bookmark_type,
-            "category": category,
-            "comment": comment,
-        }, description=f"Added bookmark at {address}")
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("BOOKMARK_ADD_ERROR", str(e))
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            bookmark_manager = program.getBookmarkManager()
+            
+            # Parse address
+            addr = flat_api.toAddr(address)
+            if addr is None:
+                return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
+            
+            # Add bookmark
+            transaction = program.startTransaction("Add Bookmark")
+            try:
+                bookmark_manager.setBookmark(addr, bookmark_type, category, comment)
+                program.endTransaction(transaction, True)
+            except Exception:
+                program.endTransaction(transaction, False)
+                raise
+            
+            return success({
+                "address": address,
+                "type": bookmark_type,
+                "category": category,
+                "comment": comment,
+            }, description=f"Added bookmark at {address}")
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("BOOKMARK_ADD_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 # =============================================================================
@@ -576,47 +604,51 @@ async def Ghidra_read_memory(
     validated_path = validate_file_path(file_path)
     length = min(length, 4096)  # Cap at 4KB
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        
-        # Parse address
-        addr = flat_api.toAddr(address)
-        if addr is None:
-            return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
-        
-        # Read bytes
-        byte_array = flat_api.getBytes(addr, length)
-        
-        if byte_array is None:
-            return failure("MEMORY_READ_ERROR", f"Could not read memory at {address}")
-        
-        # Format as hex dump
-        hex_bytes = " ".join(f"{b & 0xFF:02X}" for b in byte_array)
-        
-        # Format as hex dump with ASCII
-        hex_dump_lines = []
-        for i in range(0, len(byte_array), 16):
-            chunk = byte_array[i:i+16]
-            hex_part = " ".join(f"{b & 0xFF:02X}" for b in chunk)
-            ascii_part = "".join(
-                chr(b & 0xFF) if 32 <= (b & 0xFF) <= 126 else "."
-                for b in chunk
-            )
-            line_addr = addr.add(i)
-            hex_dump_lines.append(f"{line_addr}: {hex_part:<48} |{ascii_part}|")
-        
-        return success({
-            "address": address,
-            "length": len(byte_array),
-            "hex_bytes": hex_bytes,
-            "hex_dump": "\n".join(hex_dump_lines),
-        })
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("MEMORY_READ_ERROR", str(e))
+    
+    def _impl():
+        try:
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            
+            # Parse address
+            addr = flat_api.toAddr(address)
+            if addr is None:
+                return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
+            
+            # Read bytes
+            byte_array = flat_api.getBytes(addr, length)
+            
+            if byte_array is None:
+                return failure("MEMORY_READ_ERROR", f"Could not read memory at {address}")
+            
+            # Format as hex dump
+            hex_bytes = " ".join(f"{b & 0xFF:02X}" for b in byte_array)
+            
+            # Format as hex dump with ASCII
+            hex_dump_lines = []
+            for i in range(0, len(byte_array), 16):
+                chunk = byte_array[i:i+16]
+                hex_part = " ".join(f"{b & 0xFF:02X}" for b in chunk)
+                ascii_part = "".join(
+                    chr(b & 0xFF) if 32 <= (b & 0xFF) <= 126 else "."
+                    for b in chunk
+                )
+                line_addr = addr.add(i)
+                hex_dump_lines.append(f"{line_addr}: {hex_part:<48} |{ascii_part}|")
+            
+            return success({
+                "address": address,
+                "length": len(byte_array),
+                "hex_bytes": hex_bytes,
+                "hex_dump": "\n".join(hex_dump_lines),
+            })
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("MEMORY_READ_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 @handle_tool_errors
@@ -642,33 +674,37 @@ async def Ghidra_get_bytes(
     validated_path = validate_file_path(file_path)
     length = min(length, 1024)
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        
-        # Parse address
-        addr = flat_api.toAddr(address)
-        if addr is None:
-            return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
-        
-        # Read bytes
-        byte_array = flat_api.getBytes(addr, length)
-        
-        if byte_array is None:
-            return failure("MEMORY_READ_ERROR", f"Could not read bytes at {address}")
-        
-        hex_string = " ".join(f"{b & 0xFF:02X}" for b in byte_array)
-        
-        return success({
-            "address": address,
-            "length": len(byte_array),
-            "bytes": hex_string,
-        })
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("GET_BYTES_ERROR", str(e))
+    
+    def _impl():
+        try:
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            
+            # Parse address
+            addr = flat_api.toAddr(address)
+            if addr is None:
+                return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
+            
+            # Read bytes
+            byte_array = flat_api.getBytes(addr, length)
+            
+            if byte_array is None:
+                return failure("MEMORY_READ_ERROR", f"Could not read bytes at {address}")
+            
+            hex_string = " ".join(f"{b & 0xFF:02X}" for b in byte_array)
+            
+            return success({
+                "address": address,
+                "length": len(byte_array),
+                "bytes": hex_string,
+            })
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("GET_BYTES_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 # =============================================================================
@@ -679,17 +715,22 @@ async def Ghidra_get_bytes(
 @handle_tool_errors
 @log_execution
 @track_metrics
-async def Ghidra_patch_bytes(
+@handle_tool_errors
+@log_execution
+@track_metrics
+async def Ghidra_simulate_patch(
     file_path: str,
     address: str,
     hex_bytes: str,
     ctx: Context = None,
 ) -> ToolResult:
     """
-    Patch bytes at the specified address.
+    Simulate patching bytes at the specified address in the cached project.
     
-    WARNING: This modifies the binary in Ghidra's cached project (not the original file).
-    Changes persist until the project is evicted from cache or server restarts.
+    WARNING: This tool ONLY modifies the binary in Ghidra's cached project database.
+    It DOES NOT modify the actual file on disk. Changes persist in the cache
+    until the project is evicted or server restarts. To apply patches to the
+    file, you must export the binary (feature coming soon).
     
     Args:
         file_path: Path to the binary file
@@ -701,7 +742,7 @@ async def Ghidra_patch_bytes(
     """
     validated_path = validate_file_path(file_path)
     
-    # Parse hex bytes
+    # Parse hex bytes (fast, can stay in main thread)
     try:
         hex_bytes_clean = hex_bytes.replace(" ", "").replace(",", "")
         if len(hex_bytes_clean) % 2 != 0:
@@ -711,36 +752,40 @@ async def Ghidra_patch_bytes(
     except ValueError as e:
         return failure("INVALID_HEX", f"Invalid hex string: {e}")
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        memory = program.getMemory()
-        
-        # Parse address
-        addr = flat_api.toAddr(address)
-        if addr is None:
-            return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
-        
-        # Patch bytes
-        transaction = program.startTransaction("Patch Bytes")
+    def _impl():
         try:
-            for i, byte_val in enumerate(byte_values):
-                memory.setByte(addr.add(i), byte_val)
-            program.endTransaction(transaction, True)
-        except Exception:
-            program.endTransaction(transaction, False)
-            raise
-        
-        return success({
-            "address": address,
-            "bytes_patched": len(byte_values),
-            "new_bytes": hex_bytes,
-        }, description=f"Patched {len(byte_values)} bytes at {address}")
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("PATCH_ERROR", str(e))
+            program, flat_api = _get_ghidra_program(str(validated_path))
+            memory = program.getMemory()
+            
+            # Parse address
+            addr = flat_api.toAddr(address)
+            if addr is None:
+                return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
+            
+            # Patch bytes
+            transaction = program.startTransaction("Patch Bytes")
+            try:
+                for i, byte_val in enumerate(byte_values):
+                    memory.setByte(addr.add(i), byte_val)
+                program.endTransaction(transaction, True)
+            except Exception:
+                program.endTransaction(transaction, False)
+                raise
+            
+            return success({
+                "address": address,
+                "bytes_patched": len(byte_values),
+                "new_bytes": hex_bytes,
+            }, description=f"Simulated patch of {len(byte_values)} bytes at {address} (Ghidra cache only)")
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("PATCH_ERROR", str(e))
+
+    # Run blocking Ghidra operations in a separate thread
+    return await asyncio.to_thread(_impl)
 
 
 # =============================================================================
@@ -770,57 +815,61 @@ async def Ghidra_analyze_function(
     """
     validated_path = validate_file_path(file_path)
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        
-        from ghidra.app.cmd.function import CreateFunctionCmd
-        
-        function_manager = program.getFunctionManager()
-        
-        # Parse address
-        addr = flat_api.toAddr(address)
-        if addr is None:
-            return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
-        
-        # Check if function exists
-        func = function_manager.getFunctionAt(addr)
-        
-        transaction = program.startTransaction("Analyze Function")
+    
+    def _impl():
         try:
-            if func is None:
-                # Try to create function
-                cmd = CreateFunctionCmd(addr)
-                cmd.applyTo(program)
-                func = function_manager.getFunctionAt(addr)
+            program, flat_api = _get_ghidra_program(str(validated_path))
             
-            if func is None:
+            from ghidra.app.cmd.function import CreateFunctionCmd
+            
+            function_manager = program.getFunctionManager()
+            
+            # Parse address
+            addr = flat_api.toAddr(address)
+            if addr is None:
+                return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
+            
+            # Check if function exists
+            func = function_manager.getFunctionAt(addr)
+            
+            transaction = program.startTransaction("Analyze Function")
+            try:
+                if func is None:
+                    # Try to create function
+                    cmd = CreateFunctionCmd(addr)
+                    cmd.applyTo(program)
+                    func = function_manager.getFunctionAt(addr)
+                
+                if func is None:
+                    program.endTransaction(transaction, False)
+                    return failure("FUNCTION_NOT_FOUND", f"Could not find or create function at {address}")
+                
+                # Get function info
+                result = {
+                    "name": func.getName(),
+                    "address": str(func.getEntryPoint()),
+                    "signature": str(func.getSignature()),
+                    "body_size": func.getBody().getNumAddresses(),
+                    "parameter_count": func.getParameterCount(),
+                    "local_variable_count": len(list(func.getLocalVariables())),
+                    "calling_convention": str(func.getCallingConvention()),
+                }
+                
+                program.endTransaction(transaction, True)
+                
+                return success(result, description=f"Analyzed function '{func.getName()}'")
+                
+            except Exception:
                 program.endTransaction(transaction, False)
-                return failure("FUNCTION_NOT_FOUND", f"Could not find or create function at {address}")
+                raise
             
-            # Get function info
-            result = {
-                "name": func.getName(),
-                "address": str(func.getEntryPoint()),
-                "signature": str(func.getSignature()),
-                "body_size": func.getBody().getNumAddresses(),
-                "parameter_count": func.getParameterCount(),
-                "local_variable_count": len(list(func.getLocalVariables())),
-                "calling_convention": str(func.getCallingConvention()),
-            }
-            
-            program.endTransaction(transaction, True)
-            
-            return success(result, description=f"Analyzed function '{func.getName()}'")
-            
-        except Exception:
-            program.endTransaction(transaction, False)
-            raise
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("ANALYZE_ERROR", str(e))
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("ANALYZE_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 @handle_tool_errors
@@ -848,93 +897,97 @@ async def Ghidra_get_call_graph(
     validated_path = validate_file_path(file_path)
     depth = min(depth, 10)
     
-    try:
-        program, flat_api = _get_ghidra_program(str(validated_path))
-        
-        function_manager = program.getFunctionManager()
-        reference_manager = program.getReferenceManager()
-        
-        # Parse address
-        addr = flat_api.toAddr(address)
-        if addr is None:
-            return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
-        
-        # Get function
-        func = function_manager.getFunctionAt(addr)
-        if func is None:
-            func = function_manager.getFunctionContaining(addr)
-        
-        if func is None:
-            return failure("FUNCTION_NOT_FOUND", f"No function at {address}")
-        
-        root_name = func.getName()
-        root_addr = str(func.getEntryPoint())
-        
-        callers = []
-        callees = []
-        
-        # Get callers (functions that call this function)
-        if direction in ("callers", "both"):
-            refs_to = reference_manager.getReferencesTo(func.getEntryPoint())
-            seen_callers = set()
+    def _impl():
+        try:
+            program, flat_api = _get_ghidra_program(str(validated_path))
             
-            for ref in refs_to:
-                if ref.getReferenceType().isCall():
-                    caller_func = function_manager.getFunctionContaining(ref.getFromAddress())
-                    if caller_func and caller_func.getName() not in seen_callers:
-                        seen_callers.add(caller_func.getName())
-                        callers.append({
-                            "name": caller_func.getName(),
-                            "address": str(caller_func.getEntryPoint()),
-                        })
-        
-        # Get callees (functions this function calls)
-        if direction in ("callees", "both"):
-            func_body = func.getBody()
-            seen_callees = set()
+            function_manager = program.getFunctionManager()
+            reference_manager = program.getReferenceManager()
             
-            for addr_range in func_body:
-                refs_from = reference_manager.getReferencesFrom(addr_range)
-                for ref in refs_from:
+            # Parse address
+            addr = flat_api.toAddr(address)
+            if addr is None:
+                return failure("INVALID_ADDRESS", f"Could not parse address: {address}")
+            
+            # Get function
+            func = function_manager.getFunctionAt(addr)
+            if func is None:
+                func = function_manager.getFunctionContaining(addr)
+            
+            if func is None:
+                return failure("FUNCTION_NOT_FOUND", f"No function at {address}")
+            
+            root_name = func.getName()
+            root_addr = str(func.getEntryPoint())
+            
+            callers = []
+            callees = []
+            
+            # Get callers (functions that call this function)
+            if direction in ("callers", "both"):
+                refs_to = reference_manager.getReferencesTo(func.getEntryPoint())
+                seen_callers = set()
+                
+                for ref in refs_to:
                     if ref.getReferenceType().isCall():
-                        callee_func = function_manager.getFunctionAt(ref.getToAddress())
-                        if callee_func and callee_func.getName() not in seen_callees:
-                            seen_callees.add(callee_func.getName())
-                            callees.append({
-                                "name": callee_func.getName(),
-                                "address": str(callee_func.getEntryPoint()),
+                        caller_func = function_manager.getFunctionContaining(ref.getFromAddress())
+                        if caller_func and caller_func.getName() not in seen_callers:
+                            seen_callers.add(caller_func.getName())
+                            callers.append({
+                                "name": caller_func.getName(),
+                                "address": str(caller_func.getEntryPoint()),
                             })
-        
-        # Build graph representation
-        graph_lines = [f"Call Graph for {root_name} ({root_addr})", "=" * 50]
-        
-        if callers:
-            graph_lines.append(f"\n📥 Callers ({len(callers)}):")
-            for c in callers[:20]:  # Limit output
-                graph_lines.append(f"  ← {c['name']} ({c['address']})")
-        
-        graph_lines.append(f"\n🎯 {root_name} ({root_addr})")
-        
-        if callees:
-            graph_lines.append(f"\n📤 Callees ({len(callees)}):")
-            for c in callees[:20]:
-                graph_lines.append(f"  → {c['name']} ({c['address']})")
-        
-        return success({
-            "function": root_name,
-            "address": root_addr,
-            "callers": callers,
-            "callees": callees,
-            "caller_count": len(callers),
-            "callee_count": len(callees),
-            "graph": "\n".join(graph_lines),
-        })
-        
-    except ImportError as e:
-        return failure("GHIDRA_NOT_AVAILABLE", str(e))
-    except Exception as e:
-        ghidra_service._invalidate_project(str(validated_path))
-        return failure("CALL_GRAPH_ERROR", str(e))
+            
+            # Get callees (functions called by this function)
+            if direction in ("callees", "both"):
+                seen_callees = set()
+                body = func.getBody()
+                instr_iter = program.getListing().getInstructions(body, True)
+                
+                for instr in instr_iter:
+                    refs = instr.getReferencesFrom()
+                    for ref in refs:
+                        if ref.getReferenceType().isCall():
+                            callee_func = function_manager.getFunctionAt(ref.getToAddress())
+                            if callee_func and callee_func.getName() not in seen_callees:
+                                seen_callees.add(callee_func.getName())
+                                callees.append({
+                                    "name": callee_func.getName(),
+                                    "address": str(callee_func.getEntryPoint()),
+                                })
+            
+            # Build graph representation (simplified for output)
+            graph_lines = [f"Call Graph for {root_name} ({root_addr})", "=" * 50]
+            
+            if callers:
+                graph_lines.append(f"\n📥 Callers ({len(callers)}):")
+                for c in callers[:20]:  # Limit output
+                    graph_lines.append(f"  ← {c['name']} ({c['address']})")
+            
+            graph_lines.append(f"\n🎯 {root_name} ({root_addr})")
+            
+            if callees:
+                graph_lines.append(f"\n📤 Callees ({len(callees)}):")
+                for c in callees[:20]:
+                    graph_lines.append(f"  → {c['name']} ({c['address']})")
+            
+            return success({
+                "function": root_name,
+                "address": root_addr,
+                "callers": callers,
+                "callees": callees,
+                "caller_count": len(callers),
+                "callee_count": len(callees),
+                "graph": "\n".join(graph_lines),
+            }, description=f"Generated call graph for '{root_name}' (cached project)")
+            
+        except ImportError as e:
+            return failure("GHIDRA_NOT_AVAILABLE", str(e))
+        except Exception as e:
+            ghidra_service._invalidate_project(str(validated_path))
+            return failure("CALL_GRAPH_ERROR", str(e))
+
+    return await asyncio.to_thread(_impl)
 
 
 # =============================================================================
@@ -975,7 +1028,7 @@ class GhidraToolsPlugin(Plugin):
         mcp_server.tool(Ghidra_get_bytes)
         
         # Patching tools
-        mcp_server.tool(Ghidra_patch_bytes)
+        mcp_server.tool(Ghidra_simulate_patch)
         
         # Analysis tools
         mcp_server.tool(Ghidra_analyze_function)

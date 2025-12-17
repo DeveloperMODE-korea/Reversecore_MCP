@@ -19,22 +19,22 @@ try:
     import orjson
 
     _ORJSON_AVAILABLE = True
-    # Expose orjson's JSONDecodeError for compatibility
-    JSONDecodeError = orjson.JSONDecodeError
+    # Expose stdlib JSONDecodeError for consistent error handling
+    JSONDecodeError = _stdlib_json.JSONDecodeError
 
     def loads(s: str | bytes) -> Any:
         """
         Parse JSON with orjson (fast path).
-
-        Args:
-            s: JSON string or bytes to parse
-
-        Returns:
-            Parsed Python object
+        Wraps orjson.JSONDecodeError ensuring compatibility with stdlib json.
         """
         if isinstance(s, str):
             s = s.encode("utf-8")
-        return orjson.loads(s)
+        try:
+            return orjson.loads(s)
+        except orjson.JSONDecodeError as e:
+            # Re-raise as stdlib JSONDecodeError for compatibility
+            # orjson error message usually contains position info at the end
+            raise _stdlib_json.JSONDecodeError(str(e), str(s), 0) from e
 
     def dumps(obj: Any, indent: int | None = None, ensure_ascii: bool = True) -> str:
         """
