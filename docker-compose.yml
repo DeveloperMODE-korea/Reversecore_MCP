@@ -28,6 +28,11 @@ services:
     environment:
       - MCP_TRANSPORT=http
       - LOG_LEVEL=INFO
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
     restart: unless-stopped
     profiles:
       - default
@@ -48,6 +53,11 @@ services:
     environment:
       - MCP_TRANSPORT=http
       - LOG_LEVEL=INFO
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
     restart: unless-stopped
     profiles:
       - arm64

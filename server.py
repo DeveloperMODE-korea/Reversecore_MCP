@@ -266,14 +266,23 @@ def main():
         # Apply authentication to all endpoints if enabled
         dependencies = [auth_dependency] if auth_dependency else []
 
+        mcp_app = mcp.http_app()
+
+        # Fix: Wrap initialization in FastAPI lifespan
+        @asynccontextmanager
+        async def app_lifespan(app: FastAPI):
+            # Run server startup logic
+            async with server_lifespan(mcp):
+                yield
+
         app = FastAPI(
             title="Reversecore_MCP",
             docs_url="/docs",
             redoc_url="/redoc",
             openapi_url="/openapi.json",
             dependencies=dependencies,  # Apply authentication globally
+            lifespan=app_lifespan, # Register lifespan
         )
-        mcp_app = mcp.http_app()
         app.mount("/mcp", mcp_app)
 
         # Add health endpoint
@@ -399,8 +408,13 @@ def main():
                 safe_filename = f"{uuid.uuid4().hex[:8]}_{_secure_filename(original_filename)}"
                 file_path = workspace / safe_filename
 
-                # PERFORMANCE: Use asyncio.to_thread to avoid blocking event loop
-                await asyncio.to_thread(_save_file_sync, file_path, file.file)
+                # PERFORMANCE: Use aiofiles for non-blocking async I/O
+                # This prevents blocking the event loop during large file uploads
+                import aiofiles
+                
+                async with aiofiles.open(file_path, 'wb') as out_file:
+                    while content := await file.read(1024 * 64):  # Read in 64KB chunks
+                        await out_file.write(content)
 
                 logger.info(f"File uploaded: {original_filename} -> {file_path}")
 

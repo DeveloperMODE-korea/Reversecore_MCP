@@ -5,6 +5,29 @@ description = "MCP Server for Reverse Engineering with Binary Analysis Tools"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
+dependencies = [
+    "mcp[cli]>=1.0.0",
+    "fastmcp",
+    "fastapi",
+    "uvicorn",
+    "python-multipart",
+    "aiofiles",
+    "pydantic>=2.0",
+    "loguru",
+    "psutil",
+    "requests",
+    "typer",
+    "rich",
+    "orjson",
+    "pefile",
+    "lief",
+    "capstone",
+    "keystone-engine",
+    "yara-python",
+    "graphviz",
+    "networkx",
+    "matplotlib",
+]
 
 [tool.ruff]
 target-version = "py310"
