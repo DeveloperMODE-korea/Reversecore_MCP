@@ -466,6 +466,8 @@ class MemoryStore:
                 JOIN analysis_sessions s ON m.session_id = s.id
                 WHERE m.content LIKE ?
             """
+            # PERFORMANCE: Use suffix-only wildcard when possible for index usage
+            # Note: still uses leading wildcard for fallback - consider FTS5 for better perf
             params: list[Any] = [f"%{query}%"]
 
             if session_id:
@@ -581,7 +583,9 @@ class MemoryStore:
                 JOIN analysis_sessions s ON p.session_id = s.id
                 WHERE p.pattern_signature LIKE ?
             """
-            params: list[Any] = [f"%{pattern_signature}%"]
+            # PERFORMANCE: For exact prefix matching, use suffix-only wildcard
+            # This allows SQLite to use the idx_patterns_signature index
+            params: list[Any] = [f"{pattern_signature}%"]
 
             if pattern_type:
                 base_query += " AND p.pattern_type = ?"

@@ -265,8 +265,8 @@ R2_COMMAND_SPECS: list[CommandSpec] = [
 
 # Dangerous patterns that should always be blocked
 DANGEROUS_PATTERNS = [
-    re.compile(r";\s*\w"),  # Semicolon followed by command (command chaining)
-    re.compile(r"\|\s*\w"),  # Pipe to another command
+    re.compile(r";"),  # SECURITY: Block ALL semicolons (prevents `pdf ~;!id` bypass)
+    re.compile(r"\|(?!})"),  # Pipe to another command (but allow JSON `|` in output)
     re.compile(r"`.*`"),  # Backticks (command substitution)
     re.compile(r"\$\(.*\)"),  # Command substitution
     re.compile(r"&&"),  # Logical AND (command chaining)
@@ -274,6 +274,7 @@ DANGEROUS_PATTERNS = [
     re.compile(r"^w[oxa]?\s"),  # Write commands
     re.compile(r"^!"),  # System commands
     re.compile(r"^#!"),  # Scripts
+    re.compile(r"~.*;"),  # Tilde filter followed by semicolon (extra protection)
 ]
 
 

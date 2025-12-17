@@ -44,8 +44,16 @@ class EmailConfig:
 
     @property
     def is_configured(self) -> bool:
-        """Check if email is configured"""
-        return bool(self.smtp_server and self.username)
+        """Check if email is configured.
+        
+        Requires smtp_server and username. If username is set, password must also be set
+        to avoid SMTPAuthenticationError at runtime.
+        """
+        if not self.smtp_server:
+            return False
+        if self.username and not self.password:
+            return False  # Username without password will fail auth
+        return True
 
 
 def load_quick_contacts_from_env() -> dict[str, dict[str, str]]:
