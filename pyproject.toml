@@ -38,11 +38,12 @@ known-first-party = ["reversecore_mcp"]
 
 [tool.mypy]
 python_version = "3.10"
-warn_return_any = false
+warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
-no_implicit_optional = false  # Temporarily disabled
-check_untyped_defs = false    # Temporarily disabled
+no_implicit_optional = true   # Strict: explicit Optional[T] required
+check_untyped_defs = true     # Strict: check untyped function definitions
+disallow_untyped_defs = false # Allow gradual adoption
 
 [tool.bandit]
 exclude_dirs = ["tests", "htmlcov", ".venv"]

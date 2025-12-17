@@ -208,8 +208,8 @@ class TestPrecompiledRegexPatterns:
     """Test that regex patterns are pre-compiled."""
 
     def test_ghost_trace_precompiled_patterns(self):
-        """Verify ghost_trace.py uses pre-compiled patterns."""
-        with open("reversecore_mcp/tools/ghost_trace.py") as f:
+        """Verify dormant_detector.py uses pre-compiled patterns."""
+        with open("reversecore_mcp/tools/dormant_detector.py") as f:
             content = f.read()
 
             # Should have module-level compiled patterns

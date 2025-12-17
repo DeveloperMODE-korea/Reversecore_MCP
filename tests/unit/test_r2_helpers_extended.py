@@ -276,17 +276,17 @@ class TestTrinityDefenseDeep:
 
 
 # ============================================================================
-# Ghost Trace deep coverage
+# Dormant Detector deep coverage (previously ghost_trace)
 # ============================================================================
 
 
-class TestGhostTraceDeep:
-    """Deep tests for ghost_trace module."""
+class TestDormantDetectorDeep:
+    """Deep tests for dormant_detector module."""
 
     @pytest.mark.asyncio
-    async def test_ghost_trace_analyze(self, patched_workspace_config, workspace_dir):
-        """Test ghost_trace analyze function."""
-        from reversecore_mcp.tools.ghost_trace import ghost_trace
+    async def test_dormant_detector_analyze(self, patched_workspace_config, workspace_dir):
+        """Test dormant_detector analyze function."""
+        from reversecore_mcp.tools.malware.dormant_detector import dormant_detector
 
         test_file = workspace_dir / "test.bin"
         test_file.write_bytes(b"\x7fELF" + b"\x00" * 100)
@@ -296,7 +296,7 @@ class TestGhostTraceDeep:
             new_callable=AsyncMock,
             return_value=('{"analysis": "complete"}', ""),
         ):
-            result = await ghost_trace(str(test_file))
+            result = await dormant_detector(str(test_file))
             assert result.status in ("success", "error")
 
 

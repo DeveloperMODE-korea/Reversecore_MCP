@@ -104,10 +104,10 @@ class TestDormantDetectorRegister:
     """Tests for dormant_detector registration."""
 
     def test_register_dormant_detector(self):
-        """Test register_dormant_detector."""
-        from reversecore_mcp.tools.malware.dormant_detector import DormantDetectorPlugin
+        """Test register_dormant_detector via MalwareToolsPlugin."""
+        from reversecore_mcp.tools.malware import MalwareToolsPlugin
 
-        plugin = DormantDetectorPlugin()
+        plugin = MalwareToolsPlugin()
         mock_mcp = MagicMock()
         plugin.register(mock_mcp)
         mock_mcp.tool.assert_called()
@@ -429,14 +429,13 @@ class TestAdditionalEdgeCases:
     @pytest.mark.asyncio
     async def test_multiple_tool_registrations(self):
         """Test multiple tools can be registered to same MCP."""
-        from reversecore_mcp.tools.malware.dormant_detector import DormantDetectorPlugin
-        from reversecore_mcp.tools.malware.vulnerability_hunter import VulnerabilityHunterPlugin
+        from reversecore_mcp.tools.malware import MalwareToolsPlugin
 
         mock_mcp = MagicMock()
-        DormantDetectorPlugin().register(mock_mcp)
-        VulnerabilityHunterPlugin().register(mock_mcp)
+        MalwareToolsPlugin().register(mock_mcp)
 
-        assert mock_mcp.tool.call_count >= 2
+        # MalwareToolsPlugin registers 5 tools
+        assert mock_mcp.tool.call_count >= 5
 
     def test_result_types(self):
         """Test result type creation."""

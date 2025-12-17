@@ -1,4 +1,4 @@
-"""Additional coverage tests for ghost_trace, cli_tools, and static_analysis modules.
+"""Additional coverage tests for dormant_detector, cli_tools, and static_analysis modules.
 
 This file targets the lowest coverage modules to achieve 80% overall coverage.
 """
@@ -12,7 +12,7 @@ import pytest
 
 
 class TestGhostTraceHelpers:
-    """Tests for ghost_trace helper functions."""
+    """Tests for dormant_detector helper functions."""
 
     def test_extract_json_safely_empty_input(self):
         """Test _extract_json_safely with empty input."""
@@ -183,7 +183,7 @@ class TestGhostTraceIdentifyConditionalPaths:
         mock_output = '{"ops": [{"disasm": "cmp eax, 0xdeadbeef", "offset": 4096}]}'
 
         with patch(
-            "reversecore_mcp.tools.ghost_trace._run_r2_cmd",
+            "reversecore_mcp.tools.malware.dormant_detector._run_r2_cmd",
             new_callable=AsyncMock,
             return_value=mock_output,
         ):
@@ -214,7 +214,7 @@ class TestGhostTraceVerifyHypothesis:
         mock_output = '{"eax": 0, "ebx": 0}'
 
         with patch(
-            "reversecore_mcp.tools.ghost_trace._run_r2_cmd",
+            "reversecore_mcp.tools.malware.dormant_detector._run_r2_cmd",
             new_callable=AsyncMock,
             return_value=mock_output,
         ):
@@ -232,7 +232,7 @@ class TestGhostTraceVerifyHypothesis:
         from reversecore_mcp.tools.malware.dormant_detector import _verify_hypothesis_with_emulation
 
         with patch(
-            "reversecore_mcp.tools.ghost_trace._run_r2_cmd",
+            "reversecore_mcp.tools.malware.dormant_detector._run_r2_cmd",
             new_callable=AsyncMock,
             return_value="not valid json",
         ):
@@ -467,18 +467,18 @@ class TestTrinityDefenseGenerateRecommendations:
 class TestEdgeCases:
     """Additional edge case tests for coverage."""
 
-    def test_ghost_trace_register_function(self):
-        """Test register_ghost_trace function."""
-        from reversecore_mcp.tools.malware.dormant_detector import register_ghost_trace
+    def test_dormant_detector_register_function(self):
+        """Test register_dormant_detector function."""
+        from reversecore_mcp.tools.malware.dormant_detector import register_dormant_detector
 
         mock_mcp = MagicMock()
-        register_ghost_trace(mock_mcp)
+        register_dormant_detector(mock_mcp)
         mock_mcp.tool.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_ghost_trace_main_function_scan(self, patched_workspace_config, workspace_dir):
-        """Test ghost_trace main function in scan mode."""
-        from reversecore_mcp.tools.malware.dormant_detector import ghost_trace
+    async def test_dormant_detector_main_function_scan(self, patched_workspace_config, workspace_dir):
+        """Test dormant_detector main function in scan mode."""
+        from reversecore_mcp.tools.malware.dormant_detector import dormant_detector
 
         test_file = workspace_dir / "test.bin"
         test_file.write_bytes(b"\x7fELF" + b"\x00" * 100)
@@ -487,28 +487,28 @@ class TestEdgeCases:
         mock_output = '[{"name": "main", "offset": 4096, "size": 100}]'
 
         with patch(
-            "reversecore_mcp.tools.ghost_trace._run_r2_cmd",
+            "reversecore_mcp.tools.malware.dormant_detector._run_r2_cmd",
             new_callable=AsyncMock,
             return_value=mock_output,
         ):
             with patch(
-                "reversecore_mcp.tools.ghost_trace._find_orphan_functions",
+                "reversecore_mcp.tools.malware.dormant_detector._find_orphan_functions",
                 new_callable=AsyncMock,
                 return_value=[],
             ):
                 with patch(
-                    "reversecore_mcp.tools.ghost_trace._identify_conditional_paths",
+                    "reversecore_mcp.tools.malware.dormant_detector._identify_conditional_paths",
                     new_callable=AsyncMock,
                     return_value=[],
                 ):
-                    result = await ghost_trace(str(test_file))
+                    result = await dormant_detector(str(test_file))
                     assert result.status == "success"
                     assert "scan_type" in result.data
 
     @pytest.mark.asyncio
-    async def test_ghost_trace_emulation_mode(self, patched_workspace_config, workspace_dir):
-        """Test ghost_trace in emulation mode."""
-        from reversecore_mcp.tools.malware.dormant_detector import ghost_trace
+    async def test_dormant_detector_emulation_mode(self, patched_workspace_config, workspace_dir):
+        """Test dormant_detector in emulation mode."""
+        from reversecore_mcp.tools.malware.dormant_detector import dormant_detector
 
         test_file = workspace_dir / "test.bin"
         test_file.write_bytes(b"\x7fELF" + b"\x00" * 100)
@@ -516,11 +516,11 @@ class TestEdgeCases:
         mock_output = '{"eax": 0}'
 
         with patch(
-            "reversecore_mcp.tools.ghost_trace._run_r2_cmd",
+            "reversecore_mcp.tools.malware.dormant_detector._run_r2_cmd",
             new_callable=AsyncMock,
             return_value=mock_output,
         ):
-            result = await ghost_trace(
+            result = await dormant_detector(
                 str(test_file),
                 focus_function="0x401000",
                 hypothesis={"registers": {"eax": "0x1234"}},
@@ -528,19 +528,19 @@ class TestEdgeCases:
             assert result.status == "success"
 
     @pytest.mark.asyncio
-    async def test_ghost_trace_invalid_json_output(self, patched_workspace_config, workspace_dir):
-        """Test ghost_trace with invalid JSON output from r2."""
-        from reversecore_mcp.tools.malware.dormant_detector import ghost_trace
+    async def test_dormant_detector_invalid_json_output(self, patched_workspace_config, workspace_dir):
+        """Test dormant_detector with invalid JSON output from r2."""
+        from reversecore_mcp.tools.malware.dormant_detector import dormant_detector
 
         test_file = workspace_dir / "test.bin"
         test_file.write_bytes(b"\x7fELF" + b"\x00" * 100)
 
         with patch(
-            "reversecore_mcp.tools.ghost_trace._run_r2_cmd",
+            "reversecore_mcp.tools.malware.dormant_detector._run_r2_cmd",
             new_callable=AsyncMock,
             return_value="not valid json at all",
         ):
-            result = await ghost_trace(str(test_file))
+            result = await dormant_detector(str(test_file))
             assert result.status == "error"
 
     def test_trinity_defense_register_function(self):

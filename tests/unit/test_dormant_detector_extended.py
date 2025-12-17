@@ -2,7 +2,7 @@
 Tests to boost coverage for modules with low coverage.
 
 Target modules:
-- ghost_trace.py (21%)
+- dormant_detector.py (21%)
 - neural_decompiler.py (18%)
 - static_analysis.py (46%)
 - file_operations.py (50%)
@@ -17,7 +17,7 @@ import pytest
 from tests.conftest import requires_file, requires_strings
 
 # ============================================================================
-# ghost_trace.py tests
+# dormant_detector.py tests
 # ============================================================================
 
 
@@ -26,7 +26,7 @@ class TestGhostTraceHelpers:
 
     def test_extract_json_safely_with_array(self):
         """Test JSON extraction with array."""
-        from reversecore_mcp.tools.ghost_trace import _extract_json_safely
+        from reversecore_mcp.tools.malware.dormant_detector import _extract_json_safely
 
         output = 'garbage [{"name": "main", "offset": 4096}] more text'
         result = _extract_json_safely(output)
@@ -34,7 +34,7 @@ class TestGhostTraceHelpers:
 
     def test_extract_json_safely_with_object(self):
         """Test JSON extraction with object."""
-        from reversecore_mcp.tools.ghost_trace import _extract_json_safely
+        from reversecore_mcp.tools.malware.dormant_detector import _extract_json_safely
 
         output = 'prefix {"key": "value", "num": 42} suffix'
         result = _extract_json_safely(output)
@@ -42,7 +42,7 @@ class TestGhostTraceHelpers:
 
     def test_extract_json_safely_with_nested(self):
         """Test JSON extraction with nested structures."""
-        from reversecore_mcp.tools.ghost_trace import _extract_json_safely
+        from reversecore_mcp.tools.malware.dormant_detector import _extract_json_safely
 
         # Test that it can extract valid JSON (actual result depends on implementation)
         output = '{"outer": {"inner": [1, 2, 3]}, "list": ["a", "b"]}'
@@ -53,7 +53,7 @@ class TestGhostTraceHelpers:
 
     def test_extract_json_safely_empty_input(self):
         """Test JSON extraction with empty input."""
-        from reversecore_mcp.tools.ghost_trace import _extract_json_safely
+        from reversecore_mcp.tools.malware.dormant_detector import _extract_json_safely
 
         assert _extract_json_safely("") is None
         assert _extract_json_safely("   ") is None
@@ -61,14 +61,14 @@ class TestGhostTraceHelpers:
 
     def test_extract_json_safely_no_json(self):
         """Test JSON extraction when no valid JSON present."""
-        from reversecore_mcp.tools.ghost_trace import _extract_json_safely
+        from reversecore_mcp.tools.malware.dormant_detector import _extract_json_safely
 
         result = _extract_json_safely("no json here at all")
         assert result is None
 
     def test_extract_json_safely_single_line(self):
         """Test JSON extraction from single line."""
-        from reversecore_mcp.tools.ghost_trace import _extract_json_safely
+        from reversecore_mcp.tools.malware.dormant_detector import _extract_json_safely
 
         output = "line1\nline2\n[1, 2, 3]\nline4"
         result = _extract_json_safely(output)
@@ -76,21 +76,21 @@ class TestGhostTraceHelpers:
 
     def test_validate_r2_identifier_hex_address(self):
         """Test validation of hex addresses."""
-        from reversecore_mcp.tools.ghost_trace import _validate_r2_identifier
+        from reversecore_mcp.tools.malware.dormant_detector import _validate_r2_identifier
 
         assert _validate_r2_identifier("0x401000") == "0x401000"
         assert _validate_r2_identifier("0xDEADBEEF") == "0xDEADBEEF"
 
     def test_validate_r2_identifier_symbol(self):
         """Test validation of symbol names."""
-        from reversecore_mcp.tools.ghost_trace import _validate_r2_identifier
+        from reversecore_mcp.tools.malware.dormant_detector import _validate_r2_identifier
 
         assert _validate_r2_identifier("sym.main") == "sym.main"
         assert _validate_r2_identifier("sym.imp.CreateFileA") == "sym.imp.CreateFileA"
 
     def test_validate_r2_identifier_function_name(self):
         """Test validation of simple function names."""
-        from reversecore_mcp.tools.ghost_trace import _validate_r2_identifier
+        from reversecore_mcp.tools.malware.dormant_detector import _validate_r2_identifier
 
         assert _validate_r2_identifier("main") == "main"
         assert _validate_r2_identifier("_start") == "_start"
@@ -99,7 +99,7 @@ class TestGhostTraceHelpers:
     def test_validate_r2_identifier_invalid(self):
         """Test validation of invalid identifiers."""
         from reversecore_mcp.core.exceptions import ValidationError
-        from reversecore_mcp.tools.ghost_trace import _validate_r2_identifier
+        from reversecore_mcp.tools.malware.dormant_detector import _validate_r2_identifier
 
         with pytest.raises(ValidationError):
             _validate_r2_identifier("rm -rf /")
@@ -112,7 +112,7 @@ class TestGhostTraceHelpers:
 
     def test_get_file_cache_key(self, workspace_dir):
         """Test cache key generation."""
-        from reversecore_mcp.tools.ghost_trace import _get_file_cache_key
+        from reversecore_mcp.tools.malware.dormant_detector import _get_file_cache_key
 
         test_file = workspace_dir / "test.bin"
         test_file.write_bytes(b"test content")

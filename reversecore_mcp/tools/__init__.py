@@ -5,9 +5,6 @@ This package contains tool modules that wrap reverse engineering CLI tools
 and libraries, making them accessible to AI agents through the MCP protocol.
 """
 
-# Backward compatibility re-exports for legacy imports
-# These allow tests and other code to use `from reversecore_mcp.tools import X` syntax
-
 # Analysis tools
 from reversecore_mcp.tools.analysis import static_analysis
 from reversecore_mcp.tools.analysis import diff_tools
@@ -17,6 +14,7 @@ from reversecore_mcp.tools.analysis import lief_tools
 # Common tools
 from reversecore_mcp.tools.common import file_operations
 from reversecore_mcp.tools.common import lib_tools
+from reversecore_mcp.tools.common import patch_explainer
 
 # Radare2 tools
 from reversecore_mcp.tools.radare2 import r2_analysis
@@ -24,38 +22,37 @@ from reversecore_mcp.tools.radare2 import r2_analysis
 # Ghidra tools
 from reversecore_mcp.tools.ghidra import decompilation
 
-# Malware tools - backward compatibility aliases
+# Malware tools
 from reversecore_mcp.tools.malware import dormant_detector
 from reversecore_mcp.tools.malware import adaptive_vaccine
 from reversecore_mcp.tools.malware import vulnerability_hunter
 
-# Legacy aliases for renamed modules
-ghost_trace = dormant_detector  # ghost_trace was renamed to dormant_detector
-
-# Report tools - backward compatibility
+# Report tools
 from reversecore_mcp.tools.report import report_tools
 from reversecore_mcp.tools.report import report_mcp_tools
 
-# Common tools extra - backward compatibility
-from reversecore_mcp.tools.common import patch_explainer
-
 __all__ = [
+    # Analysis tools
     "static_analysis",
     "diff_tools",
     "signature_tools",
     "lief_tools",
+    # Common tools
     "file_operations",
     "lib_tools",
+    "patch_explainer",
+    # Radare2 tools
     "r2_analysis",
+    # Ghidra tools
     "decompilation",
     # Malware tools
     "dormant_detector",
     "adaptive_vaccine",
     "vulnerability_hunter",
-    "ghost_trace",  # Legacy alias
     # Report tools
     "report_tools",
     "report_mcp_tools",
-    # Common tools extra
-    "patch_explainer",
 ]
+
+# NOTE: Legacy alias 'ghost_trace' was removed in v1.0.0
+# Use 'dormant_detector' directly
