@@ -331,7 +331,7 @@ _FUNC_NAME_CLEAN_TABLE = str.maketrans("", "", "_")
 async def trace_execution_path(
     file_path: str,
     target_function: str,
-    max_depth: int = 2,
+    max_depth: int = 5,
     max_paths: int = 5,
     timeout: int | None = None,
     prioritize_sinks: bool = True,
@@ -541,6 +541,9 @@ def _radare2_json_to_mermaid(json_str: str) -> str:
     Returns:
         Mermaid flowchart syntax string
     """
+    # Maximum nodes before switching to summary mode (browser Mermaid limit)
+    MAX_MERMAID_NODES = 100
+
     try:
         graph_data = json.loads(json_str)
         if not graph_data:
@@ -552,6 +555,14 @@ def _radare2_json_to_mermaid(json_str: str) -> str:
             if isinstance(graph_data, list)
             else graph_data.get("blocks", [])
         )
+
+        # Check node count limit to prevent browser rendering crashes
+        if len(blocks) > MAX_MERMAID_NODES:
+            return (
+                f"graph TD;\n"
+                f"    Warning[\"Graph too complex: {len(blocks)} nodes\"]"
+                f"\n    Warning --> Hint[\"Use PNG export or reduce scope\"]"
+            )
 
         mermaid_lines = ["graph TD"]
 

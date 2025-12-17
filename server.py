@@ -393,11 +393,6 @@ def main():
                     filename = name[:195] + ('.' + ext if ext else '')
                 return filename or "unnamed_file"
             
-            def _save_file_sync(file_path, file_obj):
-                """Synchronous file save - run in thread to avoid blocking."""
-                with open(file_path, "wb") as buffer:
-                    shutil.copyfileobj(file_obj, buffer)
-            
             try:
                 # Ensure workspace exists
                 workspace = settings.workspace

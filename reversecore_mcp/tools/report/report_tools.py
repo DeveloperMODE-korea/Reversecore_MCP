@@ -15,7 +15,7 @@ import hashlib
 import logging
 import os
 import platform
-import smtplib
+import aiosmtplib
 import uuid
 from datetime import datetime, timedelta, timezone
 from email import encoders
@@ -836,20 +836,15 @@ class ReportTools:
                 attachment.add_header("Content-Disposition", f"attachment; filename={report_id}.md")
                 msg.attach(attachment)
 
-            # 전송 (Run in thread to avoid blocking event loop)
-            def _send_sync():
-                with smtplib.SMTP(
-                    self.email_config.smtp_server, self.email_config.smtp_port
-                ) as server:
-                    if self.email_config.use_tls:
-                        server.starttls()
-                    if self.email_config.username and self.email_config.password:
-                        server.login(self.email_config.username, self.email_config.password)
-                    server.sendmail(
-                        self.email_config.username, resolved_recipients, msg.as_string()
-                    )
-
-            await asyncio.to_thread(_send_sync)
+            # 전송 (Native async SMTP - no thread pool blocking)
+            await aiosmtplib.send(
+                msg,
+                hostname=self.email_config.smtp_server,
+                port=self.email_config.smtp_port,
+                start_tls=self.email_config.use_tls,
+                username=self.email_config.username if self.email_config.username else None,
+                password=self.email_config.password if self.email_config.password else None,
+            )
 
             return {
                 "success": True,

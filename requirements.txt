@@ -34,6 +34,9 @@ aiofiles>=23.2.0
 # Async SQLite for AI memory storage
 aiosqlite>=0.19.0
 
+# Async SMTP for non-blocking email sending
+aiosmtplib>=3.0.0
+
 # Symbolic Execution
 angr>=9.2.0
 
