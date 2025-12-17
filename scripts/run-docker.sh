@@ -51,13 +51,24 @@ echo "📁 Project directory: $PROJECT_DIR"
 case "$ACTION" in
     run)
         echo "🚀 Starting Reversecore MCP ($ARCH)..."
+        # Map arch to docker platform
+        PLATFORM="linux/amd64"
         if [[ "$ARCH" == "arm64" ]]; then
-            docker compose --profile arm64 up -d
-            echo "✅ Started reversecore-mcp-arm64 container"
-        else
-            docker compose --profile x86 up -d
-            echo "✅ Started reversecore-mcp container"
+            PLATFORM="linux/arm64"
         fi
+        
+        # Use simple docker run for now since we consolidated Dockerfile
+        # Note: In a real environment, you'd update docker-compose.yml to use platform: linux/arm64
+        # but for simplicity we rely on buildx/platform handling.
+        
+        if [[ "$ARCH" == "arm64" ]]; then
+            echo "🍎 Running for Apple Silicon"
+            docker compose --profile arm64 up -d
+        else
+            echo "🖥️ Running for Intel/AMD"
+            docker compose --profile x86 up -d
+        fi
+        
         echo ""
         echo "📡 Server running at: http://localhost:8000"
         echo "📂 Workspace mounted: ./workspace"
@@ -68,12 +79,20 @@ case "$ACTION" in
 
     build)
         echo "🔨 Building Docker image ($ARCH)..."
+        
+        PLATFORM="linux/amd64"
+        TAG="latest"
         if [[ "$ARCH" == "arm64" ]]; then
-            docker build -f Dockerfile.arm64 -t reversecore-mcp:arm64 .
-        else
-            docker build -f Dockerfile -t reversecore-mcp:latest .
+            PLATFORM="linux/arm64"
+            TAG="arm64"
         fi
-        echo "✅ Build complete!"
+        
+        # Enable BuildKit for multi-arch support
+        export DOCKER_BUILDKIT=1
+        
+        docker build --platform $PLATFORM -f Dockerfile -t reversecore-mcp:$TAG .
+        
+        echo "✅ Build complete: reversecore-mcp:$TAG"
         ;;
 
     stop)

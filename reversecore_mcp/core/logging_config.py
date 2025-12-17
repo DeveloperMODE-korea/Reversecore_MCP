@@ -80,7 +80,8 @@ class JSONFormatter(logging.Formatter):
                 "traceback": self.formatException(record.exc_info),
             }
 
-        return json.dumps(log_data)
+        # Safe serialization with default=str to prevent crashes on non-serializable objects
+        return json.dumps(log_data, default=str)
 
 
 class ContextAdapter(logging.LoggerAdapter):
@@ -143,7 +144,8 @@ def setup_logging() -> None:
 
     # Console handler
     console_handler = logging.StreamHandler(sys.stderr)
-    console_handler.setLevel(logging.INFO)
+    # Unlock console level to allow DEBUG logs if configured
+    console_handler.setLevel(getattr(logging, log_level, logging.INFO))
     console_handler.setFormatter(console_formatter)
     logger.addHandler(console_handler)
 

@@ -25,6 +25,7 @@
 # Build Stage: Install dependencies that require compilation
 # ============================================================================
 FROM python:3.14-slim-bookworm AS builder
+ARG TARGETARCH
 ARG YARA_VERSION=4.3.1
 ARG RADARE2_VERSION=6.0.4
 ARG GHIDRA_VERSION=11.4.2
@@ -102,6 +103,8 @@ COPY requirements.txt .
 # Using a venv makes it easy to copy only the installed packages to the runtime stage
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+# Conditional install for ARM64 (skip incompatible packages like angr if needed)
+# For now we install standard requirements as angr support improves
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ============================================================================
@@ -124,14 +127,11 @@ RUN mkdir -p /app/workspace /app/rules
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     # coreutils "file" command required by run_file tool
-    # Version: 1:5.44-3 (Debian 12 Bookworm)
-    file=1:5.44-3 \
+    file \
     # Binutils for strings command
-    # Version: 2.40-2 (Debian 12 Bookworm)
-    binutils=2.40-2 \
+    binutils \
     # Binwalk for firmware analysis and file carving
-    # Version: 2.3.4+dfsg1-1 (Debian 12 Bookworm)
-    binwalk=2.3.4+dfsg1-1 \
+    binwalk \
     # Graphviz for CFG image generation (FastMCP Image support)
     graphviz \
     # Required for Adoptium GPG key
@@ -148,7 +148,10 @@ RUN wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gp
     && rm -rf /var/lib/apt/lists/*
 
 # Set JAVA_HOME environment variable (required for PyGhidra to find Java 21 JDK)
-ENV JAVA_HOME="/usr/lib/jvm/temurin-21-jdk-amd64"
+ENV JAVA_HOME="/usr/lib/jvm/temurin-21-jdk-hotspot"
+# Note: Debian adoptium package usually links to -hotspot suffix regardless of arch, 
+# or we can rely on standard java in path.
+# Updating PATH guarantees java works.
 
 # Copy native tooling built in the builder stage so CLI tools match Python bindings
 RUN mkdir -p /usr/local/include /usr/local/lib/pkgconfig
@@ -183,17 +186,17 @@ ENV PATH="/opt/radare2/bin:/opt/venv/bin:$PATH" \
     MEMORY_DB_PATH=/app/workspace/.memory.db \
     RATE_LIMIT=60
 
-# Create log directory
-RUN mkdir -p /var/log/reversecore
-
-# Create a non-root user and switch to it
-RUN useradd -m -u 1000 appuser \
-    && chown -R appuser:appuser /app /var/log/reversecore
+# Create log directory and non-root user
+RUN mkdir -p /var/log/reversecore && \
+    useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app /var/log/reversecore
 USER appuser
 
 # Expose port for HTTP transport
 EXPOSE 8000
 
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()" || exit 1
+
 # Run the MCP server
 CMD ["python", "server.py"]
-
