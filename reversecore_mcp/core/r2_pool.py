@@ -259,21 +259,28 @@ class R2ConnectionPool:
             return await asyncio.to_thread(self._execute_unsafe, file_path, command)
 
     def _execute_unsafe(self, file_path: str, command: str) -> str:
-        """Execute without acquiring lock (caller must hold lock)."""
-        try:
-            r2 = self._get_connection_unsafe(file_path)
-            return r2.cmd(command)
-        except Exception as e:
-            logger.warning(f"r2 command failed, retrying connection: {e}")
-            self._remove_connection_unsafe(file_path)
-            self._stats["reconnections"] += 1
-
+        """Execute with thread lock for safe asyncio.to_thread usage.
+        
+        Note: Despite the name 'unsafe', this method now acquires self._lock
+        to ensure thread-safety when called from asyncio.to_thread().
+        The async lock in execute_async() serializes async callers,
+        while this thread lock protects against concurrent sync callers.
+        """
+        with self._lock:  # Thread lock for safe pool access
             try:
                 r2 = self._get_connection_unsafe(file_path)
                 return r2.cmd(command)
-            except Exception as retry_error:
-                logger.error(f"Retry failed: {retry_error}")
-                raise
+            except Exception as e:
+                logger.warning(f"r2 command failed, retrying connection: {e}")
+                self._remove_connection_unsafe(file_path)
+                self._stats["reconnections"] += 1
+
+                try:
+                    r2 = self._get_connection_unsafe(file_path)
+                    return r2.cmd(command)
+                except Exception as retry_error:
+                    logger.error(f"Retry failed: {retry_error}")
+                    raise
 
     def _get_connection_unsafe(self, file_path: str) -> Any:
         """Get or create connection without locking (caller must hold lock)."""

@@ -1,0 +1,55 @@
+# Reversecore_MCP Docker build context exclusions
+# Reduces build context size and improves build speed/caching
+
+# Version control
+.git
+.github
+.gitignore
+
+# Python cache and compiled files
+__pycache__
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Testing
+tests/
+.pytest_cache
+.coverage
+htmlcov/
+.tox
+.nox
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+
+# Virtual environments
+.venv
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Documentation (keep README for reference)
+docs/
+*.md
+!README.md
+
+# Misc
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

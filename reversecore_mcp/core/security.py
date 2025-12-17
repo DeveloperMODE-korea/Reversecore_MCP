@@ -9,6 +9,7 @@ Note: For radare2 command validation, use the improved regex-based validation
 in command_spec.py which provides stronger security guarantees.
 """
 
+import threading
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -34,10 +35,11 @@ class WorkspaceConfig:
         return cls(workspace=config.workspace, read_only_dirs=config.read_only_dirs)
 
 
-# Lazy-initialized workspace configuration
+# Lazy-initialized workspace configuration with thread safety
 # This avoids initialization errors when the module is imported before
 # environment variables are set (common in test fixtures)
 _WORKSPACE_CONFIG: WorkspaceConfig | None = None
+_WORKSPACE_CONFIG_LOCK = threading.Lock()
 
 
 def get_workspace_config() -> WorkspaceConfig:
@@ -46,22 +48,26 @@ def get_workspace_config() -> WorkspaceConfig:
 
     This lazy initialization pattern allows tests to set up environment
     variables or mock configurations before the first access.
+    Thread-safe via double-checked locking pattern.
 
     Returns:
         WorkspaceConfig instance
     """
     global _WORKSPACE_CONFIG
     if _WORKSPACE_CONFIG is None:
-        _WORKSPACE_CONFIG = WorkspaceConfig.from_env()
+        with _WORKSPACE_CONFIG_LOCK:
+            if _WORKSPACE_CONFIG is None:
+                _WORKSPACE_CONFIG = WorkspaceConfig.from_env()
     return _WORKSPACE_CONFIG
 
 
 def refresh_workspace_config() -> WorkspaceConfig:
     """Recompute the default workspace configuration (mainly for tests)."""
     global _WORKSPACE_CONFIG
-    _WORKSPACE_CONFIG = WorkspaceConfig.from_env()
-    # Clear the path resolution cache when config changes
-    _resolve_path_cached.cache_clear()
+    with _WORKSPACE_CONFIG_LOCK:
+        _WORKSPACE_CONFIG = WorkspaceConfig.from_env()
+        # Clear the path resolution cache when config changes
+        _resolve_path_cached.cache_clear()
     return _WORKSPACE_CONFIG
 
 
@@ -73,8 +79,9 @@ def reset_workspace_config() -> None:
     and have the configuration re-read on next access.
     """
     global _WORKSPACE_CONFIG
-    _WORKSPACE_CONFIG = None
-    _resolve_path_cached.cache_clear()
+    with _WORKSPACE_CONFIG_LOCK:
+        _WORKSPACE_CONFIG = None
+        _resolve_path_cached.cache_clear()
 
 
 @lru_cache(maxsize=PATH_VALIDATION_CACHE_SIZE)

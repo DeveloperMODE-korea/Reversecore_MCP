@@ -14,35 +14,50 @@ from reversecore_mcp.core.result import ToolError
 
 class MetricsCollector:
     """
-    Thread-safe performance metrics collector.
+    Thread-safe performance metrics collector with bounded memory.
 
     Uses threading.Lock to ensure safe concurrent access in multi-threaded
     or async environments (e.g., FastMCP server with multiple tool calls).
+    
+    Memory protection: Limits entries to MAX_ENTRIES to prevent unbounded growth.
     """
+    
+    # Maximum number of unique entries per category to prevent memory leaks
+    MAX_TOOL_ENTRIES = 500
+    MAX_CACHE_ENTRIES = 200
+    MAX_CIRCUIT_BREAKER_ENTRIES = 100
 
     def __init__(self):
         self._lock = threading.Lock()
-        self.tool_metrics: dict[str, dict[str, Any]] = defaultdict(
-            lambda: {
-                "calls": 0,
-                "errors": 0,
-                "total_time": 0.0,
-                "avg_time": 0.0,
-                "max_time": 0.0,
-                "min_time": float("inf"),
-            }
-        )
-        self.cache_metrics: dict[str, dict[str, int]] = defaultdict(
-            lambda: {
-                "hits": 0,
-                "misses": 0,
-            }
-        )
+        # Use regular dict instead of defaultdict for LRU control
+        self.tool_metrics: dict[str, dict[str, Any]] = {}
+        self.cache_metrics: dict[str, dict[str, int]] = {}
         self.circuit_breaker_states: dict[str, str] = {}
+    
+    def _get_default_tool_metrics(self) -> dict[str, Any]:
+        """Create default metrics dict for a new tool."""
+        return {
+            "calls": 0,
+            "errors": 0,
+            "total_time": 0.0,
+            "avg_time": 0.0,
+            "max_time": 0.0,
+            "min_time": float("inf"),
+        }
+    
+    def _get_default_cache_metrics(self) -> dict[str, int]:
+        """Create default metrics dict for a new cache."""
+        return {"hits": 0, "misses": 0}
+    
+    def _evict_oldest(self, d: dict, max_entries: int) -> None:
+        """Evict oldest entries if dict exceeds max size (FIFO eviction)."""
+        while len(d) > max_entries:
+            oldest_key = next(iter(d))
+            del d[oldest_key]
 
     def record_tool_execution(self, tool_name: str, execution_time: float, success: bool = True):
         """
-        Record metrics for a tool execution (thread-safe).
+        Record metrics for a tool execution (thread-safe, bounded).
 
         Args:
             tool_name: Name of the tool
@@ -50,6 +65,10 @@ class MetricsCollector:
             success: Whether the execution succeeded
         """
         with self._lock:
+            if tool_name not in self.tool_metrics:
+                self._evict_oldest(self.tool_metrics, self.MAX_TOOL_ENTRIES - 1)
+                self.tool_metrics[tool_name] = self._get_default_tool_metrics()
+            
             metrics = self.tool_metrics[tool_name]
             metrics["calls"] += 1
 
@@ -62,18 +81,26 @@ class MetricsCollector:
             metrics["min_time"] = min(metrics["min_time"], execution_time)
 
     def record_cache_hit(self, cache_name: str):
-        """Record a cache hit."""
+        """Record a cache hit (thread-safe, bounded)."""
         with self._lock:
+            if cache_name not in self.cache_metrics:
+                self._evict_oldest(self.cache_metrics, self.MAX_CACHE_ENTRIES - 1)
+                self.cache_metrics[cache_name] = self._get_default_cache_metrics()
             self.cache_metrics[cache_name]["hits"] += 1
 
     def record_cache_miss(self, cache_name: str):
-        """Record a cache miss."""
+        """Record a cache miss (thread-safe, bounded)."""
         with self._lock:
+            if cache_name not in self.cache_metrics:
+                self._evict_oldest(self.cache_metrics, self.MAX_CACHE_ENTRIES - 1)
+                self.cache_metrics[cache_name] = self._get_default_cache_metrics()
             self.cache_metrics[cache_name]["misses"] += 1
 
     def record_circuit_breaker_state(self, tool_name: str, state: str):
-        """Record circuit breaker state change."""
+        """Record circuit breaker state change (thread-safe, bounded)."""
         with self._lock:
+            if tool_name not in self.circuit_breaker_states:
+                self._evict_oldest(self.circuit_breaker_states, self.MAX_CIRCUIT_BREAKER_ENTRIES - 1)
             self.circuit_breaker_states[tool_name] = state
 
     def get_metrics(self) -> dict[str, Any]:
