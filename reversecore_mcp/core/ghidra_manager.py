@@ -16,11 +16,15 @@ from reversecore_mcp.core.logging_config import get_logger
 # Custom Exceptions for Structured Error Handling
 class GhidraError(Exception):
     """Base exception for Ghidra operations."""
+
     pass
+
 
 class DecompilationError(GhidraError):
     """Raised when decompilation fails."""
+
     pass
+
 
 logger = get_logger(__name__)
 
@@ -42,7 +46,7 @@ class GhidraManager:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = super(GhidraManager, cls).__new__(cls)
+                    cls._instance = super().__new__(cls)
                     cls._instance._initialized = False
         return cls._instance
 
@@ -135,7 +139,7 @@ class GhidraManager:
     def close_all(self) -> None:
         """Close all cached projects. Call on shutdown to prevent resource leaks."""
         with self._project_lock:
-            for path, (prog, api, ctx) in list(self._projects.items()):
+            for path, (_prog, _api, ctx) in list(self._projects.items()):
                 self._close_project(path, ctx)
             self._projects.clear()
             logger.info("All Ghidra projects closed")
@@ -196,7 +200,7 @@ class GhidraManager:
                         # Try to find nearest function
                         func = flat_api.getFunctionBefore(addr)
                         if not func:
-                             raise ValueError(f"No function found at or near {function_address}")
+                            raise ValueError(f"No function found at or near {function_address}")
 
                     res = decompiler.decompileFunction(func, 60, monitor)
                     if not res.decompileCompleted():
@@ -204,7 +208,9 @@ class GhidraManager:
 
                     return res.getDecompiledFunction().getC()
                 else:
-                    raise NotImplementedError("Full file decompilation not supported. Please specify a function.")
+                    raise NotImplementedError(
+                        "Full file decompilation not supported. Please specify a function."
+                    )
 
             except Exception as e:
                 logger.error(f"Ghidra decompilation failed: {e}")
@@ -221,3 +227,8 @@ class GhidraManager:
 
 # Global instance
 ghidra_manager = GhidraManager()
+
+
+def get_ghidra_manager() -> GhidraManager:
+    """Get the global GhidraManager instance."""
+    return ghidra_manager
