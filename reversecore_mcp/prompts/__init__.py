@@ -6,8 +6,12 @@ from reversecore_mcp.prompts.game import game_analysis_mode
 from reversecore_mcp.prompts.malware import (
     apt_hunting_mode,
     basic_analysis_mode,
+    c2_extraction_mode,
+    code_similarity_mode,
     full_analysis_mode,
     malware_analysis_mode,
+    ransomware_triage_mode,
+    unpacking_mode,
     vulnerability_hunter_mode,
 )
 from reversecore_mcp.prompts.report import report_generation_mode
@@ -32,6 +36,12 @@ def register_prompts(mcp: FastMCP):
     mcp.prompt("basic_analysis_mode")(basic_analysis_mode)
     mcp.prompt("apt_hunting_mode")(apt_hunting_mode)
     mcp.prompt("vulnerability_hunter_mode")(vulnerability_hunter_mode)
+
+    # NEW: Specialized Malware Prompts
+    mcp.prompt("unpacking_mode")(unpacking_mode)
+    mcp.prompt("c2_extraction_mode")(c2_extraction_mode)
+    mcp.prompt("ransomware_triage_mode")(ransomware_triage_mode)
+    mcp.prompt("code_similarity_mode")(code_similarity_mode)
 
     # Security Research Prompts
     mcp.prompt("patch_analysis_mode")(patch_analysis_mode)
