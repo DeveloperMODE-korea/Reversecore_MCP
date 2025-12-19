@@ -204,8 +204,6 @@ async def _cleanup_old_files():
                         if now - p.stat().st_mtime > retention_seconds:
                             # Only delete files that are clearly temporary or uploaded
                             # This is a safety measure to avoid deleting user's important files
-                            import re
-
                             # Match UUID-prefixed uploads (8 hex chars followed by underscore)
                             is_uuid_upload = bool(re.match(r"^[0-9a-f]{8}_", p.name))
                             # Match temp files (.tmp suffix or .r2_* prefix for radare2)
