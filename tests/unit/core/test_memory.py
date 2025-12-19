@@ -1,8 +1,5 @@
 """Unit tests for the AI memory store module."""
 
-import json
-from pathlib import Path
-
 import pytest
 import pytest_asyncio
 

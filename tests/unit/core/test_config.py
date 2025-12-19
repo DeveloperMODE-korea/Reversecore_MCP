@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 from reversecore_mcp.core.config import (
-    Config,
     LogFormat,
     Settings,
     TransportMode,
@@ -234,7 +233,7 @@ class TestPydanticSettings:
         monkeypatch.setenv("LOG_FORMAT", "json")
         config = reset_config()
         assert config.log_format == "json"
-        
+
         settings = get_settings()
         assert settings.log_format == LogFormat.JSON
 
@@ -244,7 +243,7 @@ class TestPydanticSettings:
         monkeypatch.setenv("MCP_TRANSPORT", "http")
         config = reset_config()
         assert config.mcp_transport == "http"
-        
+
         settings = get_settings()
         assert settings.mcp_transport == TransportMode.HTTP
 
@@ -253,7 +252,7 @@ class TestPydanticSettings:
         workspace, _ = _provision_env(monkeypatch, tmp_path)
         monkeypatch.setenv("REVERSECORE_R2_POOL_SIZE", "5")
         monkeypatch.setenv("REVERSECORE_R2_POOL_TIMEOUT", "60")
-        
+
         config = reset_config()
         assert config.r2_pool_size == 5
         assert config.r2_pool_timeout == 60
@@ -262,7 +261,7 @@ class TestPydanticSettings:
         """get_settings should return the pydantic Settings instance."""
         workspace, _ = _provision_env(monkeypatch, tmp_path)
         reset_config()
-        
+
         settings = get_settings()
         assert isinstance(settings, Settings)
         assert settings.workspace == workspace
@@ -271,19 +270,19 @@ class TestPydanticSettings:
         """Invalid log level should raise validation error."""
         workspace, _ = _provision_env(monkeypatch, tmp_path)
         monkeypatch.setenv("LOG_LEVEL", "INVALID")
-        
+
         with pytest.raises(ValueError, match="Invalid log level"):
             reset_config()
 
     def test_rate_limit_bounds(self, monkeypatch, tmp_path):
         """Rate limit should respect bounds."""
         workspace, _ = _provision_env(monkeypatch, tmp_path)
-        
+
         # Valid rate limit
         monkeypatch.setenv("REVERSECORE_RATE_LIMIT", "500")
         config = reset_config()
         assert config.rate_limit == 500
-        
+
         # Rate limit below minimum should raise error
         monkeypatch.setenv("REVERSECORE_RATE_LIMIT", "0")
         with pytest.raises(ValueError):
@@ -293,7 +292,7 @@ class TestPydanticSettings:
         """Config wrapper should provide same interface as before."""
         workspace, read_dir = _provision_env(monkeypatch, tmp_path)
         config = reset_config()
-        
+
         # All properties should be accessible
         assert isinstance(config.workspace, Path)
         assert isinstance(config.read_only_dirs, tuple)

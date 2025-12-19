@@ -181,6 +181,7 @@ def test_json_formatter_with_exception(monkeypatch):
         assert data["exception"]["type"] == "ValueError"
         assert "Test exception" in data["exception"]["message"]
 
+
 def test_get_logger_with_different_names():
     """Test get_logger returns loggers with correct names."""
     logger1 = get_logger("module1")
