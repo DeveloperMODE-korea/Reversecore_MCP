@@ -190,10 +190,9 @@ async def _cleanup_old_files():
             # We will conservatively clean only things that look temp or explicitly marked.
             # For now, let's target the 'tmp' folder and specific file patterns if needed.
 
-            targets = [
-                workspace / "tmp",
-                workspace,
-            ]  # Include workspace root for files not in 'tmp'
+            # Only scan tmp folder - never touch user's analysis files in workspace root
+            # This prevents accidental deletion of important binary files
+            targets = [workspace / "tmp"]
 
             for target_dir in targets:
                 if not target_dir.exists():
@@ -205,10 +204,14 @@ async def _cleanup_old_files():
                         if now - p.stat().st_mtime > retention_seconds:
                             # Only delete files that are clearly temporary or uploaded
                             # This is a safety measure to avoid deleting user's important files
-                            if p.name.startswith(f"{uuid.UUID(int=0).hex[:8]}_") or p.suffix in [
-                                ".tmp",
-                                ".r2_",
-                            ]:  # Placeholder for UUID prefix
+                            import re
+
+                            # Match UUID-prefixed uploads (8 hex chars followed by underscore)
+                            is_uuid_upload = bool(re.match(r"^[0-9a-f]{8}_", p.name))
+                            # Match temp files (.tmp suffix or .r2_* prefix for radare2)
+                            is_temp = p.suffix == ".tmp" or p.name.startswith(".r2_")
+
+                            if is_uuid_upload or is_temp:
                                 try:
                                     p.unlink()
                                     count += 1
