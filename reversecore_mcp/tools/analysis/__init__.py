@@ -25,6 +25,10 @@ class AnalysisToolsPlugin(Plugin):
     def register(self, mcp_server: Any) -> None:
         """Register all analysis tools."""
         # Import tool functions from submodules
+        from reversecore_mcp.tools.analysis.capa_tools import (
+            run_capa,
+            run_capa_quick,
+        )
         from reversecore_mcp.tools.analysis.die_tools import (
             detect_packer,
             detect_packer_deep,
@@ -61,8 +65,10 @@ class AnalysisToolsPlugin(Plugin):
         mcp_server.tool(extract_rtti_info)
         mcp_server.tool(detect_packer)
         mcp_server.tool(detect_packer_deep)
+        mcp_server.tool(run_capa)
+        mcp_server.tool(run_capa_quick)
 
-        logger.info(f"Registered {self.name} plugin with 13 analysis tools (unified)")
+        logger.info(f"Registered {self.name} plugin with 15 analysis tools (unified)")
 
 
 __all__ = ["AnalysisToolsPlugin"]
