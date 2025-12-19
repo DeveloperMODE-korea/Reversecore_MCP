@@ -37,8 +37,9 @@ aiosqlite>=0.19.0  # Kept open
 # Async SMTP for non-blocking email sending
 aiosmtplib==5.0.0
 
-# Symbolic Execution
-angr>=9.2.0  # Kept open
+# Symbolic Execution (optional - requires Rust compiler for building from source)
+# Install separately: pip install angr>=9.2.0
+# angr>=9.2.0
 
 # Additional dependencies for HTTP transport mode
 # fastmcp may include these, but we need them explicitly for server.py
