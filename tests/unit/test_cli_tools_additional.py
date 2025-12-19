@@ -31,7 +31,7 @@ async def test_run_file_success(monkeypatch, workspace_dir, patched_workspace_co
         mock_exec,
     )
     out = await file_operations.run_file(str(mocked_path))
-    assert out.status == "success" and "ELF" in out.data
+    assert out.status == "success" and "ELF" in out.data.get("file_type", "")
 
 
 @pytest.mark.asyncio

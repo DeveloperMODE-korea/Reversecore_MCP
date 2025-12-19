@@ -46,7 +46,7 @@ class TestSmartDecompile:
 
         assert result.status == "error"
         # Updated to match the new error message from validate_address_format
-        assert "must contain only alphanumeric characters" in result.message
+        assert "safe characters" in result.message
 
     async def test_smart_decompile_no_function(self, workspace_dir, patched_workspace_config):
         """Test decompilation when function doesn't exist."""
@@ -147,7 +147,7 @@ class TestGenerateYaraRule:
 
         assert result.status == "error"
         # Updated to match the new error message from validate_address_format
-        assert "must contain only alphanumeric characters" in result.message
+        assert "safe characters" in result.message
 
     async def test_generate_yara_rule_custom_byte_length(
         self, workspace_dir, patched_workspace_config

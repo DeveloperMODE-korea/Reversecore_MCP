@@ -50,7 +50,7 @@ class TestCliToolsMocked:
         result = await signature_tools.generate_signature(str(test_file), "invalid;cmd")
         assert result.status == "error"
         # Updated to match the new error message from validate_address_format
-        assert "must contain only alphanumeric characters" in result.message
+        assert "safe characters" in result.message
 
     async def test_generate_signature_extraction_failed(
         self, workspace_dir, patched_workspace_config

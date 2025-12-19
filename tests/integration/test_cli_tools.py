@@ -23,7 +23,8 @@ class TestRunFile:
         _require_command("file")
         result = await file_operations.run_file(str(sample_binary_path))
         assert result.status == "success"
-        assert isinstance(result.data, str)
+        assert isinstance(result.data, dict)
+        assert "file_type" in result.data
         assert result.metadata and "bytes_read" in result.metadata
 
     @pytest.mark.asyncio
