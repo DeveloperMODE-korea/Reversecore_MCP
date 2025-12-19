@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Reversecore MCP{% endblock %}</title>
+    <link rel="stylesheet" href="/dashboard/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="logo">
+                <h1>🔬 Reversecore</h1>
+                <span class="version">MCP Dashboard</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="/dashboard/" class="{% if active == 'overview' %}active{% endif %}">📁 Overview</a></li>
+                <li><a href="#" class="disabled">📊 Analysis</a></li>
+                <li><a href="#" class="disabled">🔍 IOCs</a></li>
+                <li><a href="#" class="disabled">📝 Reports</a></li>
+            </ul>
+            <div class="nav-footer">
+                <a href="/health" target="_blank">🟢 Health Check</a>
+            </div>
+        </nav>
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    <script src="/dashboard/static/js/main.js"></script>
+</body>
+</html>

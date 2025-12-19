@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Analysis - {{ file.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📊 Binary Analysis</h2>
+    <p class="subtitle">{{ file.name }} ({{ (file.size / 1024)|round(1) }} KB)</p>
+</div>
+
+<div class="analysis-layout">
+    <div class="functions-panel">
+        <h3>Functions ({{ functions|length }})</h3>
+        <ul class="function-list">
+            {% for func in functions %}
+            <li>
+                <span class="func-name">{{ func.name }}</span>
+                <span class="func-addr">{{ func.offset }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="disasm-panel">
+        <h3>Disassembly</h3>
+        <pre class="disasm-code"><code>{{ disasm }}</code></pre>
+    </div>
+</div>
+
+<div class="actions-bar">
+    <a href="/dashboard/" class="btn btn-secondary">← Back</a>
+    <a href="/dashboard/iocs/{{ file.name }}" class="btn btn-primary">Extract IOCs</a>
+</div>
+{% endblock %}

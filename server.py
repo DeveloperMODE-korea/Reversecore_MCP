@@ -464,6 +464,16 @@ def main():
         )
         app.mount("/mcp", mcp_app)
 
+        # Mount dashboard
+        try:
+            from reversecore_mcp.dashboard import get_router, get_static_files
+
+            app.include_router(get_router())
+            app.mount("/dashboard/static", get_static_files(), name="dashboard_static")
+            logger.info("📊 Dashboard available at /dashboard/")
+        except ImportError as e:
+            logger.warning(f"Dashboard not available: {e}")
+
         # Add health endpoint
         @app.get("/health")
         async def health():

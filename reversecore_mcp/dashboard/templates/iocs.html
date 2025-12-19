@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}IOCs - {{ filename }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🔍 Indicators of Compromise</h2>
+    <p class="subtitle">{{ filename }}</p>
+</div>
+
+{% if iocs.error %}
+<div class="alert alert-error">
+    Error extracting IOCs: {{ iocs.error }}
+</div>
+{% else %}
+
+<div class="ioc-grid">
+    <div class="ioc-card">
+        <h3>🌐 URLs ({{ iocs.urls|length if iocs.urls else 0 }})</h3>
+        <ul class="ioc-list">
+            {% for url in iocs.urls or [] %}
+            <li class="ioc-item">{{ url }}</li>
+            {% else %}
+            <li class="empty">No URLs found</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="ioc-card">
+        <h3>🖥️ IP Addresses ({{ iocs.ips|length if iocs.ips else 0 }})</h3>
+        <ul class="ioc-list">
+            {% for ip in iocs.ips or [] %}
+            <li class="ioc-item">{{ ip }}</li>
+            {% else %}
+            <li class="empty">No IPs found</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="ioc-card">
+        <h3>📧 Emails ({{ iocs.emails|length if iocs.emails else 0 }})</h3>
+        <ul class="ioc-list">
+            {% for email in iocs.emails or [] %}
+            <li class="ioc-item">{{ email }}</li>
+            {% else %}
+            <li class="empty">No emails found</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<div class="section">
+    <h3>📝 Interesting Strings</h3>
+    <div class="strings-list">
+        {% for s in iocs.strings or [] %}
+        <code class="string-item">{{ s }}</code>
+        {% else %}
+        <p class="empty">No interesting strings found</p>
+        {% endfor %}
+    </div>
+</div>
+
+{% endif %}
+
+<div class="actions-bar">
+    <a href="/dashboard/" class="btn btn-secondary">← Back</a>
+    <a href="/dashboard/analysis/{{ filename }}" class="btn btn-primary">View Analysis</a>
+</div>
+{% endblock %}

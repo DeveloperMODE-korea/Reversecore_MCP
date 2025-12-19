@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Error - Reversecore MCP{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <h2>⚠️ Error</h2>
+    <div class="alert alert-error">
+        {{ error }}
+    </div>
+    <a href="/dashboard/" class="btn btn-secondary">← Back to Dashboard</a>
+</div>
+{% endblock %}
