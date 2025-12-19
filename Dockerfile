@@ -134,12 +134,14 @@ RUN apt-get update \
     binwalk \
     # Graphviz for CFG image generation (FastMCP Image support)
     graphviz \
-    # Detect It Easy for packer/compiler detection
-    detect-it-easy \
     # Required for Adoptium GPG key
     wget \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
+
+# Note: Detect It Easy (diec) is optional and not in apt.
+# Install manually from: https://github.com/horsicq/DIE-engine/releases
+# Or use: detect_packer tool will gracefully fail if not installed.
 
 # Install Eclipse Temurin (Adoptium) OpenJDK 21 for Ghidra 11.4+
 # Ghidra 11.4.2 requires Java 21+ JDK (not just JRE - needs javac for some operations)
