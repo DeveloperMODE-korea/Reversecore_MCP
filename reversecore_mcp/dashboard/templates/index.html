@@ -40,8 +40,8 @@
                 <td class="filename">{{ file.name }}</td>
                 <td class="filesize">{{ (file.size / 1024)|round(1) }} KB</td>
                 <td class="actions">
-                    <a href="/dashboard/analysis/{{ file.name }}" class="btn btn-primary">Analyze</a>
-                    <a href="/dashboard/iocs/{{ file.name }}" class="btn btn-secondary">IOCs</a>
+                    <a href="/dashboard/analysis/{{ file.name_raw | urlencode }}" class="btn btn-primary">Analyze</a>
+                    <a href="/dashboard/iocs/{{ file.name_raw | urlencode }}" class="btn btn-secondary">IOCs</a>
                 </td>
             </tr>
             {% endfor %}
