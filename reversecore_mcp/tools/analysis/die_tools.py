@@ -6,7 +6,7 @@ Provides tools to identify binary file characteristics using the DIE CLI (diec).
 
 import shutil
 
-from reversecore_mcp.core.decorators import tool_error_handler
+from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.execution import execute_subprocess_async
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.result import ToolResult
@@ -89,7 +89,7 @@ def _parse_die_output(output: str) -> dict:
     return result
 
 
-@tool_error_handler
+@log_execution()
 async def detect_packer(file_path: str) -> ToolResult:
     """
     Detect packer, compiler, and protector using Detect It Easy (DIE).
@@ -142,7 +142,7 @@ async def detect_packer(file_path: str) -> ToolResult:
     )
 
 
-@tool_error_handler
+@log_execution()
 async def detect_packer_deep(file_path: str) -> ToolResult:
     """
     Deep scan with DIE for more thorough detection.

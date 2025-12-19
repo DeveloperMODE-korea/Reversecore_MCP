@@ -5,7 +5,7 @@ CAPA (by Mandiant FLARE) identifies capabilities in executable files,
 providing high-level behavioral information like encryption, file deletion, etc.
 """
 
-from reversecore_mcp.core.decorators import tool_error_handler
+from reversecore_mcp.core.decorators import log_execution
 from reversecore_mcp.core.logging_config import get_logger
 from reversecore_mcp.core.result import ToolResult
 from reversecore_mcp.core.security import validate_file_path
@@ -23,7 +23,7 @@ def _is_capa_available() -> bool:
         return False
 
 
-@tool_error_handler
+@log_execution()
 async def run_capa(file_path: str, output_format: str = "summary") -> ToolResult:
     """
     Analyze binary capabilities using CAPA (Mandiant FLARE).
@@ -161,7 +161,7 @@ async def run_capa(file_path: str, output_format: str = "summary") -> ToolResult
         return ToolResult.error_result(f"CAPA analysis failed: {e}")
 
 
-@tool_error_handler
+@log_execution()
 async def run_capa_quick(file_path: str) -> ToolResult:
     """
     Quick CAPA scan returning only high-risk capabilities.
