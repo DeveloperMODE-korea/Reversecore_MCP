@@ -91,12 +91,8 @@ async def server_lifespan(server: FastMCP) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning(f"⚠️ Memory store initialization failed: {e}")
 
-    # Initialize async resources (e.g. SQLite memory)
-    # This ensures "lazy" resources are ready before first request
-    from reversecore_mcp.core.execution import initialize_async
-
-    await initialize_async()
-    logger.info("Async resources initialized")
+    # Note: Async resources are initialized lazily when first accessed
+    logger.info("Async resources ready")
 
     # Start cleanup task
     cleanup_task = asyncio.create_task(_cleanup_old_files())
