@@ -118,6 +118,12 @@ class Radare2ToolsPlugin(Plugin):
 
                 # Use to_thread for blocking R2 spawning
                 session = await asyncio.to_thread(R2Session, file_path)
+                # IMPORTANT: R2Session(file_path) does NOT open the file automatically.
+                # We must explicitly open it, otherwise all Radare2_* tools will fail
+                # with is_open == False (and Radare2_open_file always returns R2_OPEN_FAILED).
+                opened = await asyncio.to_thread(session.open, file_path)
+                if not opened:
+                    raise ValueError(session.last_error or "Failed to open file with r2pipe")
 
                 # 4. Store session
                 self._sessions[session.session_id] = session
