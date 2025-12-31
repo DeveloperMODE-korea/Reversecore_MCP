@@ -12,11 +12,12 @@ import re
 import uuid
 from datetime import datetime
 from functools import lru_cache
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 # Lazy import for r2pipe to allow tests to run without it
 try:
     import r2pipe
+
     R2PIPE_AVAILABLE = True
 except ImportError:
     r2pipe = None  # type: ignore
@@ -50,15 +51,23 @@ _BLOCKED_R2_COMMANDS = frozenset(
         "!",  # Shell escape
         "#!",  # Alternative shell
         "=!",  # Remote shell
+        "=h",  # HTTP server
+        "=H",  # HTTP server (alt)
         "o+",  # Open for write
         "w",  # Write
         "wa",  # Write assembly
         "wb",  # Write bytes
         "wc",  # Write comment (file modification)
         "wf",  # Write file
+        "wo",  # Write operations
+        "wx",  # Write hex
+        "wv",  # Write value
+        "wd",  # Write dword
         "Ps",  # Project save (can overwrite)
         "rm",  # Remove (radare2 built-in)
         "r2pm",  # Package manager
+        "L",  # Load plugin (potential code exec)
+        ".",  # Interpret script
     }
 )
 
@@ -169,6 +178,8 @@ def _sanitize_for_r2_cmd(value: str) -> str:
 class R2Session:
     """
     Manages a radare2 session with enhanced state tracking and diagnostics.
+
+    Includes asyncio.Lock for thread-safe command execution in async contexts.
     """
 
     def __init__(self, file_path: str | None = None):
@@ -180,6 +191,10 @@ class R2Session:
         self.status = "initialized"  # initialized, active, error, closed
         self.last_error = None
         self.retry_count = 0
+        # Async lock for safe concurrent command execution
+        import asyncio
+
+        self._command_lock = asyncio.Lock()
 
     def open(self, file_path: str) -> bool:
         """Open a binary file with radare2."""
@@ -188,7 +203,7 @@ class R2Session:
             self.last_error = "r2pipe module not installed"
             logger.error("r2pipe module not available - install with: pip install r2pipe")
             return False
-        
+
         try:
             self.close()
             # Verify file exists strictly before passing to r2
@@ -241,6 +256,29 @@ class R2Session:
             self.last_error = str(e)
             logger.error(f"R2 JSON command failed: {e}")
             return None
+
+    async def safe_cmd(self, command: str) -> str:
+        """
+        Execute a radare2 command with session-level locking.
+
+        This method is safe for concurrent async access and prevents
+        command interleaving when multiple coroutines use the same session.
+        """
+        import asyncio
+
+        async with self._command_lock:
+            return await asyncio.to_thread(self.cmd, command)
+
+    async def safe_cmdj(self, command: str) -> Any:
+        """
+        Execute a radare2 JSON command with session-level locking.
+
+        This method is safe for concurrent async access.
+        """
+        import asyncio
+
+        async with self._command_lock:
+            return await asyncio.to_thread(self.cmdj, command)
 
     def analyze(self, level: int = 2) -> str:
         """Run analysis with specified depth level."""

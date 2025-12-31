@@ -188,7 +188,7 @@ async def _cleanup_old_files():
 
             # Only scan tmp folder - never touch user's analysis files in workspace root
             # This prevents accidental deletion of important binary files
-            targets = [workspace / "tmp"]
+            targets = [workspace / "tmp", workspace / "uploads"]
 
             for target_dir in targets:
                 if not target_dir.exists():
@@ -228,9 +228,57 @@ async def _validate_file_magic(file_path: str, filename: str):
 
     prevents malicious renaming (e.g. malware.exe -> report.pdf).
     """
+    ext = filename.lower().split(".")[-1] if "." in filename else ""
+    is_safe_ext = ext in [
+        "txt",
+        "pdf",
+        "json",
+        "yml",
+        "yaml",
+        "md",
+        "csv",
+        "log",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+    ]
+
     if not magic:
-        logger.warning("python-magic not installed. Skipping content validation.")
-        return
+        # Fallback: Check magic headers manually when python-magic is unavailable
+        logger.warning("python-magic not installed. Using fallback header validation.")
+        try:
+            async with aiofiles.open(file_path, "rb") as f:
+                header = await f.read(8)
+
+            # Known executable headers
+            EXECUTABLE_HEADERS = [
+                (b"MZ", "DOS/PE executable"),
+                (b"\x7fELF", "ELF executable"),
+                (b"\xca\xfe\xba\xbe", "Mach-O universal"),
+                (b"\xcf\xfa\xed\xfe", "Mach-O 64-bit"),
+                (b"\xce\xfa\xed\xfe", "Mach-O 32-bit"),
+                (b"\xfe\xed\xfa\xce", "Mach-O 32-bit (BE)"),
+                (b"\xfe\xed\xfa\xcf", "Mach-O 64-bit (BE)"),
+            ]
+
+            for magic_bytes, desc in EXECUTABLE_HEADERS:
+                if header.startswith(magic_bytes):
+                    if is_safe_ext:
+                        import os
+
+                        new_path = file_path + ".dangerous"
+                        os.rename(file_path, new_path)
+                        raise ValueError(
+                            f"Security Alert: File {filename} contains {desc} code but has safe extension. Renamed to .dangerous"
+                        )
+                    return  # Executable with executable extension is OK
+            return  # No executable header found
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.warning(f"Fallback magic validation failed: {e}")
+            return
 
     try:
         # Get MIME type from content
@@ -580,14 +628,14 @@ def main():
                 return filename or "unnamed_file"
 
             try:
-                # Ensure workspace exists
-                workspace = settings.workspace
-                workspace.mkdir(parents=True, exist_ok=True)
+                # Ensure uploads directory exists (separate from workspace root)
+                upload_dir = settings.workspace / "uploads"
+                upload_dir.mkdir(parents=True, exist_ok=True)
 
                 # SECURITY: Sanitize filename and add UUID prefix to prevent overwrites
                 original_filename = file.filename or "unnamed"
                 safe_filename = f"{uuid.uuid4().hex[:8]}_{_secure_filename(original_filename)}"
-                file_path = workspace / safe_filename
+                file_path = upload_dir / safe_filename
 
                 # PERFORMANCE: Use aiofiles for non-blocking async I/O
                 # This prevents blocking the event loop during large file uploads
@@ -666,7 +714,9 @@ def main():
             logger.warning(f"Failed to setup rate limiting: {e}")
 
         # Run uvicorn with the FastMCP HTTP app
-        uvicorn.run(app, host="0.0.0.0", port=8000)
+        # IMPORTANT: workers=1 is required because R2 sessions are stored in-memory
+        # and not shareable across worker processes
+        uvicorn.run(app, host="0.0.0.0", port=8000, workers=1)
     else:
         # Stdio transport mode for local AI clients (default)
         # Rate limiting not needed for stdio mode (single client)
