@@ -67,17 +67,23 @@ def test_server_main_http(monkeypatch, tmp_path):
 
     reload_settings()
 
-    # Mock uvicorn module before import
+    # Mock uvicorn module before import using MagicMock
+    # MagicMock automatically handles any attribute access
+    from unittest.mock import MagicMock
+
     called = {"uvicorn_run": False}
 
-    class _Uvicorn:
-        @staticmethod
-        def run(app, host: str = None, port: int = None):
-            called["uvicorn_run"] = True
-            called["host"] = host
-            called["port"] = port
+    mock_uvicorn = MagicMock()
 
-    monkeypatch.setitem(sys.modules, "uvicorn", _Uvicorn)
+    def mock_run(app, host: str = None, port: int = None, **kwargs):
+        called["uvicorn_run"] = True
+        called["host"] = host
+        called["port"] = port
+
+    mock_uvicorn.run = mock_run
+
+    monkeypatch.setitem(sys.modules, "uvicorn", mock_uvicorn)
+    monkeypatch.setitem(sys.modules, "uvicorn.server", mock_uvicorn.server)
 
     # Ensure fresh import
     sys.modules.pop("server", None)
